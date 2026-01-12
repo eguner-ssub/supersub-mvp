@@ -1,0 +1,219 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Calendar, Zap, Coins, Loader2 } from 'lucide-react';
+import { useGame } from '../context/GameContext'; 
+import MobileLayout from '../components/MobileLayout';
+
+const MatchHub = () => {
+  const navigate = useNavigate();
+  const { userProfile } = useGame(); 
+
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // 🔴 PASTE YOUR KEY HERE 🔴
+  const API_KEY = '30794d0a4f876d85ca02f3671bd49dfc'; 
+  
+  const LEAGUE_ID = 39; // Premier League
+  const SEASON = 2024;  // Switched to Previous Season (2024-2025)
+  const ROUND = "Regular Season - 22"; 
+
+  useEffect(() => {
+    const fetchMatches = async () => {
+      if (API_KEY === 'YOUR_API_KEY_HERE') {
+        setLoading(false);
+        setError("Missing API Key");
+        return;
+      }
+
+      try {
+        // Fetching by specific Round for Season 2024
+        const response = await fetch(
+          `https://v3.football.api-sports.io/fixtures?league=${LEAGUE_ID}&season=${SEASON}&round=${encodeURIComponent(ROUND)}`, 
+          {
+            method: "GET",
+            headers: {
+              "x-apisports-key": API_KEY 
+            }
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.errors && Object.keys(data.errors).length > 0) {
+          console.error("API Error Details:", data.errors);
+          const msg = Object.values(data.errors)[0]; 
+          throw new Error(msg || "API refused connection");
+        }
+        
+        // Sort matches by Date
+        const sortedMatches = (data.response || []).sort((a, b) => 
+          new Date(a.fixture.date) - new Date(b.fixture.date)
+        );
+
+        setMatches(sortedMatches);
+        setLoading(false);
+
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setError(err.message || "Could not load matches.");
+        setLoading(false);
+      }
+    };
+
+    fetchMatches();
+  }, []);
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short', 
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (dateString) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
+  const userData = userProfile || { energy: 3, maxEnergy: 3, coins: 0, name: "Loading..." };
+
+  return (
+    <MobileLayout bgImage="/bg-stadium.png"> 
+      
+      <div className="w-full h-full flex flex-col relative font-sans select-none">
+        
+        {/* HEADER */}
+        <div className="absolute top-0 left-0 w-full p-4 pt-4 flex justify-between items-center z-30 pointer-events-none">
+          <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg pointer-events-auto">
+            <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+            <span className="text-white font-bold text-sm">{userData.energy}/{userData.maxEnergy}</span>
+          </div>
+
+          <div className="absolute left-1/2 -translate-x-1/2 text-white text-xl font-black uppercase tracking-widest drop-shadow-md">
+            {userData.name}
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg pointer-events-auto">
+            <Coins className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+            <span className="text-white font-bold text-sm">{userData.coins}</span>
+          </div>
+        </div>
+
+        {/* BACK BUTTON */}
+        <div className="absolute top-14 left-4 z-20">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center justify-center w-10 h-10 bg-black/60 rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-all active:scale-95 shadow-lg group"
+          >
+            <ArrowLeft className="w-5 h-5 text-white/70 group-hover:text-white" />
+          </button>
+        </div>
+
+        {/* MATCH LIST CONTAINER */}
+        <div className="flex-1 overflow-y-auto space-y-2 pt-24 pb-20 px-0 no-scrollbar">
+          
+          {/* HEADER FOR ROUND */}
+          <div className="px-1 mb-2 text-center">
+             <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
+                Season 2024 • Week 22
+             </span>
+          </div>
+
+          {loading && (
+            <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
+              <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
+              <p className="text-xs uppercase tracking-widest">Loading History...</p>
+            </div>
+          )}
+
+          {!loading && error && (
+             <div className="text-center p-6 bg-red-900/50 mx-4 rounded-xl border border-red-500/30">
+               <p className="text-red-200 text-sm mb-2 font-bold">Connection Failed</p>
+               <p className="text-xs text-red-100">{error}</p>
+             </div>
+          )}
+
+          {!loading && !error && matches.length === 0 && (
+             <div className="text-center p-6 bg-gray-800/50 mx-4 rounded-xl border border-gray-700">
+               <p className="text-gray-300 text-sm">No matches found for this week.</p>
+             </div>
+          )}
+
+          {!loading && !error && matches.map((matchData) => {
+            const { fixture, teams, goals } = matchData;
+            
+            return (
+              <button
+                key={fixture.id}
+                onClick={() => navigate(`/match/${fixture.id}`)}
+                className="w-full group relative overflow-hidden rounded-lg border-y border-white/10 bg-gray-900/85 transition-all active:bg-gray-800"
+              >
+                <div className="relative p-3 flex items-center justify-between">
+                  
+                  {/* HOME TEAM */}
+                  <div className="flex flex-col items-center gap-1 w-1/3">
+                    <img 
+                      src={teams.home.logo} 
+                      alt={teams.home.name} 
+                      className="w-8 h-8 object-contain drop-shadow-md"
+                    />
+                    <span className="text-white font-bold text-[10px] uppercase tracking-tight leading-none text-center truncate w-full">
+                      {teams.home.name}
+                    </span>
+                  </div>
+
+                  {/* STATUS / SCORE */}
+                  <div className="flex flex-col items-center justify-center w-1/3 space-y-0.5">
+                    {/* Check for Completed Statuses */}
+                    {['FT', 'AET', 'PEN'].includes(fixture.status.short) ? (
+                      <>
+                        <div className="text-2xl font-black text-white tracking-widest font-mono">
+                          {goals.home}-{goals.away}
+                        </div>
+                        <span className="text-[9px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-1.5 py-0.5 rounded">
+                          {fixture.status.short}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-xl font-black text-gray-200 tracking-wider font-mono">
+                          {formatTime(fixture.date)}
+                        </div>
+                        <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500 uppercase tracking-wide bg-white/5 px-1.5 py-0.5 rounded">
+                          <Calendar className="w-2.5 h-2.5" />
+                          {formatDate(fixture.date)}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* AWAY TEAM */}
+                  <div className="flex flex-col items-center gap-1 w-1/3">
+                     <img 
+                      src={teams.away.logo} 
+                      alt={teams.away.name} 
+                      className="w-8 h-8 object-contain drop-shadow-md"
+                    />
+                    <span className="text-white font-bold text-[10px] uppercase tracking-tight leading-none text-center truncate w-full">
+                      {teams.away.name}
+                    </span>
+                  </div>
+
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </MobileLayout>
+  );
+};
+
+export default MatchHub;

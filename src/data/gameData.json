@@ -1,0 +1,159 @@
+{
+  "cardTypes": [
+    { "id": "c_match_result", "name": "Match Result", "value": 1, "desc": "Predict the Winner" },
+    { "id": "c_total_goals", "name": "Total Goals", "value": 2, "desc": "Predict Over/Under" },
+    { "id": "c_player_score", "name": "Player Scorer", "value": 3, "desc": "Predict a Goalscorer" }
+  ],
+  "teams": [
+    { 
+      "id": 40, 
+      "name": "Liverpool", 
+      "short": "LIV",
+      "logo": "https://media.api-sports.io/football/teams/40.png",
+      "color": "bg-red-700" 
+    },
+    { 
+      "id": 49, 
+      "name": "Chelsea", 
+      "short": "CHE",
+      "logo": "https://media.api-sports.io/football/teams/49.png",
+      "color": "bg-blue-700" 
+    },
+    { 
+      "id": 50, 
+      "name": "Man City", 
+      "short": "MCI",
+      "logo": "https://media.api-sports.io/football/teams/50.png",
+      "color": "bg-sky-500" 
+    },
+    { 
+      "id": 42, 
+      "name": "Arsenal", 
+      "short": "ARS",
+      "logo": "https://media.api-sports.io/football/teams/42.png",
+      "color": "bg-red-600" 
+    },
+    { 
+      "id": 33, 
+      "name": "Man Utd", 
+      "short": "MUN",
+      "logo": "https://media.api-sports.io/football/teams/33.png",
+      "color": "bg-red-800" 
+    },
+    { 
+      "id": 47, 
+      "name": "Tottenham", 
+      "short": "TOT",
+      "logo": "https://media.api-sports.io/football/teams/47.png",
+      "color": "bg-gray-100" 
+    }
+  ],
+  "matches": [
+    {
+      "matchId": "m_101",
+      "homeTeamId": 40,
+      "awayTeamId": 49,
+      "kickoff": "2026-05-20T15:00:00",
+      "venue": "Anfield",
+      "odds": { "home": 2.10, "draw": 3.40, "away": 3.20 }
+    },
+    {
+      "matchId": "m_102",
+      "homeTeamId": 50,
+      "awayTeamId": 47,
+      "kickoff": "2026-05-21T17:30:00",
+      "venue": "Etihad Stadium",
+      "odds": { "home": 1.45, "draw": 4.50, "away": 6.50 }
+    },
+    {
+      "matchId": "m_103",
+      "homeTeamId": 42,
+      "awayTeamId": 33,
+      "kickoff": "2026-05-22T20:00:00",
+      "venue": "Emirates Stadium",
+      "odds": { "home": 1.95, "draw": 3.60, "away": 3.80 }
+    }
+  ],
+  "trainingQuestions": [
+    {
+      "qId": 101,
+      "category": "History",
+      "difficulty": "Medium",
+      "text": "Which nation won the first ever FIFA World Cup in 1930?",
+      "options": ["Brazil", "Uruguay", "Italy", "Argentina"],
+      "correctIndex": 1
+    },
+    {
+      "qId": 102,
+      "category": "Records",
+      "difficulty": "Hard",
+      "text": "Who holds the record for most goals in a 38-game Premier League season?",
+      "options": ["Alan Shearer", "Erling Haaland", "Mohamed Salah", "Harry Kane"],
+      "correctIndex": 1
+    },
+    {
+      "qId": 103,
+      "category": "Tactics",
+      "difficulty": "Hard",
+      "text": "In a 'False 9' formation, which position drops deep into midfield?",
+      "options": ["Center Back", "Winger", "Center Forward", "Defensive Midfielder"],
+      "correctIndex": 2
+    },
+    {
+      "qId": 104,
+      "category": "Rules",
+      "difficulty": "Medium",
+      "text": "What is the max number of substitutions allowed in a standard match?",
+      "options": ["3", "4", "5", "6"],
+      "correctIndex": 2
+    },
+    {
+      "qId": 105,
+      "category": "Players",
+      "difficulty": "Hard",
+      "text": "Which player has won the most Ballon d'Or awards in history?",
+      "options": ["Cristiano Ronaldo", "Lionel Messi", "Johan Cruyff", "Michel Platini"],
+      "correctIndex": 1
+    },
+    {
+      "qId": 106,
+      "category": "History",
+      "difficulty": "Legendary",
+      "text": "Which is the only club to win a 'Golden' Premier League trophy?",
+      "options": ["Man Utd", "Liverpool", "Arsenal", "Chelsea"],
+      "correctIndex": 2
+    },
+    {
+      "qId": 107,
+      "category": "Tactics",
+      "difficulty": "Medium",
+      "text": "What is the primary goal of 'Gegenpressing'?",
+      "options": ["Park the bus", "Possess the ball", "Win ball back immediately", "Long balls"],
+      "correctIndex": 2
+    },
+    {
+      "qId": 108,
+      "category": "Records",
+      "difficulty": "Legendary",
+      "text": "Who is the all-time top scorer of the UEFA Champions League?",
+      "options": ["Lionel Messi", "Robert Lewandowski", "Karim Benzema", "Cristiano Ronaldo"],
+      "correctIndex": 3
+    },
+    {
+      "qId": 109,
+      "category": "Rules",
+      "difficulty": "Hard",
+      "text": "A goalkeeper handles the ball outside the box to deny a goal. Ruling?",
+      "options": ["Yellow Card", "Red Card", "Warning", "Penalty Kick"],
+      "correctIndex": 1
+    },
+    {
+      "qId": 110,
+      "category": "Players",
+      "difficulty": "Medium",
+      "text": "Zlatan Ibrahimović has NOT played for which of these clubs?",
+      "options": ["Barcelona", "Juventus", "Bayern Munich", "AC Milan"],
+      "correctIndex": 2
+    }
+  ]
+}
