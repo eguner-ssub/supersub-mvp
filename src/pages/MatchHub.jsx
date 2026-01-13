@@ -12,32 +12,24 @@ const MatchHub = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 🔴 PASTE YOUR KEY HERE 🔴
-  const API_KEY = '30794d0a4f876d85ca02f3671bd49dfc'; 
-  
-  const LEAGUE_ID = 39; // Premier League
-  const SEASON = 2024;  // Switched to Previous Season (2024-2025)
+  // CONFIG: We still define what we want, but we don't need the Key here anymore.
+  const LEAGUE_ID = 39; 
+  const SEASON = 2024;  
   const ROUND = "Regular Season - 22"; 
 
   useEffect(() => {
     const fetchMatches = async () => {
-      if (API_KEY === 'YOUR_API_KEY_HERE') {
-        setLoading(false);
-        setError("Missing API Key");
-        return;
-      }
-
       try {
-        // Fetching by specific Round for Season 2024
+        // --- THE CHANGE IS HERE ---
+        // Old: https://v3.football.api-sports.io/... (Insecure)
+        // New: /api/matches (Secure Proxy)
         const response = await fetch(
-          `https://v3.football.api-sports.io/fixtures?league=${LEAGUE_ID}&season=${SEASON}&round=${encodeURIComponent(ROUND)}`, 
-          {
-            method: "GET",
-            headers: {
-              "x-apisports-key": API_KEY 
-            }
-          }
+          `/api/matches?league=${LEAGUE_ID}&season=${SEASON}&round=${encodeURIComponent(ROUND)}`
         );
+
+        if (!response.ok) {
+            throw new Error(`Server Error: ${response.status}`);
+        }
 
         const data = await response.json();
 
@@ -171,7 +163,6 @@ const MatchHub = () => {
 
                   {/* STATUS / SCORE */}
                   <div className="flex flex-col items-center justify-center w-1/3 space-y-0.5">
-                    {/* Check for Completed Statuses */}
                     {['FT', 'AET', 'PEN'].includes(fixture.status.short) ? (
                       <>
                         <div className="text-2xl font-black text-white tracking-widest font-mono">

@@ -1,107 +1,93 @@
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { ArrowLeft, Settings as SettingsIcon, Plus } from 'lucide-react';
+import { ArrowLeft, LogOut, User, Mail, Shield, ChevronRight } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
 
 const Settings = () => {
-  const { refillEnergy, addCard } = useGame(); 
   const navigate = useNavigate();
+  const { userProfile, supabase } = useGame();
 
-  const handleRefillEnergy = () => {
-    refillEnergy();
-    alert('Energy Refilled to Max');
-  };
-
-  const handleResetSaveData = () => {
-    if (confirm('Are you sure you want to reset all save data? This cannot be undone.')) {
-      localStorage.clear();
-      window.location.reload();
+  const handleLogout = async () => {
+    try {
+      // 1. Tell Supabase to kill the session
+      await supabase.auth.signOut();
+      // 2. The GameContext listener will detect this automatically
+      // 3. App.jsx will see userProfile is null and kick you to /login
+    } catch (error) {
+      console.error('Error logging out:', error);
     }
-  };
-
-  // REALITY CHECK: Updated to match Dashboard.jsx exactly
-  const cardTypes = [
-    { id: 'c_match_result', label: 'Match Result' },
-    { id: 'c_total_goals', label: 'Total Goals' },
-    { id: 'c_player_score', label: 'Player Score' },
-    { id: 'c_supersub', label: 'Super Sub' }, // UPDATED
-  ];
-
-  const handleAddCard = (card) => {
-    addCard(card.id);
-    console.log(`Added ${card.label}`);
-    // Optional: Visual feedback
-    alert(`Added 1x ${card.label} to Inventory`);
   };
 
   return (
     <MobileLayout>
-      <div className="bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-700 h-full overflow-y-auto">
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="mb-4 flex items-center gap-2 text-gray-400 hover:text-white"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back</span>
-        </button>
-
-        <div className="flex items-center gap-3 mb-6">
-          <SettingsIcon className="w-6 h-6 text-white" />
-          <h1 className="text-2xl font-bold text-white">Settings</h1>
+      <div className="flex flex-col h-full bg-black text-white font-sans">
+        
+        {/* Header */}
+        <div className="p-4 pt-6 flex items-center gap-4 border-b border-gray-800 bg-gray-900">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="p-2 -ml-2 rounded-full hover:bg-gray-800 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h1 className="text-xl font-bold">Settings</h1>
         </div>
 
-        <div className="space-y-6">
+        {/* Content */}
+        <div className="p-4 space-y-6">
           
-          {/* DEVELOPER TOOLS SECTION */}
-          <div className="border-2 border-red-500/50 bg-red-500/5 rounded-xl p-4 space-y-4">
-            <h2 className="text-sm font-bold text-red-400 uppercase tracking-widest mb-4 border-b border-red-500/20 pb-2">
-              Developer Console
-            </h2>
-            
-            {/* Energy Tools */}
-            <div className="space-y-2">
-              <p className="text-xs text-gray-400 font-bold uppercase">Game State</p>
-              <button
-                onClick={handleRefillEnergy}
-                className="w-full flex items-center justify-between px-4 py-3 bg-gray-700/50 hover:bg-gray-700 border border-white/5 hover:border-white/20 text-white font-semibold rounded-lg transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">⚡</span>
-                  <span>Refill Energy</span>
-                </div>
-              </button>
-
-              <button
-                onClick={handleResetSaveData}
-                className="w-full flex items-center justify-between px-4 py-3 bg-red-900/20 hover:bg-red-900/40 border border-red-500/30 hover:border-red-500 text-red-200 font-semibold rounded-lg transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">🗑️</span>
-                  <span>Wipe Save Data</span>
-                </div>
-              </button>
+          {/* Profile Card */}
+          <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-4 border border-gray-700">
+            <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center border border-gray-600">
+              <User className="w-6 h-6 text-gray-400" />
             </div>
-
-            {/* CARD INJECTOR */}
-            <div className="space-y-2 pt-2">
-              <p className="text-xs text-gray-400 font-bold uppercase">Inject Cards (Inventory)</p>
-              <div className="grid grid-cols-2 gap-2">
-                {cardTypes.map((card) => (
-                  <button
-                    key={card.id}
-                    onClick={() => handleAddCard(card)}
-                    className="flex flex-col items-center justify-center gap-1 p-3 bg-gray-700/50 hover:bg-blue-600 border border-white/5 hover:border-blue-400 rounded-lg transition-all active:scale-95 group"
-                  >
-                    <Plus className="w-4 h-4 text-gray-400 group-hover:text-white" />
-                    <span className="text-xs font-medium text-gray-300 group-hover:text-white text-center">
-                      {card.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
+            <div className="overflow-hidden">
+              <p className="text-sm text-gray-400 uppercase tracking-wider font-bold">Manager Profile</p>
+              <p className="text-white font-semibold truncate">{userProfile?.email || "Unknown"}</p>
             </div>
-
           </div>
+
+          {/* Account Section */}
+          <div>
+            <h2 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2 pl-2">Account</h2>
+            <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+              
+              <div className="flex items-center justify-between p-4 border-b border-gray-800">
+                <div className="flex items-center gap-3">
+                  <Mail className="w-5 h-5 text-blue-500" />
+                  <span className="text-sm font-medium">Email</span>
+                </div>
+                <span className="text-xs text-gray-500">{userProfile?.email}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <Shield className="w-5 h-5 text-emerald-500" />
+                  <span className="text-sm font-medium">Status</span>
+                </div>
+                <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded">Active</span>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Danger Zone */}
+          <button 
+            onClick={handleLogout}
+            className="w-full bg-red-500/10 hover:bg-red-500/20 active:scale-95 border border-red-500/30 text-red-500 p-4 rounded-xl flex items-center justify-between transition-all group mt-8"
+          >
+            <div className="flex items-center gap-3">
+              <LogOut className="w-5 h-5" />
+              <span className="font-bold">Log Out</span>
+            </div>
+            <ChevronRight className="w-5 h-5 opacity-50 group-hover:translate-x-1 transition-transform" />
+          </button>
+
+          <p className="text-center text-gray-600 text-xs mt-4">
+            Supersub v1.0.0 (MVP)
+          </p>
+
         </div>
       </div>
     </MobileLayout>
