@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useGame } from '../context/GameContext'; 
 import { Zap, Coins, Cone, Trophy, ShoppingBag, X } from 'lucide-react'; 
 // Assuming you have the JSON available via import
-import gameData from '../data/GameData.json';
+import gameData from '../data/gameData.json';
 
 export default function Dashboard() {
   const navigate = useNavigate(); 

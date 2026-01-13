@@ -9,94 +9,169 @@ export const GameProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- 1. AUTH & LOAD LOGIC ---
+  // --- 1. INITIAL LOAD & AUTH LISTENER ---
   useEffect(() => {
+    // Check active session immediately
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) loadProfile(session.user);
-      else setLoading(false);
+      if (session) {
+        await loadProfile(session.user);
+      } else {
+        setLoading(false);
+      }
     };
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) loadProfile(session.user);
-      else {
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session) {
+        await loadProfile(session.user);
+      } else {
         setUserProfile(null);
         setLoading(false);
       }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
-  const loadProfile = (user) => {
-    const savedData = localStorage.getItem('superSubProfile');
-    if (savedData) {
-      setUserProfile({ ...JSON.parse(savedData), id: user.id, email: user.email });
-    } else {
-      setUserProfile({ id: user.id, email: user.email, club_name: null });
+  // --- 2. LOAD PROFILE (FROM DB) ---
+  const loadProfile = async (user) => {
+    try {
+      // A. Fetch Profile Stats
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Error loading profile:', profileError);
+      }
+
+      // B. Fetch Inventory
+      const { data: inventoryData, error: invError } = await supabase
+        .from('inventory')
+        .select('card_id')
+        .eq('user_id', user.id);
+
+      if (profileData) {
+        // MERGE DB DATA INTO STATE
+        setUserProfile({
+          ...profileData,
+          email: user.email,
+          inventory: inventoryData ? inventoryData.map(i => i.card_id) : []
+        });
+      } else {
+        // User exists in Auth but not in 'profiles' table yet (needs Onboarding)
+        setUserProfile({ 
+          id: user.id, 
+          email: user.email, 
+          club_name: null // Triggers Onboarding flow
+        });
+      }
+    } catch (error) {
+      console.error('Load Profile Fatal Error:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  // --- 2. PROFILE CREATION ---
-  const createProfile = (managerName) => {
+  // --- 3. CREATE PROFILE (ONBOARDING) ---
+  const createProfile = async (managerName) => {
+    if (!userProfile?.id) return;
+
     const newProfile = {
-      ...userProfile,
+      id: userProfile.id, // Links to Auth User
       name: managerName,
       club_name: `${managerName}'s FC`,
       coins: 500,
       energy: 3,
-      maxEnergy: 5,
-      inventory: ['c_match_result', 'c_total_goals', 'c_player_score'],
-      createdAt: new Date().toISOString()
+      max_energy: 5,
+      // We don't store inventory in 'profiles' table, we use 'inventory' table
     };
-    saveProfile(newProfile);
+
+    // 1. Insert into DB
+    const { error } = await supabase.from('profiles').insert([newProfile]);
+
+    if (error) {
+      console.error('Error creating profile:', error);
+      return;
+    }
+
+    // 2. Add Starter Cards
+    const starterCards = ['c_match_result', 'c_total_goals', 'c_player_score'];
+    await updateInventory(starterCards);
+
+    // 3. Update State
+    setUserProfile({
+      ...newProfile,
+      email: userProfile.email,
+      inventory: starterCards
+    });
   };
 
-  // --- 3. GAME LOGIC (The Missing Links) ---
+  // --- 4. GAME ACTIONS (DB WRITES) ---
 
-  // Helper to save state + localStorage
-  const saveProfile = (profile) => {
-    setUserProfile(profile);
-    localStorage.setItem('superSubProfile', JSON.stringify(profile));
-  };
-
-  // FIX FOR TRAINING: Consumes Energy
-  const spendEnergy = (amount) => {
+  const spendEnergy = async (amount) => {
     if (!userProfile) return;
-    const newProfile = { 
-      ...userProfile, 
-      energy: Math.max(0, userProfile.energy - amount) 
-    };
-    saveProfile(newProfile);
+    
+    const newEnergy = Math.max(0, userProfile.energy - amount);
+    
+    // Optimistic UI Update (Instant)
+    setUserProfile(prev => ({ ...prev, energy: newEnergy }));
+
+    // DB Update (Background)
+    const { error } = await supabase
+      .from('profiles')
+      .update({ energy: newEnergy })
+      .eq('id', userProfile.id);
+
+    if (error) console.error('Failed to sync energy:', error);
   };
 
-  // FIX FOR TRAINING: Adds a single card
-  const addCard = (cardId) => {
+  const addCard = async (cardId) => {
     if (!userProfile) return;
-    const newProfile = {
-      ...userProfile,
-      inventory: [...userProfile.inventory, cardId]
-    };
-    saveProfile(newProfile);
+
+    // Optimistic UI Update
+    setUserProfile(prev => ({
+      ...prev,
+      inventory: [...(prev.inventory || []), cardId]
+    }));
+
+    // DB Insert
+    const { error } = await supabase
+      .from('inventory')
+      .insert([{ user_id: userProfile.id, card_id: cardId }]);
+
+    if (error) console.error('Failed to add card:', error);
   };
 
-  // Existing bulk update (for opening bags)
-  const updateInventory = (newCardIds) => {
+  const updateInventory = async (newCardIds) => {
     if (!userProfile) return;
-    const newProfile = {
-      ...userProfile,
-      inventory: [...userProfile.inventory, ...newCardIds]
-    };
-    saveProfile(newProfile);
+
+    // Optimistic UI
+    setUserProfile(prev => ({
+      ...prev,
+      inventory: [...(prev.inventory || []), ...newCardIds]
+    }));
+
+    // DB Bulk Insert
+    const rows = newCardIds.map(cid => ({
+      user_id: userProfile.id,
+      card_id: cid
+    }));
+
+    const { error } = await supabase.from('inventory').insert(rows);
+    if (error) console.error('Failed to update inventory:', error);
   };
 
   const value = {
     userProfile,
     loading,
     createProfile,
-    spendEnergy,    // Now exposed to Training.jsx
-    addCard,        // Now exposed to Training.jsx
+    spendEnergy,
+    addCard,
     updateInventory
   };
 
