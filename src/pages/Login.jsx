@@ -1,75 +1,123 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Mail, Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, Key } from 'lucide-react';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState(null); // For errors or magic link success
+  const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  // Option 1: Password Login
+  const handlePasswordLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
-    // Supabase Magic Link Logic
-    const { error } = await supabase.auth.signInWithOtp({
+    setMessage(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      options: {
-        // IMPORTANT: This URL must be allowed in your Supabase Auth settings
-        emailRedirectTo: window.location.origin, 
-      },
+      password,
     });
 
     if (error) {
-      alert(error.message);
+      setMessage({ type: 'error', text: error.message });
+      setLoading(false);
     } else {
-      setSent(true);
+      navigate('/dashboard');
+    }
+  };
+
+  // Option 2: Magic Link Login
+  const handleMagicLink = async () => {
+    if (!email) {
+      setMessage({ type: 'error', text: 'Please enter your email first.' });
+      return;
+    }
+    setLoading(true);
+    setMessage(null);
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: 'https://supersub.mobi' },
+    });
+
+    if (error) {
+      setMessage({ type: 'error', text: error.message });
+    } else {
+      setMessage({ type: 'success', text: 'Magic link sent! Check your email.' });
     }
     setLoading(false);
   };
 
-  if (sent) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6 text-center">
-        <div className="max-w-md w-full bg-gray-800 p-8 rounded-2xl border border-gray-700">
-           <Mail className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-           <h2 className="text-2xl font-bold text-white mb-2">Check your email</h2>
-           <p className="text-gray-400">We sent a magic link to <span className="text-white font-mono">{email}</span>.</p>
-           <p className="text-gray-500 text-sm mt-4">Click the link in the email to sign in.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute top-0 left-0 w-full h-full bg-[url('/bg-stadium.png')] bg-cover opacity-20 z-0"></div>
-      
-      <div className="w-full max-w-sm z-10">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-black text-white italic tracking-tighter">SUPERSUB</h1>
-          <p className="text-yellow-500 font-bold tracking-widest text-xs uppercase mt-1">Manager Access</p>
+    <div className="min-h-screen bg-black text-white p-4 flex flex-col justify-center">
+      <div className="max-w-md w-full mx-auto space-y-6">
+        <Link to="/" className="text-gray-400 hover:text-white flex items-center gap-2 mb-8">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </Link>
+
+        <div>
+          <h2 className="text-3xl font-black italic mb-2">WELCOME BACK</h2>
+          <p className="text-gray-400">Login to access your dashboard.</p>
         </div>
 
-        <form onSubmit={handleLogin} className="bg-gray-900/80 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
-          <input 
-            type="email" 
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-black/50 border border-gray-600 rounded-xl p-4 text-white placeholder-gray-500 focus:border-yellow-500 focus:outline-none transition-colors mb-6"
-            placeholder="pep@city.com"
-          />
+        <form onSubmit={handlePasswordLogin} className="space-y-4">
+          <div>
+            <label className="block text-xs font-mono text-gray-500 mb-1">EMAIL</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-yellow-500"
+              placeholder="you@example.com"
+            />
+          </div>
 
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? <Loader2 className="animate-spin" /> : <>ENTER DUGOUT <ArrowRight className="w-5 h-5" /></>}
-          </button>
+          <div>
+            <label className="block text-xs font-mono text-gray-500 mb-1">PASSWORD</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-yellow-500"
+              placeholder="••••••••"
+            />
+          </div>
+
+          {message && (
+            <div className={`p-3 rounded-lg text-sm ${message.type === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+              {message.text}
+            </div>
+          )}
+
+          <div className="pt-2 space-y-3">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-3 rounded-xl flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Key className="w-4 h-4" /> LOGIN WITH PASSWORD</>}
+            </button>
+
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-zinc-800"></div>
+              <span className="flex-shrink mx-4 text-gray-500 text-xs">OR</span>
+              <div className="flex-grow border-t border-zinc-800"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleMagicLink}
+              disabled={loading}
+              className="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2"
+            >
+              <Mail className="w-4 h-4" /> SEND MAGIC LINK
+            </button>
+          </div>
         </form>
       </div>
     </div>
