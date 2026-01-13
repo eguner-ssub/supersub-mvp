@@ -4,9 +4,10 @@ import { GameProvider, useGame } from './context/GameContext';
 import { Loader2 } from 'lucide-react';
 
 // Pages
-import Landing from './pages/Landing'; // NEW
-import Signup from './pages/Signup';   // NEW
+import Landing from './pages/Landing';
+import Signup from './pages/Signup';
 import Login from './pages/Login';
+import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
 import MatchHub from './pages/MatchHub';
 import MatchDetail from './pages/MatchDetail';
@@ -15,10 +16,10 @@ import Inventory from './pages/Inventory';
 import Settings from './pages/Settings'; 
 
 // --- THE BOUNCER (Security Guard) ---
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, requireOnboarding = true }) => {
   const { userProfile, loading } = useGame();
   
-  // MAGIC LINK CHECK (Keep this!)
+  // MAGIC LINK CHECK
   const isLoggingIn = 
     window.location.hash.includes('access_token') || 
     window.location.search.includes('token=') ||
@@ -32,10 +33,22 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
+  // 1. Not logged in? Get out.
   if (!userProfile) {
     return <Navigate to="/login" replace />;
   }
 
+  // 2. Logged in, but trying to access Dashboard without a Club Name?
+  if (requireOnboarding && !userProfile.club_name) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  // 3. Logged in, HAS a club name, but trying to go to Onboarding?
+  if (!requireOnboarding && userProfile.club_name) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // 4. All good. Enter.
   return children;
 };
 
@@ -47,7 +60,17 @@ const AppRoutes = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
 
-      {/* PROTECTED ROUTES */}
+      {/* ONBOARDING (Protected, but doesn't require club_name yet) */}
+      <Route 
+        path="/onboarding" 
+        element={
+          <ProtectedRoute requireOnboarding={false}>
+            <Onboarding />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* DASHBOARD & GAME (Protected AND requires club_name) */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
       <Route path="/match-hub" element={<ProtectedRoute><MatchHub /></ProtectedRoute>} />
@@ -55,8 +78,8 @@ const AppRoutes = () => {
       <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Fallback logic */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 };

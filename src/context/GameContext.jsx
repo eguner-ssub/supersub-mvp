@@ -1,132 +1,103 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
 const GameContext = createContext();
+
+export const useGame = () => useContext(GameContext);
 
 export const GameProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- 1. DATA TRANSFORMER ---
-  const fetchFullProfile = async (userId) => {
-    try {
-      // Get Profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (profileError) throw profileError;
-
-      // Get Inventory
-      const { data: inventoryData, error: invError } = await supabase
-        .from('inventory')
-        .select('card_id')
-        .eq('user_id', userId);
-
-      if (invError) throw invError;
-
-      const flatInventory = inventoryData.map(item => item.card_id);
-
-      setUserProfile({
-        ...profile,
-        inventory: flatInventory 
-      });
-
-    } catch (err) {
-      console.error("Profile Load Error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- 2. AUTH LISTENER (THE FIX IS HERE) ---
+  // --- 1. AUTH & LOAD LOGIC ---
   useEffect(() => {
-    // Check active session on load
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        fetchFullProfile(session.user.id);
-      } else {
-        // 🔴 CRITICAL FIX:
-        // If there is a "hash" in the URL (access_token), it means Supabase is 
-        // about to log us in. DO NOT turn off loading yet. Wait for the event below.
-        if (!window.location.hash.includes('access_token')) {
-           setLoading(false); 
-        }
-      }
-    });
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) loadProfile(session.user);
+      else setLoading(false);
+    };
+    checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        // We have a user! Fetch their data.
-        await fetchFullProfile(session.user.id);
-        
-        // Handle New User Creation
-        const { data: check } = await supabase.from('profiles').select('id').eq('id', session.user.id).single();
-        if (!check) {
-          await supabase.from('profiles').insert([{ 
-            id: session.user.id,
-            email: session.user.email,
-            username: session.user.email.split('@')[0],
-            energy: 3, 
-            max_energy: 3, 
-            coins: 100 
-          }]);
-          await supabase.from('inventory').insert([{ user_id: session.user.id, card_id: 'c_match_result' }]);
-          fetchFullProfile(session.user.id);
-        }
-      } else {
-        // Only set loading to false if we are SURE there's no pending auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) loadProfile(session.user);
+      else {
         setUserProfile(null);
         setLoading(false);
       }
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- 3. GAME ACTIONS ---
-  const spendEnergy = async (amount) => {
-    if (!userProfile || userProfile.energy < amount) return false;
-    
-    // Optimistic
-    const newEnergy = userProfile.energy - amount;
-    setUserProfile(prev => ({ ...prev, energy: newEnergy }));
-
-    // DB
-    const { error } = await supabase
-      .from('profiles')
-      .update({ energy: newEnergy })
-      .eq('id', userProfile.id);
-
-    if (error) {
-      fetchFullProfile(userProfile.id); 
-      return false;
+  const loadProfile = (user) => {
+    const savedData = localStorage.getItem('superSubProfile');
+    if (savedData) {
+      setUserProfile({ ...JSON.parse(savedData), id: user.id, email: user.email });
+    } else {
+      setUserProfile({ id: user.id, email: user.email, club_name: null });
     }
-    return true;
+    setLoading(false);
   };
 
-  const addCard = async (cardId) => {
+  // --- 2. PROFILE CREATION ---
+  const createProfile = (managerName) => {
+    const newProfile = {
+      ...userProfile,
+      name: managerName,
+      club_name: `${managerName}'s FC`,
+      coins: 500,
+      energy: 3,
+      maxEnergy: 5,
+      inventory: ['c_match_result', 'c_total_goals', 'c_player_score'],
+      createdAt: new Date().toISOString()
+    };
+    saveProfile(newProfile);
+  };
+
+  // --- 3. GAME LOGIC (The Missing Links) ---
+
+  // Helper to save state + localStorage
+  const saveProfile = (profile) => {
+    setUserProfile(profile);
+    localStorage.setItem('superSubProfile', JSON.stringify(profile));
+  };
+
+  // FIX FOR TRAINING: Consumes Energy
+  const spendEnergy = (amount) => {
     if (!userProfile) return;
-    
-    // Optimistic
-    setUserProfile(prev => ({ ...prev, inventory: [...prev.inventory, cardId] }));
+    const newProfile = { 
+      ...userProfile, 
+      energy: Math.max(0, userProfile.energy - amount) 
+    };
+    saveProfile(newProfile);
+  };
 
-    // DB
-    const { error } = await supabase
-      .from('inventory')
-      .insert([{ user_id: userProfile.id, card_id: cardId }]);
+  // FIX FOR TRAINING: Adds a single card
+  const addCard = (cardId) => {
+    if (!userProfile) return;
+    const newProfile = {
+      ...userProfile,
+      inventory: [...userProfile.inventory, cardId]
+    };
+    saveProfile(newProfile);
+  };
 
-    if (error) fetchFullProfile(userProfile.id); 
+  // Existing bulk update (for opening bags)
+  const updateInventory = (newCardIds) => {
+    if (!userProfile) return;
+    const newProfile = {
+      ...userProfile,
+      inventory: [...userProfile.inventory, ...newCardIds]
+    };
+    saveProfile(newProfile);
   };
 
   const value = {
     userProfile,
     loading,
-    spendEnergy,
-    addCard,
-    supabase
+    createProfile,
+    spendEnergy,    // Now exposed to Training.jsx
+    addCard,        // Now exposed to Training.jsx
+    updateInventory
   };
 
   return (
@@ -135,6 +106,3 @@ export const GameProvider = ({ children }) => {
     </GameContext.Provider>
   );
 };
-
-export const useGame = () => useContext(GameContext);
-export default GameContext;

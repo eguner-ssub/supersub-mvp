@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Loader2, ArrowLeft, Mail, Key } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, Key, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState(null); // For errors or magic link success
+  const [showPassword, setShowPassword] = useState(false); // New state
+  const [message, setMessage] = useState(null);
   const navigate = useNavigate();
 
   // Option 1: Password Login
@@ -25,6 +26,7 @@ const Login = () => {
       setMessage({ type: 'error', text: error.message });
       setLoading(false);
     } else {
+      // SUCCESS: Send to Dashboard. The App.jsx 'Bouncer' will check if they need Onboarding.
       navigate('/dashboard');
     }
   };
@@ -78,14 +80,27 @@ const Login = () => {
 
           <div>
             <label className="block text-xs font-mono text-gray-500 mb-1">PASSWORD</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-yellow-500"
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"} // Dynamic type
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-yellow-500 pr-10"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-white transition-colors"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           {message && (
