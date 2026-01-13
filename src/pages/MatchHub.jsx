@@ -12,17 +12,21 @@ const MatchHub = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // CONFIG: We still define what we want, but we don't need the Key here anymore.
-  const LEAGUE_ID = 39; 
+  // CONFIGURATION
+  // In a real app, you might fetch these dynamically or pick them from a dropdown
+  const LEAGUE_ID = 39; // Premier League
   const SEASON = 2024;  
   const ROUND = "Regular Season - 22"; 
 
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        // --- THE CHANGE IS HERE ---
-        // Old: https://v3.football.api-sports.io/... (Insecure)
-        // New: /api/matches (Secure Proxy)
+        setLoading(true);
+        setError(null);
+
+        // --- SECURE API CALL ---
+        // This calls your Vercel Function (api/matches.js)
+        // No API key is exposed here.
         const response = await fetch(
           `/api/matches?league=${LEAGUE_ID}&season=${SEASON}&round=${encodeURIComponent(ROUND)}`
         );
@@ -33,23 +37,24 @@ const MatchHub = () => {
 
         const data = await response.json();
 
+        // Check for internal API errors (like bad plan, rate limit, etc.)
         if (data.errors && Object.keys(data.errors).length > 0) {
           console.error("API Error Details:", data.errors);
           const msg = Object.values(data.errors)[0]; 
           throw new Error(msg || "API refused connection");
         }
         
-        // Sort matches by Date
+        // Sort matches by Date (Ascending)
         const sortedMatches = (data.response || []).sort((a, b) => 
           new Date(a.fixture.date) - new Date(b.fixture.date)
         );
 
         setMatches(sortedMatches);
-        setLoading(false);
 
       } catch (err) {
         console.error("Fetch error:", err);
-        setError(err.message || "Could not load matches.");
+        setError("Could not load matches. Please try again later.");
+      } finally {
         setLoading(false);
       }
     };
@@ -57,6 +62,7 @@ const MatchHub = () => {
     fetchMatches();
   }, []);
 
+  // FORMATTERS
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -74,7 +80,8 @@ const MatchHub = () => {
     });
   };
 
-  const userData = userProfile || { energy: 3, maxEnergy: 3, coins: 0, name: "Loading..." };
+  // Safe Fallback for user data
+  const userData = userProfile || { energy: 3, maxEnergy: 3, coins: 0, name: "Manager" };
 
   return (
     <MobileLayout bgImage="/bg-stadium.png"> 
@@ -114,33 +121,45 @@ const MatchHub = () => {
           {/* HEADER FOR ROUND */}
           <div className="px-1 mb-2 text-center">
              <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
-                Season 2024 • Week 22
+                Premier League • Week 22
              </span>
           </div>
 
+          {/* LOADING STATE */}
           {loading && (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
               <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
-              <p className="text-xs uppercase tracking-widest">Loading History...</p>
+              <p className="text-xs uppercase tracking-widest">Scouting Fixtures...</p>
             </div>
           )}
 
+          {/* ERROR STATE */}
           {!loading && error && (
              <div className="text-center p-6 bg-red-900/50 mx-4 rounded-xl border border-red-500/30">
-               <p className="text-red-200 text-sm mb-2 font-bold">Connection Failed</p>
+               <p className="text-red-200 text-sm mb-2 font-bold">Signal Lost</p>
                <p className="text-xs text-red-100">{error}</p>
+               <button 
+                 onClick={() => window.location.reload()}
+                 className="mt-4 px-4 py-2 bg-red-800 rounded text-xs text-white font-bold uppercase"
+               >
+                 Retry Connection
+               </button>
              </div>
           )}
 
+          {/* EMPTY STATE */}
           {!loading && !error && matches.length === 0 && (
              <div className="text-center p-6 bg-gray-800/50 mx-4 rounded-xl border border-gray-700">
-               <p className="text-gray-300 text-sm">No matches found for this week.</p>
+               <p className="text-gray-300 text-sm">No matches scheduled.</p>
              </div>
           )}
 
+          {/* MATCHES LIST */}
           {!loading && !error && matches.map((matchData) => {
             const { fixture, teams, goals } = matchData;
-            
+            const isCompleted = ['FT', 'AET', 'PEN'].includes(fixture.status.short);
+            const isLive = ['1H', '2H', 'HT', 'ET', 'P'].includes(fixture.status.short);
+
             return (
               <button
                 key={fixture.id}
@@ -161,15 +180,15 @@ const MatchHub = () => {
                     </span>
                   </div>
 
-                  {/* STATUS / SCORE */}
+                  {/* CENTER STATUS */}
                   <div className="flex flex-col items-center justify-center w-1/3 space-y-0.5">
-                    {['FT', 'AET', 'PEN'].includes(fixture.status.short) ? (
+                    {isCompleted || isLive ? (
                       <>
                         <div className="text-2xl font-black text-white tracking-widest font-mono">
-                          {goals.home}-{goals.away}
+                          {goals.home ?? 0}-{goals.away ?? 0}
                         </div>
-                        <span className="text-[9px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-1.5 py-0.5 rounded">
-                          {fixture.status.short}
+                        <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${isLive ? 'text-red-500 animate-pulse' : 'text-green-400 bg-green-500/10'}`}>
+                          {isLive ? 'LIVE' : fixture.status.short}
                         </span>
                       </>
                     ) : (
