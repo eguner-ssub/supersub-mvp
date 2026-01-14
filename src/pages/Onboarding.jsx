@@ -1,16 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { ArrowRight, PenTool, CheckCircle, Coins, Zap, Layers, Loader2 } from 'lucide-react';
+import { ArrowRight, PenTool, CheckCircle, Coins, Zap, Layers } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
 
 const Onboarding = () => {
   const [managerName, setManagerName] = useState('');
-  const [showSigningBonus, setShowSigningBonus] = useState(false);
   
-  // FIX 1: Destructure userProfile so we can check it
+  // FIX 1: REMOVED local state 'showSigningBonus'. 
+  // We now derive the view directly from the profile.
   const { createProfile, userProfile, loading } = useGame();
   const navigate = useNavigate();
+
+  // FIX 2: DERIVED STATE
+  // If the profile has a club_name, we are in "Bonus Mode" automatically.
+  // This persists even if the page refreshes or bounces.
+  const hasSignedContract = !!userProfile?.club_name;
 
   // Tactical Carbon Fiber CSS texture
   const carbonStyle = {
@@ -25,54 +30,43 @@ const Onboarding = () => {
     year: 'numeric',
   });
 
-  // FIX 2: THE TRAMPOLINE (Auto-Forwarding)
-  // If the user lands here but ALREADY has a club name, send them to Dashboard.
-  // This catches the "Bouncer" mistake if it kicks you back here accidentally.
-  useEffect(() => {
-    if (!loading && userProfile?.club_name) {
-      console.log("Trampoline: Profile exists, forwarding to Dashboard...");
-      navigate('/dashboard', { state: { firstLogin: true } });
-    }
-  }, [userProfile, loading, navigate]);
-
   const handleSignContract = async () => {
     if (managerName.trim()) {
+      // This will update 'userProfile' in context, triggering a re-render
+      // which switches 'hasSignedContract' to true instantly.
       await createProfile(managerName.trim());
-      setShowSigningBonus(true);
     }
   };
 
   const handleGetToWork = () => {
+    // Navigate with state to trigger the Bag Animation on Dashboard
     navigate('/dashboard', { state: { firstLogin: true } });
   };
 
-  // Prevent flash of content while checking profile
-  if (loading) return null; 
+  // Prevent flash while loading
+  if (loading) return null;
 
   return (
     <MobileLayout>
       {/* DYNAMIC BACKGROUND */}
       <div 
-        className={`fixed inset-0 bg-cover bg-center bg-no-repeat z-0 transition-all duration-1000 ${showSigningBonus ? 'scale-110 blur-sm' : 'scale-100'}`}
+        className={`fixed inset-0 bg-cover bg-center bg-no-repeat z-0 transition-all duration-1000 ${hasSignedContract ? 'scale-110 blur-sm' : 'scale-100'}`}
         style={{ backgroundImage: "url('/bg-clubroom.png')" }}
       >
-        <div className={`absolute inset-0 bg-black transition-opacity duration-1000 ${showSigningBonus ? 'opacity-80' : 'opacity-40'}`}></div>
+        <div className={`absolute inset-0 bg-black transition-opacity duration-1000 ${hasSignedContract ? 'opacity-80' : 'opacity-40'}`}></div>
       </div>
 
       <div className="relative z-10 h-full flex flex-col items-center justify-center p-6">
         
-        {!showSigningBonus ? (
-          /* --- STATE 1: THE CONTRACT --- */
+        {!hasSignedContract ? (
+          /* --- STATE 1: THE CONTRACT (Show only if NO club name) --- */
           <div className="w-full max-w-md bg-[#f4f1ea] text-gray-900 rounded-sm shadow-[0_0_50px_rgba(0,0,0,0.7)] overflow-hidden relative animate-in slide-in-from-bottom-8 duration-700">
-            {/* ... (Rest of your Contract UI code remains exactly the same) ... */}
             
-            {/* Letterhead Strip */}
             <div className="h-3 bg-[#1a1a1a] w-full flex items-center justify-center">
                 <div className="w-1/3 h-[1px] bg-gold-500/50"></div>
             </div>
 
             <div className="p-8">
-              {/* Header */}
               <div className="text-center border-b-2 border-gray-900 pb-5 mb-6">
                 <h1 className="text-3xl font-serif font-black uppercase tracking-widest text-gray-900">
                   Managerial Contract
@@ -82,18 +76,15 @@ const Onboarding = () => {
                 </p>
               </div>
 
-              {/* Legal Text */}
               <div className="space-y-5 text-sm font-serif leading-relaxed text-justify mb-8 text-gray-800">
                 <p>
-                  <strong>1. LIABILITY:</strong> By executing this agreement, the undersigned Manager accepts full accountability for tactical operations, squad morale, and economic stability. The Board retains the right to immediate termination upon failure to meet performance metrics.
+                  <strong>1. LIABILITY:</strong> By executing this agreement, the undersigned Manager accepts full accountability for tactical operations, squad morale, and economic stability.
                 </p>
-                
                 <p>
                   <strong>2. COMPENSATION:</strong> Upon signature, the Club shall release a starting capital of <span className="font-bold border-b border-gray-800">500 Coins</span> and standard tactical provisions.
                 </p>
               </div>
 
-              {/* Signature Field */}
               <div className="space-y-6 mt-8">
                 <div className="relative group">
                   <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2 text-center">
@@ -134,7 +125,7 @@ const Onboarding = () => {
             </div>
           </div>
         ) : (
-          /* --- STATE 2: THE WELCOME BONUS --- */
+          /* --- STATE 2: THE WELCOME BONUS (Show if Club Name Exists) --- */
           <div className="w-full max-w-sm relative animate-in fade-in zoom-in duration-500">
             <div className="absolute inset-0 bg-green-500/20 blur-[60px] rounded-full"></div>
 
@@ -182,6 +173,7 @@ const Onboarding = () => {
                   </div>
                 </div>
 
+                {/* GET TO WORK BUTTON */}
                 <button
                   onClick={handleGetToWork}
                   className="group relative w-full h-[68px] rounded-full p-[2px] transition-all active:scale-95 shadow-[0_0_30px_rgba(34,197,94,0.3)] hover:shadow-[0_0_45px_rgba(34,197,94,0.5)]"

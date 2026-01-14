@@ -125,16 +125,22 @@ export const GameProvider = ({ children }) => {
     };
 
     try {
-      const { error } = await supabase.from('profiles').insert([newProfile]);
-      if (error) throw error;
+      // FIX IS HERE: Change .insert() to .upsert()
+      const { error } = await supabase.from('profiles').upsert([newProfile]);
+      
+      if (error) {
+        console.error("Database Error:", error.message);
+        throw error;
+      }
 
+      // 2. Insert Starter Inventory
       const starterCards = ['c_match_result', 'c_total_goals', 'c_player_score'];
       await updateInventory(starterCards);
 
+      // 3. Update Local State (This triggers the Onboarding screen to switch)
       setUserProfile(prev => ({
         ...prev,
-        ...newProfile,
-        inventory: starterCards
+        ...newProfile
       }));
 
     } catch (error) {

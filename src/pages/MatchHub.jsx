@@ -9,10 +9,11 @@ const MatchHub = () => {
   const { userProfile, loading: gameLoading } = useGame(); 
 
   const [matches, setMatches] = useState([]);
+  const [currentRound, setCurrentRound] = useState('');
   const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // CONFIGURATION FOR PRO PLAN
+  // CONFIGURATION
   const LEAGUE_ID = 39; 
   const SEASON = 2025;  
 
@@ -22,18 +23,30 @@ const MatchHub = () => {
         setDataLoading(true);
         setError(null);
 
+        // We ask the backend for the league data.
+        // The backend handles the logic of finding the active round.
         const response = await fetch(
-          `/api/matches?league=${LEAGUE_ID}&season=${SEASON}&next=10`
+          `/api/matches?league=${LEAGUE_ID}&season=${SEASON}`
         );
 
         if (!response.ok) throw new Error(`Server Error: ${response.status}`);
 
         const data = await response.json();
+        
         if (data.errors && Object.keys(data.errors).length > 0) {
            throw new Error("API refused connection");
         }
         
-        const sortedMatches = (data.response || []).sort((a, b) => 
+        // The backend tells us the active round name
+        if (data.active_round) {
+          setCurrentRound(data.active_round.replace("Regular Season - ", "Matchweek "));
+        }
+
+        // The backend returns the matches in 'response'
+        const matchesData = data.response || [];
+        
+        // Client-side sort by date
+        const sortedMatches = matchesData.sort((a, b) => 
           new Date(a.fixture.date) - new Date(b.fixture.date)
         );
 
@@ -107,7 +120,7 @@ const MatchHub = () => {
           
           <div className="px-1 mb-2 text-center">
              <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
-                Upcoming Fixtures
+                {currentRound || "Upcoming Fixtures"}
              </span>
           </div>
 

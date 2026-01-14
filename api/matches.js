@@ -1,53 +1,58 @@
+// api/matches.js (or wherever your Vercel function lives)
+
 export default async function handler(req, res) {
-  // --- DEBUG LOGS: CHECK YOUR TERMINAL ---
-  console.log("➡️ API Function Invoked");
-  console.log("🔑 API Key defined?", !!process.env.FOOTBALL_API_KEY);
-  // ---------------------------------------
+  const { league = 39, season = 2025, id } = req.query;
+  const apiKey = process.env.VITE_API_FOOTBALL_KEY; // Ensure this env var is set in Vercel
 
-  // 1. Get the Key securely from the server environment
-  const API_KEY = process.env.FOOTBALL_API_KEY;
-
-  if (!API_KEY) {
-    console.error("❌ CRITICAL: API Key is missing. Check .env.local file.");
-    return res.status(500).json({ error: 'Server misconfiguration: No API Key found' });
-  }
-
-  // 2. Extract query parameters from the frontend request
-  const { league, season, round } = req.query;
-
-  // Basic validation to save API calls
-  if (!league || !season) {
-    console.error("❌ Missing parameters. Received:", req.query);
-    return res.status(400).json({ error: 'Missing required parameters: league, season' });
-  }
+  const baseUrl = "https://v3.football.api-sports.io";
+  const headers = {
+    "x-rapidapi-host": "v3.football.api-sports.io",
+    "x-rapidapi-key": apiKey
+  };
 
   try {
-    // 3. Call the external provider (API-Football)
-    const url = `https://v3.football.api-sports.io/fixtures?league=${league}&season=${season}${round ? `&round=${round}` : ''}`;
-    
-    console.log(`🌍 Fetching from: ${url}`); // Debug the URL being called
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-apisports-key': API_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      console.error(`❌ External API Error: ${response.status} ${response.statusText}`);
-      throw new Error(`API Error: ${response.statusText}`);
+    // SCENARIO 1: Fetch Specific Match Detail (for MatchDetail page)
+    if (id) {
+      const response = await fetch(`${baseUrl}/fixtures?id=${id}`, { headers });
+      const data = await response.json();
+      return res.status(200).json(data);
     }
 
-    const data = await response.json();
+    // SCENARIO 2: Fetch Active Round (The "Proper" Way)
+    // First, we ask: "What is the current round?"
+    const roundRes = await fetch(
+      `${baseUrl}/fixtures/rounds?league=${league}&season=${season}&current=true`, 
+      { headers }
+    );
+    const roundData = await roundRes.json();
+    
+    // Safety check: If API returns nothing, fallback to next 10
+    if (!roundData.response || roundData.response.length === 0) {
+      const backupRes = await fetch(
+        `${baseUrl}/fixtures?league=${league}&season=${season}&next=10`, 
+        { headers }
+      );
+      return res.status(200).json(await backupRes.json());
+    }
 
-    // 4. Return the clean data to your frontend
-    console.log(`✅ Success! Fetched ${data.response?.length || 0} matches.`);
-    return res.status(200).json(data);
+    const currentRound = roundData.response[0]; // e.g., "Regular Season - 22"
+
+    // SCENARIO 3: Fetch Matches for that Round
+    // Now we ask: "Give me matches for Regular Season - 22"
+    const fixturesRes = await fetch(
+      `${baseUrl}/fixtures?league=${league}&season=${season}&round=${currentRound}`, 
+      { headers }
+    );
+    const fixturesData = await fixturesRes.json();
+
+    // Send the smart data back to the frontend
+    return res.status(200).json({
+      ...fixturesData,
+      active_round: currentRound // We pass this so the UI can display it
+    });
 
   } catch (error) {
-    console.error('❌ Proxy Error:', error);
-    return res.status(500).json({ error: 'Failed to fetch match data' });
+    console.error("API Error:", error);
+    return res.status(500).json({ error: "Failed to fetch match data" });
   }
 }

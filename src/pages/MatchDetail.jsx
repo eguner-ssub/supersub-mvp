@@ -1,30 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Zap, Loader2 } from 'lucide-react';
-import { useGame } from '../context/GameContext'; // IMPORTED CONTEXT
+import { useGame } from '../context/GameContext'; 
 
 const MatchDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { userProfile, loading: gameLoading } = useGame(); // REAL DATA
+  const { userProfile, loading: gameLoading } = useGame(); 
   
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // --- MOCK MATCH DATA (Keep this for now until we build real match fetching) ---
-  const mockMatchData = {
-    fixture: {
-      id: 1208240,
-      date: "2025-01-25T16:00:00+00:00",
-      venue: { name: "Etihad Stadium" },
-      status: { short: "NS" } 
-    },
-    teams: {
-      home: { id: 50, name: "Man City", logo: "https://media.api-sports.io/football/teams/50.png" },
-      away: { id: 49, name: "Chelsea", logo: "https://media.api-sports.io/football/teams/49.png" }
-    }
-  };
-
+  // CARD TYPES DEFINITION
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.png' },
     { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.png' },
@@ -42,12 +30,34 @@ const MatchDetail = () => {
     e.target.style.opacity = 0.5; 
   };
 
+  // FETCH REAL MATCH DATA
   useEffect(() => {
-    setTimeout(() => {
-      setMatch(mockMatchData);
-      setLoading(false);
-    }, 500);
-  }, []);
+    const fetchMatchDetail = async () => {
+      try {
+        setLoading(true);
+        // We reuse the same endpoint but pass the specific ID
+        const response = await fetch(`/api/matches?id=${id}`);
+        
+        if (!response.ok) throw new Error("Match unavailable");
+        
+        const data = await response.json();
+        
+        // API-Football returns an array, we want the first item
+        if (data.response && data.response.length > 0) {
+          setMatch(data.response[0]);
+        } else {
+          throw new Error("Match not found");
+        }
+      } catch (err) {
+        console.error("Match Detail Error:", err);
+        setError("Could not retrieve match intelligence.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchMatchDetail();
+  }, [id]);
 
   const formatTime = (d) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   const formatDate = (d) => new Date(d).toLocaleDateString([], { weekday: 'long' });
@@ -100,6 +110,13 @@ const MatchDetail = () => {
          </div>
       )}
 
+      {error && !loading && (
+        <div className="flex-1 flex flex-col items-center justify-center h-full z-50 relative px-6 text-center">
+            <p className="text-red-400 font-bold mb-4">{error}</p>
+            <button onClick={() => navigate('/match-hub')} className="px-6 py-3 bg-white text-black font-black uppercase rounded">Return to Hub</button>
+        </div>
+      )}
+
       {!loading && match && (
         <>
           {/* 3. SCOREBOARD */}
@@ -126,17 +143,7 @@ const MatchDetail = () => {
               </div>
           </div>
 
-          {/* 4. 3D WALL LOGOS */}
-          <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-              <div className="absolute top-[45%] left-[8%] w-40 h-40 opacity-70" style={{ transform: 'perspective(800px) rotateY(60deg) skewY(-10deg) scale(0.9)' }}>
-                  <img src={match.teams.home.logo} className="w-full h-full object-contain grayscale brightness-125 contrast-125 drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" alt="" />
-              </div>
-              <div className="absolute top-[45%] right-[8%] w-40 h-40 opacity-70" style={{ transform: 'perspective(800px) rotateY(-60deg) skewY(10deg) scale(0.9)' }}>
-                  <img src={match.teams.away.logo} className="w-full h-full object-contain grayscale brightness-125 contrast-125 drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" alt="" />
-              </div>
-          </div>
-
-          {/* 5. SHELF & INVENTORY */}
+          {/* 4. SHELF & INVENTORY */}
           <div className="absolute bottom-0 w-full z-30">
               <div className="w-full flex justify-center items-end gap-3 pb-4 px-4 z-40 relative translate-y-2">
                   {cardTypes.map((card) => {
