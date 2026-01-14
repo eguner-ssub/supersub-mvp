@@ -13,32 +13,43 @@ export const GameProvider = ({ children }) => {
   useEffect(() => {
     let mounted = true;
 
+    // A. DEADMAN'S SWITCH: Force loading to stop after 4 seconds
+    // This guarantees the app never gets "stuck" infinitely.
+    const safetyTimeout = setTimeout(() => {
+      if (loading && mounted) {
+        console.warn("⚠️ DATABASE TIMEOUT: Forcing application load.");
+        setLoading(false);
+      }
+    }, 4000);
+
     const initSession = async () => {
+      console.log("⚡ INIT: Starting Session Check...");
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
+          console.log("✅ USER FOUND:", session.user.id);
           if (mounted) await loadProfile(session.user);
         } else {
+          console.log("❌ NO USER SESSION");
           if (mounted) setLoading(false);
         }
       } catch (err) {
-        console.error("Session Init Failed:", err);
+        console.error("💀 FATAL SESSION ERROR:", err);
         if (mounted) setLoading(false);
       }
     };
 
     initSession();
 
-    // 2. Listen for Auth Changes
+    // B. AUTH LISTENER
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`AUTH EVENT: ${event}`);
+      console.log(`🔔 AUTH EVENT: ${event}`);
 
       if (event === 'SIGNED_OUT') {
-        // CHANGED: Only clear state. Do NOT clear localStorage here. 
-        // Supabase signOut() already handles token removal.
         setUserProfile(null);
-        setLoading(false); 
+        setLoading(false);
+        localStorage.clear(); 
       } else if (session?.user) {
         await loadProfile(session.user);
       } else {
@@ -48,13 +59,16 @@ export const GameProvider = ({ children }) => {
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout); // Clean up the timer
       subscription.unsubscribe();
     };
   }, []);
 
   // --- 2. LOAD PROFILE (READ) ---
   const loadProfile = async (user) => {
+    console.log("📂 LOADING PROFILE FOR:", user.email);
     try {
+      // Fetch Core Profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -62,23 +76,24 @@ export const GameProvider = ({ children }) => {
         .single();
 
       if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Error fetching profile:', profileError.message);
+        console.error('⚠️ PROFILE FETCH ERROR:', profileError.message);
       }
 
-      const { data: inventoryData, error: invError } = await supabase
+      // Fetch Inventory
+      const { data: inventoryData } = await supabase
         .from('inventory')
         .select('card_id')
         .eq('user_id', user.id);
 
-      if (invError) console.warn("Inventory fetch warning:", invError.message);
-
       if (profileData) {
+        console.log("✅ PROFILE LOADED:", profileData.club_name);
         setUserProfile({
           ...profileData,
           email: user.email,
           inventory: inventoryData ? inventoryData.map(i => i.card_id) : []
         });
       } else {
+        console.log("🆕 NEW USER DETECTED (No Profile DB Row)");
         setUserProfile({ 
           id: user.id, 
           email: user.email, 
@@ -86,8 +101,9 @@ export const GameProvider = ({ children }) => {
         });
       }
     } catch (error) {
-      console.error('CRITICAL: Load Profile Failed', error);
+      console.error('🔥 CRITICAL PROFILE FAILURE:', error);
     } finally {
+      // THIS MUST RUN
       setLoading(false);
     }
   };
@@ -95,6 +111,7 @@ export const GameProvider = ({ children }) => {
   // --- 3. CREATE PROFILE (WRITE) ---
   const createProfile = async (managerName) => {
     if (!userProfile?.id) return;
+    console.log("✍️ CREATING PROFILE:", managerName);
 
     const newProfile = {
       id: userProfile.id,
@@ -127,37 +144,23 @@ export const GameProvider = ({ children }) => {
   // --- 4. GAME ACTIONS ---
   const spendEnergy = async (amount) => {
     if (!userProfile) return;
-    
     const newEnergy = Math.max(0, userProfile.energy - amount);
-    
     setUserProfile(prev => ({ ...prev, energy: newEnergy }));
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ energy: newEnergy })
-      .eq('id', userProfile.id);
-
-    if (error) console.error('Energy Sync Failed:', error);
+    await supabase.from('profiles').update({ energy: newEnergy }).eq('id', userProfile.id);
   };
 
   const updateInventory = async (newCardIds) => {
     if (!userProfile?.id) return;
-
-    const rows = newCardIds.map(cid => ({
-      user_id: userProfile.id,
-      card_id: cid
+    const rows = newCardIds.map(cid => ({ user_id: userProfile.id, card_id: cid }));
+    
+    // Optimistic update
+    setUserProfile(prev => ({
+      ...prev,
+      inventory: [...(prev.inventory || []), ...newCardIds]
     }));
 
     const { error } = await supabase.from('inventory').insert(rows);
-    
-    if (error) {
-      console.error('Inventory Sync Failed:', error.message);
-    } else {
-      setUserProfile(prev => ({
-        ...prev,
-        inventory: [...(prev.inventory || []), ...newCardIds]
-      }));
-    }
+    if (error) console.error('Inventory Sync Failed:', error.message);
   };
 
   const value = {
