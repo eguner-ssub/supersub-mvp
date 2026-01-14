@@ -6,41 +6,33 @@ import MobileLayout from '../components/MobileLayout';
 
 const MatchHub = () => {
   const navigate = useNavigate();
-  const { userProfile } = useGame(); 
+  const { userProfile, loading: gameLoading } = useGame(); 
 
   const [matches, setMatches] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // CONFIGURATION FOR PRO PLAN
-  // Use 2025 for current season (2025/2026)
-  const LEAGUE_ID = 39; // Premier League
+  const LEAGUE_ID = 39; 
   const SEASON = 2025;  
 
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        setLoading(true);
+        setDataLoading(true);
         setError(null);
 
-        // Fetch the next 10 matches regardless of round
         const response = await fetch(
           `/api/matches?league=${LEAGUE_ID}&season=${SEASON}&next=10`
         );
 
-        if (!response.ok) {
-            throw new Error(`Server Error: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Server Error: ${response.status}`);
 
         const data = await response.json();
-
         if (data.errors && Object.keys(data.errors).length > 0) {
-          console.error("API Error Details:", data.errors);
-          const msg = Object.values(data.errors)[0]; 
-          throw new Error(msg || "API refused connection");
+           throw new Error("API refused connection");
         }
         
-        // Sort matches by Date (Ascending)
         const sortedMatches = (data.response || []).sort((a, b) => 
           new Date(a.fixture.date) - new Date(b.fixture.date)
         );
@@ -49,34 +41,34 @@ const MatchHub = () => {
 
       } catch (err) {
         console.error("Fetch error:", err);
-        setError("Could not load matches. Please try again later.");
+        setError("Could not load matches.");
       } finally {
-        setLoading(false);
+        setDataLoading(false);
       }
     };
 
     fetchMatches();
   }, []);
 
-  // FORMATTERS
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short', 
-      day: 'numeric'
-    });
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   const formatTime = (dateString) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
+    return new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
-  const userData = userProfile || { energy: 3, maxEnergy: 3, coins: 0, name: "Manager" };
+  // SAFETY SHIELD
+  if (gameLoading || !userProfile) {
+     return (
+        <div className="h-screen w-full bg-black flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
+        </div>
+     );
+  }
+
+  const userData = userProfile;
 
   return (
     <MobileLayout bgImage="/bg-stadium.png"> 
@@ -87,11 +79,11 @@ const MatchHub = () => {
         <div className="absolute top-0 left-0 w-full p-4 pt-4 flex justify-between items-center z-30 pointer-events-none">
           <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg pointer-events-auto">
             <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-            <span className="text-white font-bold text-sm">{userData.energy}/{userData.maxEnergy}</span>
+            <span className="text-white font-bold text-sm">{userData.energy}/{userData.max_energy}</span>
           </div>
 
           <div className="absolute left-1/2 -translate-x-1/2 text-white text-xl font-black uppercase tracking-widest drop-shadow-md">
-            {userData.name}
+            {userData.club_name}
           </div>
 
           <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg pointer-events-auto">
@@ -113,44 +105,27 @@ const MatchHub = () => {
         {/* MATCH LIST CONTAINER */}
         <div className="flex-1 overflow-y-auto space-y-2 pt-24 pb-20 px-0 no-scrollbar">
           
-          {/* HEADER FOR ROUND */}
           <div className="px-1 mb-2 text-center">
              <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
                 Upcoming Fixtures
              </span>
           </div>
 
-          {/* LOADING STATE */}
-          {loading && (
+          {dataLoading && (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
               <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
               <p className="text-xs uppercase tracking-widest">Scouting Fixtures...</p>
             </div>
           )}
 
-          {/* ERROR STATE */}
-          {!loading && error && (
+          {!dataLoading && error && (
              <div className="text-center p-6 bg-red-900/50 mx-4 rounded-xl border border-red-500/30">
                <p className="text-red-200 text-sm mb-2 font-bold">Signal Lost</p>
-               <p className="text-xs text-red-100">{error}</p>
-               <button 
-                 onClick={() => window.location.reload()}
-                 className="mt-4 px-4 py-2 bg-red-800 rounded text-xs text-white font-bold uppercase"
-               >
-                 Retry Connection
-               </button>
+               <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-800 rounded text-xs text-white font-bold uppercase">Retry</button>
              </div>
           )}
 
-          {/* EMPTY STATE */}
-          {!loading && !error && matches.length === 0 && (
-             <div className="text-center p-6 bg-gray-800/50 mx-4 rounded-xl border border-gray-700">
-               <p className="text-gray-300 text-sm">No matches scheduled.</p>
-             </div>
-          )}
-
-          {/* MATCHES LIST */}
-          {!loading && !error && matches.map((matchData) => {
+          {!dataLoading && !error && matches.map((matchData) => {
             const { fixture, teams, goals } = matchData;
             const isCompleted = ['FT', 'AET', 'PEN'].includes(fixture.status.short);
             const isLive = ['1H', '2H', 'HT', 'ET', 'P'].includes(fixture.status.short);
@@ -162,55 +137,32 @@ const MatchHub = () => {
                 className="w-full group relative overflow-hidden rounded-lg border-y border-white/10 bg-gray-900/85 transition-all active:bg-gray-800"
               >
                 <div className="relative p-3 flex items-center justify-between">
-                  
-                  {/* HOME TEAM */}
+                  {/* HOME */}
                   <div className="flex flex-col items-center gap-1 w-1/3">
-                    <img 
-                      src={teams.home.logo} 
-                      alt={teams.home.name} 
-                      className="w-8 h-8 object-contain drop-shadow-md"
-                    />
-                    <span className="text-white font-bold text-[10px] uppercase tracking-tight leading-none text-center truncate w-full">
-                      {teams.home.name}
-                    </span>
+                    <img src={teams.home.logo} alt={teams.home.name} className="w-8 h-8 object-contain drop-shadow-md" />
+                    <span className="text-white font-bold text-[10px] uppercase tracking-tight leading-none text-center truncate w-full">{teams.home.name}</span>
                   </div>
 
-                  {/* CENTER STATUS */}
+                  {/* STATUS */}
                   <div className="flex flex-col items-center justify-center w-1/3 space-y-0.5">
                     {isCompleted || isLive ? (
                       <>
-                        <div className="text-2xl font-black text-white tracking-widest font-mono">
-                          {goals.home ?? 0}-{goals.away ?? 0}
-                        </div>
-                        <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${isLive ? 'text-red-500 animate-pulse' : 'text-green-400 bg-green-500/10'}`}>
-                          {isLive ? 'LIVE' : fixture.status.short}
-                        </span>
+                        <div className="text-2xl font-black text-white tracking-widest font-mono">{goals.home ?? 0}-{goals.away ?? 0}</div>
+                        <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${isLive ? 'text-red-500 animate-pulse' : 'text-green-400 bg-green-500/10'}`}>{isLive ? 'LIVE' : fixture.status.short}</span>
                       </>
                     ) : (
                       <>
-                        <div className="text-xl font-black text-gray-200 tracking-wider font-mono">
-                          {formatTime(fixture.date)}
-                        </div>
-                        <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500 uppercase tracking-wide bg-white/5 px-1.5 py-0.5 rounded">
-                          <Calendar className="w-2.5 h-2.5" />
-                          {formatDate(fixture.date)}
-                        </div>
+                        <div className="text-xl font-black text-gray-200 tracking-wider font-mono">{formatTime(fixture.date)}</div>
+                        <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500 uppercase tracking-wide bg-white/5 px-1.5 py-0.5 rounded"><Calendar className="w-2.5 h-2.5" />{formatDate(fixture.date)}</div>
                       </>
                     )}
                   </div>
 
-                  {/* AWAY TEAM */}
+                  {/* AWAY */}
                   <div className="flex flex-col items-center gap-1 w-1/3">
-                     <img 
-                      src={teams.away.logo} 
-                      alt={teams.away.name} 
-                      className="w-8 h-8 object-contain drop-shadow-md"
-                    />
-                    <span className="text-white font-bold text-[10px] uppercase tracking-tight leading-none text-center truncate w-full">
-                      {teams.away.name}
-                    </span>
+                     <img src={teams.away.logo} alt={teams.away.name} className="w-8 h-8 object-contain drop-shadow-md" />
+                    <span className="text-white font-bold text-[10px] uppercase tracking-tight leading-none text-center truncate w-full">{teams.away.name}</span>
                   </div>
-
                 </div>
               </button>
             );

@@ -73,9 +73,9 @@ export const GameProvider = ({ children }) => {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle(); // Changed from single() to maybeSingle() to prevent error throwing on new users
 
-      if (profileError && profileError.code !== 'PGRST116') {
+      if (profileError) {
         console.error('⚠️ PROFILE FETCH ERROR:', profileError.message);
       }
 
@@ -94,6 +94,8 @@ export const GameProvider = ({ children }) => {
         });
       } else {
         console.log("🆕 NEW USER DETECTED (No Profile DB Row)");
+        // THIS IS CRITICAL: We must set userProfile even if DB row is missing
+        // so App.jsx doesn't kick us out, but sends us to Onboarding instead.
         setUserProfile({ 
           id: user.id, 
           email: user.email, 
@@ -103,7 +105,6 @@ export const GameProvider = ({ children }) => {
     } catch (error) {
       console.error('🔥 CRITICAL PROFILE FAILURE:', error);
     } finally {
-      // THIS MUST RUN
       setLoading(false);
     }
   };

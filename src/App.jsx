@@ -43,10 +43,10 @@ const ProtectedRoute = ({ children, requireOnboarding = true }) => {
     return <Navigate to="/onboarding" replace />;
   }
 
-  // 3. Logged in, HAS a club name, but trying to go to Onboarding?
-  if (!requireOnboarding && userProfile.club_name) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  // --- REMOVED LOGIC #3 ---
+  // We removed the rule that kicks you out of Onboarding if you have a name.
+  // Why? Because the "Welcome Bonus" screen IS on the Onboarding route.
+  // We need to let the user stay there to see their rewards.
 
   // 4. All good. Enter.
   return children;

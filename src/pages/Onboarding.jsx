@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { ArrowRight, PenTool, CheckCircle, Coins, Zap, Layers } from 'lucide-react';
+import { ArrowRight, PenTool, CheckCircle, Coins, Zap, Layers, Loader2 } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
 
 const Onboarding = () => {
   const [managerName, setManagerName] = useState('');
   const [showSigningBonus, setShowSigningBonus] = useState(false);
-  const { createProfile } = useGame();
+  
+  // FIX 1: Destructure userProfile so we can check it
+  const { createProfile, userProfile, loading } = useGame();
   const navigate = useNavigate();
 
   // Tactical Carbon Fiber CSS texture
@@ -23,26 +25,33 @@ const Onboarding = () => {
     year: 'numeric',
   });
 
+  // FIX 2: THE TRAMPOLINE (Auto-Forwarding)
+  // If the user lands here but ALREADY has a club name, send them to Dashboard.
+  // This catches the "Bouncer" mistake if it kicks you back here accidentally.
+  useEffect(() => {
+    if (!loading && userProfile?.club_name) {
+      console.log("Trampoline: Profile exists, forwarding to Dashboard...");
+      navigate('/dashboard', { state: { firstLogin: true } });
+    }
+  }, [userProfile, loading, navigate]);
+
   const handleSignContract = async () => {
     if (managerName.trim()) {
-      // 1. Create the profile in Supabase
       await createProfile(managerName.trim());
-      // 2. Show the bonus screen (Success State)
       setShowSigningBonus(true);
     }
   };
 
   const handleGetToWork = () => {
-    // FORCE RELOAD: Using window.location.href instead of navigate
-    // This ensures the App re-fetches the new 'club_name' from the DB
-    // preventing the "Bouncer" from kicking you back here.
-    window.location.href = '/dashboard';
+    navigate('/dashboard', { state: { firstLogin: true } });
   };
+
+  // Prevent flash of content while checking profile
+  if (loading) return null; 
 
   return (
     <MobileLayout>
       {/* DYNAMIC BACKGROUND */}
-      {/* We darken the room when the bonus modal appears to make it pop */}
       <div 
         className={`fixed inset-0 bg-cover bg-center bg-no-repeat z-0 transition-all duration-1000 ${showSigningBonus ? 'scale-110 blur-sm' : 'scale-100'}`}
         style={{ backgroundImage: "url('/bg-clubroom.png')" }}
@@ -55,6 +64,7 @@ const Onboarding = () => {
         {!showSigningBonus ? (
           /* --- STATE 1: THE CONTRACT --- */
           <div className="w-full max-w-md bg-[#f4f1ea] text-gray-900 rounded-sm shadow-[0_0_50px_rgba(0,0,0,0.7)] overflow-hidden relative animate-in slide-in-from-bottom-8 duration-700">
+            {/* ... (Rest of your Contract UI code remains exactly the same) ... */}
             
             {/* Letterhead Strip */}
             <div className="h-3 bg-[#1a1a1a] w-full flex items-center justify-center">
@@ -98,16 +108,14 @@ const Onboarding = () => {
                     className="w-full px-4 py-4 bg-[#e8e4dc] border-2 border-gray-300 rounded-lg text-gray-900 font-serif font-bold text-2xl text-center uppercase tracking-widest focus:outline-none focus:border-gray-900 focus:bg-white transition-all placeholder:text-gray-300"
                     autoFocus
                   />
-                  {/* Pen Icon Decoration */}
                   <PenTool className="absolute right-4 top-10 w-5 h-5 text-gray-400 opacity-50" />
                 </div>
 
-                {/* CREATE CLUB BUTTON (Silver/Green Style) */}
                 <button
                   onClick={handleSignContract}
                   disabled={!managerName.trim()}
                   className="group relative w-full h-[64px] rounded-full p-[2px] transition-all active:scale-95 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: 'linear-gradient(180deg, #cccccc 0%, #333333 100%)' }} // Silver Chrome Rim
+                  style={{ background: 'linear-gradient(180deg, #cccccc 0%, #333333 100%)' }} 
                 >
                   <div 
                     className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[2px] border-green-600/50 relative z-10" 
@@ -121,21 +129,18 @@ const Onboarding = () => {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="bg-[#ebe7e0] p-2 text-center border-t border-gray-200">
                <p className="text-[9px] text-gray-400 font-serif uppercase tracking-[0.3em] font-bold">Official Club Document</p>
             </div>
           </div>
         ) : (
-          /* --- STATE 2: THE WELCOME BONUS (Tactical Dark Mode) --- */
+          /* --- STATE 2: THE WELCOME BONUS --- */
           <div className="w-full max-w-sm relative animate-in fade-in zoom-in duration-500">
-            
-            {/* Glow Effect behind the card */}
             <div className="absolute inset-0 bg-green-500/20 blur-[60px] rounded-full"></div>
 
             <div 
               className="relative bg-[#1a1a1a] rounded-2xl p-1 border border-white/10 shadow-2xl overflow-hidden"
-              style={carbonStyle} // Carbon Texture Background
+              style={carbonStyle}
             >
               <div className="bg-gradient-to-b from-white/5 to-transparent p-6 rounded-xl">
                 
@@ -149,7 +154,6 @@ const Onboarding = () => {
                   <p className="text-green-400 font-bold tracking-widest text-xs mt-2 uppercase">Contract Ratified</p>
                 </div>
 
-                {/* Inventory List */}
                 <div className="bg-black/40 rounded-xl p-5 mb-8 border border-white/5 space-y-4 shadow-inner">
                   <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.3em] text-center mb-2">Signing Bonus Issued</p>
                   
@@ -178,11 +182,10 @@ const Onboarding = () => {
                   </div>
                 </div>
 
-                {/* GET TO WORK BUTTON (Green Glow) */}
                 <button
                   onClick={handleGetToWork}
                   className="group relative w-full h-[68px] rounded-full p-[2px] transition-all active:scale-95 shadow-[0_0_30px_rgba(34,197,94,0.3)] hover:shadow-[0_0_45px_rgba(34,197,94,0.5)]"
-                  style={{ background: 'linear-gradient(180deg, #D4AF37 0%, #1a1a1a 100%)' }} // Gold Top Edge for prestige
+                  style={{ background: 'linear-gradient(180deg, #D4AF37 0%, #1a1a1a 100%)' }}
                 >
                   <div 
                     className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[2px] border-green-500/50 relative z-10" 

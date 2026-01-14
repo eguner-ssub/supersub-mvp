@@ -1,21 +1,33 @@
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { ArrowLeft, Package } from 'lucide-react';
+import { ArrowLeft, Package, Loader2 } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
 import gameData from '../data/gameData.json';
 
 const Inventory = () => {
-  const { userProfile } = useGame();
+  const { userProfile, loading } = useGame();
   const navigate = useNavigate();
   const cardTypes = gameData.cardTypes;
 
+  // SAFETY SHIELD: Wait for data
+  if (loading) {
+     return (
+        <div className="h-screen w-full bg-black flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        </div>
+     );
+  }
+
+  // Fallback if data is missing after loading
   if (!userProfile) return null;
 
   // Count cards by type
   const cardCounts = {};
-  userProfile.inventory.forEach((cardId) => {
-    cardCounts[cardId] = (cardCounts[cardId] || 0) + 1;
-  });
+  if (userProfile.inventory) {
+    userProfile.inventory.forEach((cardId) => {
+        cardCounts[cardId] = (cardCounts[cardId] || 0) + 1;
+    });
+  }
 
   const inventoryCards = Object.entries(cardCounts).map(([cardId, count]) => {
     const cardType = cardTypes.find((c) => c.id === cardId);
@@ -67,7 +79,7 @@ const Inventory = () => {
 
         <div className="mt-6 pt-6 border-t border-gray-700">
           <p className="text-center text-gray-400 text-sm">
-            Total Cards: {userProfile.inventory.length}
+            Total Cards: {userProfile.inventory ? userProfile.inventory.length : 0}
           </p>
         </div>
       </div>

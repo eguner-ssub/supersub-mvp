@@ -26,15 +26,20 @@ const Signup = () => {
     try {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
+      
       if (data.user && !data.session) {
         setNeedsEmailConfirm(true);
         setLoading(false);
         return;
       }
+
+      // SUCCESS: Navigate to Onboarding, NOT Dashboard.
+      // The GameContext listener will detect the new session automatically.
       setTimeout(() => {
         setLoading(false);
-        navigate('/dashboard');
+        navigate('/onboarding'); 
       }, 500);
+      
     } catch (err) {
       setError(err.message);
       setLoading(false);
@@ -60,7 +65,6 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen bg-black text-white p-6 flex flex-col justify-center relative overflow-hidden">
-      {/* Background Decorative Element */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 blur-[120px] rounded-full"></div>
       
       <div className="max-w-md w-full mx-auto space-y-8 relative z-10">
