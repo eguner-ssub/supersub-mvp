@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Loader2, ArrowLeft, Mail, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, Eye, EyeOff, UserPlus } from 'lucide-react';
 
 const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // New state for toggle
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
   const navigate = useNavigate();
+
+  const carbonStyle = {
+    background: `radial-gradient(circle, #333 1px, transparent 1px), radial-gradient(circle, #333 1px, transparent 1px), #1a1a1a`,
+    backgroundSize: '4px 4px',
+    backgroundPosition: '0 0, 2px 2px',
+  };
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -18,28 +24,18 @@ const Signup = () => {
     setError(null);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
-
-      // Check for session
       if (data.user && !data.session) {
         setNeedsEmailConfirm(true);
         setLoading(false);
         return;
       }
-
-      // Success - Redirect
       setTimeout(() => {
         setLoading(false);
         navigate('/dashboard');
       }, 500);
-
     } catch (err) {
-      console.error("Signup Error:", err);
       setError(err.message);
       setLoading(false);
     }
@@ -47,16 +43,15 @@ const Signup = () => {
 
   if (needsEmailConfirm) {
     return (
-      <div className="min-h-screen bg-black text-white p-4 flex flex-col justify-center items-center text-center">
-        <div className="max-w-md w-full bg-zinc-900 p-8 rounded-2xl border border-zinc-800">
-          <Mail className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-black italic mb-2">CHECK YOUR INBOX</h2>
-          <p className="text-gray-400 mb-6">
-            We sent a confirmation link to <span className="text-white">{email}</span>. 
-            Click it to activate your account.
+      <div className="min-h-screen bg-black text-white p-6 flex flex-col justify-center items-center text-center">
+        <div className="max-w-md w-full bg-[#1a1a1a] p-8 rounded-3xl border border-white/10 shadow-2xl" style={carbonStyle}>
+          <Mail className="w-16 h-16 text-green-400 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(34,197,94,0.4)]" />
+          <h2 className="text-2xl font-black italic mb-2 tracking-tight uppercase">Verify Access</h2>
+          <p className="text-gray-400 mb-8 text-sm leading-relaxed">
+            Activation link sent to <span className="text-white font-bold">{email}</span>.
           </p>
-          <Link to="/login" className="text-yellow-500 hover:text-yellow-400 font-bold text-sm">
-            Back to Login
+          <Link to="/login" className="text-green-400 hover:text-white font-black text-xs uppercase tracking-widest transition-colors">
+            Return to Gate
           </Link>
         </div>
       </div>
@@ -64,68 +59,77 @@ const Signup = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 flex flex-col justify-center">
-      <div className="max-w-md w-full mx-auto space-y-6">
-        <Link to="/" className="text-gray-400 hover:text-white flex items-center gap-2 mb-8">
-          <ArrowLeft className="w-4 h-4" /> Back
+    <div className="min-h-screen bg-black text-white p-6 flex flex-col justify-center relative overflow-hidden">
+      {/* Background Decorative Element */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 blur-[120px] rounded-full"></div>
+      
+      <div className="max-w-md w-full mx-auto space-y-8 relative z-10">
+        <Link to="/" className="text-gray-500 hover:text-white flex items-center gap-2 mb-4 transition-colors font-black text-[10px] uppercase tracking-[0.2em]">
+          <ArrowLeft className="w-3 h-3" /> Back
         </Link>
 
         <div>
-          <h2 className="text-3xl font-black italic mb-2">JOIN THE CLUB</h2>
-          <p className="text-gray-400">Create your account to start betting.</p>
+          <h2 className="text-4xl font-black italic mb-2 tracking-tighter uppercase">Join the Club</h2>
+          <p className="text-gray-500 text-sm font-medium">Initialize your performance profile.</p>
         </div>
 
-        <form onSubmit={handleSignup} className="space-y-4">
-          <div>
-            <label className="block text-xs font-mono text-gray-500 mb-1">EMAIL</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-yellow-500"
-              placeholder="you@example.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-mono text-gray-500 mb-1">PASSWORD</label>
-            <div className="relative">
+        <form onSubmit={handleSignup} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Email Terminal</label>
               <input
-                type={showPassword ? "text" : "password"} // Dynamic type
+                type="email"
                 required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-yellow-500 pr-10" // added pr-10 for icon space
-                placeholder="••••••••"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-[#0f0f0f] border border-white/5 rounded-2xl p-4 text-white focus:outline-none focus:border-green-500/50 transition-all shadow-inner placeholder:text-gray-700"
+                placeholder="USER@STADIUM.MOBI"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-white transition-colors"
-              >
-                {showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
-              </button>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Access Cipher</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-[#0f0f0f] border border-white/5 rounded-2xl p-4 text-white focus:outline-none focus:border-green-500/50 transition-all pr-12 shadow-inner placeholder:text-gray-700"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-600 hover:text-white transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
           </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm">
-              {error}
+            <div className="bg-red-500/5 border border-red-500/20 text-red-400 p-4 rounded-xl text-xs font-bold uppercase tracking-wider">
+              Error: {error}
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl flex items-center justify-center transition-transform active:scale-95"
+            className="group relative w-full h-[68px] rounded-full p-[2px] transition-all active:scale-95 shadow-[0_0_25px_rgba(34,197,94,0.3)]"
+            style={{ background: 'linear-gradient(180deg, #D4AF37 0%, #1a1a1a 100%)' }}
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'CREATE ACCOUNT'}
+            <div className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[1px] border-green-400/50" style={carbonStyle}>
+              {loading ? <Loader2 className="w-6 h-6 animate-spin text-green-400" /> : (
+                <>
+                  <UserPlus className="w-5 h-5 text-green-400" />
+                  <span className="text-white font-black text-lg tracking-widest italic">CREATE ACCOUNT</span>
+                </>
+              )}
+            </div>
           </button>
         </form>
       </div>

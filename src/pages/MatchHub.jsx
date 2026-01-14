@@ -12,11 +12,10 @@ const MatchHub = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // CONFIGURATION
-  // In a real app, you might fetch these dynamically or pick them from a dropdown
+  // CONFIGURATION FOR PRO PLAN
+  // Use 2025 for current season (2025/2026)
   const LEAGUE_ID = 39; // Premier League
-  const SEASON = 2024;  
-  const ROUND = "Regular Season - 22"; 
+  const SEASON = 2025;  
 
   useEffect(() => {
     const fetchMatches = async () => {
@@ -24,11 +23,9 @@ const MatchHub = () => {
         setLoading(true);
         setError(null);
 
-        // --- SECURE API CALL ---
-        // This calls your Vercel Function (api/matches.js)
-        // No API key is exposed here.
+        // Fetch the next 10 matches regardless of round
         const response = await fetch(
-          `/api/matches?league=${LEAGUE_ID}&season=${SEASON}&round=${encodeURIComponent(ROUND)}`
+          `/api/matches?league=${LEAGUE_ID}&season=${SEASON}&next=10`
         );
 
         if (!response.ok) {
@@ -37,7 +34,6 @@ const MatchHub = () => {
 
         const data = await response.json();
 
-        // Check for internal API errors (like bad plan, rate limit, etc.)
         if (data.errors && Object.keys(data.errors).length > 0) {
           console.error("API Error Details:", data.errors);
           const msg = Object.values(data.errors)[0]; 
@@ -80,7 +76,6 @@ const MatchHub = () => {
     });
   };
 
-  // Safe Fallback for user data
   const userData = userProfile || { energy: 3, maxEnergy: 3, coins: 0, name: "Manager" };
 
   return (
@@ -121,7 +116,7 @@ const MatchHub = () => {
           {/* HEADER FOR ROUND */}
           <div className="px-1 mb-2 text-center">
              <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
-                Premier League • Week 22
+                Upcoming Fixtures
              </span>
           </div>
 
