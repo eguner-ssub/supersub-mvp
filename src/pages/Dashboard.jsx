@@ -1,28 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom'; 
 import { useGame } from '../context/GameContext'; 
-import { Zap, Coins, Cone, Trophy, ShoppingBag, X } from 'lucide-react'; 
-// Assuming you have the JSON available via import
-import gameData from '../data/gameData.json';
+import { Zap, Coins, Cone, Trophy, ShoppingBag, Loader2 } from 'lucide-react'; 
+// Safe import with fallback
+import gameDataRaw from '../data/gameData.json';
 
 export default function Dashboard() {
   const navigate = useNavigate(); 
   const location = useLocation();
-  const { userProfile, updateInventory } = useGame(); // Added updateInventory assumption
   
-  // State for the "First Login" Bag Opening Sequence
+  // 1. GET THE REAL LOADING STATE
+  const { userProfile, updateInventory, loading } = useGame(); 
+  
   const [showBagOverlay, setShowBagOverlay] = useState(false);
-  const [bagStage, setBagStage] = useState('closed'); // 'closed', 'opening', 'rewards'
+  const [bagStage, setBagStage] = useState('closed'); 
   const [newCards, setNewCards] = useState([]);
 
-  const userData = userProfile || { 
-    name: "Loading...", 
-    coins: 0, 
-    energy: 0, 
-    maxEnergy: 3, 
-    inventory: [] 
-  };
+  // Safety: Handle missing JSON
+  const gameData = gameDataRaw || { cardTypes: [] };
 
+  // 2. FIRST LOGIN DETECTION
+  useEffect(() => {
+    if (location.state?.firstLogin) {
+      setShowBagOverlay(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
+
+  // 3. CARD DEFINITIONS
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.png' },
     { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.png' },
@@ -30,40 +35,60 @@ export default function Dashboard() {
     { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.png' }, 
   ];
 
-  // Check for first login flag passed from Onboarding
-  useEffect(() => {
-    if (location.state?.firstLogin) {
-      setShowBagOverlay(true);
-      // Clear state so it doesn't happen on refresh
-      window.history.replaceState({}, document.title);
-    }
-  }, [location]);
+  // 4. THE REAL LOADING CHECK
+  // We only spin if the GameContext explicitly tells us it's working
+  if (loading) {
+    return (
+      <div className="w-full h-screen bg-black flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-10 h-10 text-yellow-500 animate-spin" />
+        <p className="text-gray-500 text-xs uppercase tracking-widest">Syncing Club Data...</p>
+      </div>
+    );
+  }
 
+  // 5. THE "MISSING DATA" FALLBACK
+  // If loading is done but profile is missing, we show this instead of spinning forever
+  if (!userProfile) {
+    return (
+      <div className="w-full h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
+        <h2 className="text-red-500 font-bold text-xl mb-4">DATA SYNC ERROR</h2>
+        <p className="text-gray-400 text-sm mb-6 max-w-xs mx-auto">
+          We couldn't retrieve your manager profile. This usually happens if the database policies (RLS) are blocking access.
+        </p>
+        <button 
+          onClick={() => window.location.href = '/login'}
+          className="px-6 py-3 bg-white text-black font-bold uppercase tracking-widest rounded hover:bg-gray-200"
+        >
+          Return to Gate
+        </button>
+      </div>
+    );
+  }
+
+  // 6. SAFE DATA ACCESS (Prevents crashes)
+  const userData = userProfile;
+  
   const getCardCount = (cardId) => {
     if (!userData.inventory) return 0;
     return userData.inventory.filter(item => item === cardId).length;
   };
 
-  // Logic to open the bag and generate 5 random cards
   const handleOpenBag = () => {
     setBagStage('opening');
-    
-    // Simulate animation delay
     setTimeout(() => {
-      // Generate 5 random cards based on IDs in GameData (plus supersub)
-      const possibleIds = gameData.cardTypes.map(c => c.id); 
-      // Add supersub manually if it's missing from JSON but in assets
-      if (!possibleIds.includes('c_supersub')) possibleIds.push('c_supersub');
+      // Pick random cards safely
+      const possibleIds = gameData.cardTypes?.length > 0 
+        ? gameData.cardTypes.map(c => c.id) 
+        : ['c_match_result', 'c_total_goals']; 
 
       const drawnCards = Array.from({ length: 5 }, () => {
         const randomId = possibleIds[Math.floor(Math.random() * possibleIds.length)];
-        return cardTypes.find(c => c.id === randomId) || { id: randomId, label: 'Unknown', img: '' };
+        return cardTypes.find(c => c.id === randomId) || { id: randomId, label: 'Card', img: '' };
       });
 
       setNewCards(drawnCards);
       
-      // Update Context (You need to ensure this function exists in your provider)
-      // If updateInventory doesn't exist, you'll need to implement logic to add these IDs to userData.inventory
+      // Update DB via Context
       if (updateInventory) {
         updateInventory(drawnCards.map(c => c.id));
       }
@@ -72,102 +97,94 @@ export default function Dashboard() {
     }, 1500);
   };
 
-  const closeOverlay = () => {
-    setShowBagOverlay(false);
-  };
-
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans select-none">
       
       {/* BACKGROUND */}
-      <img 
-        src="/bg-dashboard.png" 
-        alt="Dressing Room" 
-        className="absolute inset-0 w-full h-full object-cover z-0"
-      />
+      <div className="absolute inset-0 z-0">
+        <img 
+          src="/bg-dashboard.png" 
+          alt="Dressing Room" 
+          className="w-full h-full object-cover opacity-80"
+          onError={(e) => e.target.style.display = 'none'} 
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40"></div>
+      </div>
 
       {/* HEADER HUD */}
-      <div className="absolute top-0 left-0 w-full p-4 pt-4 flex justify-between items-center z-30">
-        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg">
+      <div className="absolute top-0 left-0 w-full p-4 pt-6 flex justify-between items-center z-30">
+        {/* Energy */}
+        <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
           <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-          <span className="text-white font-bold text-sm">{userData.energy}/{userData.maxEnergy}</span>
+          <span className="text-white font-bold text-sm font-mono pt-0.5">
+            {userData.energy}/{userData.max_energy || 3}
+          </span>
         </div>
-        <div className="absolute left-1/2 -translate-x-1/2 text-white text-xl font-black uppercase tracking-widest drop-shadow-md">
-          {userData.name}
+
+        {/* Manager Name */}
+        <div className="absolute left-1/2 -translate-x-1/2 text-white text-lg font-black uppercase tracking-widest drop-shadow-lg truncate max-w-[150px] text-center">
+          {userData.club_name || userData.name}
         </div>
-        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg">
+
+        {/* Coins */}
+        <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
           <Coins className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-          <span className="text-white font-bold text-sm">{userData.coins}</span>
+          <span className="text-white font-bold text-sm font-mono pt-0.5">{userData.coins}</span>
         </div>
       </div>
 
-      {/* TV PLACEHOLDER */}
-      <div 
-        className="absolute z-10 overflow-hidden" 
-        style={{ top: '27.5%', left: '27%', width: '46%', height: '18%' }}
-      >
-        {/* <img src="/tv-screen-content.png" className="w-full h-full object-cover" /> */}
-      </div>
-
-      {/* MAIN ACTIONS */}
-      <div 
-        className="absolute w-full flex justify-center items-center gap-3 z-20 px-4"
-        style={{ top: '49%', transform: 'translateY(-50%)' }}
-      >
+      {/* CENTER ACTIONS */}
+      <div className="absolute w-full flex justify-center items-center gap-4 z-20 px-4" style={{ top: '50%', transform: 'translateY(-50%)' }}>
         <button 
-          onClick={() => navigate('/training')}
-          className="flex flex-col items-center justify-center w-20 h-20 bg-black/40 backdrop-blur-sm border border-white/10 rounded-2xl active:scale-95 transition-all group hover:bg-black/60"
+          onClick={() => navigate('/training')} 
+          className="flex flex-col items-center justify-center w-20 h-20 bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl active:scale-95 transition-all group hover:bg-white/5"
         >
-          <Cone className="w-6 h-6 text-white group-hover:text-blue-400 transition-colors mb-1" />
-          <span className="text-[10px] text-white font-bold uppercase tracking-wide">Training</span>
+          <Cone className="w-6 h-6 text-gray-300 group-hover:text-blue-400 transition-colors mb-1" />
+          <span className="text-[10px] text-gray-300 font-bold uppercase tracking-wide">Train</span>
         </button>
 
         <button 
-          onClick={() => navigate('/match-hub')}
-          className="flex flex-col items-center justify-center w-24 h-24 bg-gradient-to-b from-green-900/80 to-black/80 backdrop-blur-md border border-green-500/30 rounded-2xl shadow-[0_0_15px_rgba(34,197,94,0.2)] active:scale-95 transition-all group hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]"
+          onClick={() => navigate('/match-hub')} 
+          className="relative flex flex-col items-center justify-center w-28 h-28 bg-gradient-to-b from-green-900/90 to-black/90 backdrop-blur-xl border border-green-500/50 rounded-2xl shadow-[0_0_25px_rgba(34,197,94,0.25)] active:scale-95 transition-all group hover:shadow-[0_0_35px_rgba(34,197,94,0.4)]"
         >
-          <Trophy className="w-8 h-8 text-green-400 mb-1 drop-shadow-lg" />
-          <span className="text-xs text-white font-black uppercase tracking-widest">Match</span>
+          <div className="absolute inset-0 bg-green-500/10 rounded-2xl animate-pulse"></div>
+          <Trophy className="w-10 h-10 text-green-400 mb-2 drop-shadow-lg relative z-10" />
+          <span className="text-xs text-white font-black uppercase tracking-widest relative z-10">Match</span>
         </button>
 
         <button 
-          onClick={() => console.log("Shop clicked")}
-          className="flex flex-col items-center justify-center w-20 h-20 bg-black/40 backdrop-blur-sm border border-white/10 rounded-2xl active:scale-95 transition-all group hover:bg-black/60"
+          onClick={() => console.log("Shop clicked")} 
+          className="flex flex-col items-center justify-center w-20 h-20 bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl active:scale-95 transition-all group hover:bg-white/5"
         >
-          <ShoppingBag className="w-6 h-6 text-white group-hover:text-yellow-400 transition-colors mb-1" />
-          <span className="text-[10px] text-white font-bold uppercase tracking-wide">Shop</span>
+          <ShoppingBag className="w-6 h-6 text-gray-300 group-hover:text-yellow-400 transition-colors mb-1" />
+          <span className="text-[10px] text-gray-300 font-bold uppercase tracking-wide">Shop</span>
         </button>
       </div>
 
-      {/* THE CARD SHELF */}
+      {/* THE DECK SHELF */}
       <div className="absolute bottom-0 w-full z-30">
-        <div className="w-full bg-gradient-to-t from-gray-900 via-black to-transparent pt-8 pb-4">
-          <div className="text-center mb-2">
-            <h3 className="text-[#F5C546] font-bold text-xs tracking-[0.2em] uppercase drop-shadow-md">
-              Your Card Deck
-            </h3>
+        <div className="w-full bg-gradient-to-t from-black via-black/90 to-transparent pt-12 pb-6 px-4">
+          <div className="flex justify-between items-end mb-3 px-2">
+            <h3 className="text-white/50 font-bold text-[10px] tracking-[0.2em] uppercase">Tactical Deck</h3>
+            <span className="text-yellow-500 font-bold text-[10px] tracking-wider uppercase bg-yellow-500/10 px-2 py-0.5 rounded">
+              {userData.inventory?.length || 0} Cards
+            </span>
           </div>
-          <div className="flex justify-center items-end gap-2 px-2 h-28">
+          <div className="flex justify-between items-end gap-2 h-24">
             {cardTypes.map((card) => {
               const count = getCardCount(card.id);
               const isActive = count > 0;
               return (
-                <div key={card.id} className={`flex flex-col items-center gap-1 transition-all duration-300 ${isActive ? 'opacity-100 hover:-translate-y-2' : 'opacity-40 grayscale'}`}>
-                  <div className={`relative w-20 h-24 rounded-md overflow-hidden shadow-lg ${isActive ? 'shadow-yellow-500/20' : ''}`}>
+                <div key={card.id} className={`flex-1 flex flex-col items-center gap-2 transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-30 grayscale'}`}>
+                  <div className={`relative w-full h-full rounded-lg border border-white/5 bg-white/5 overflow-hidden flex items-center justify-center ${isActive ? 'shadow-[0_0_15px_rgba(234,179,8,0.15)] border-yellow-500/30' : ''}`}>
                     <img 
                       src={card.img} 
-                      alt={card.label}
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        e.target.style.display = 'none'; 
-                        e.target.parentElement.style.backgroundColor = '#333'; 
-                      }}
+                      alt={card.label} 
+                      className="w-full h-full object-contain p-1" 
+                      onError={(e) => e.target.style.display = 'none'} 
                     />
-                    {isActive && <div className="absolute inset-0 ring-1 ring-yellow-400/50 rounded-md"></div>}
                   </div>
-                  <span className={`text-[9px] font-bold uppercase tracking-wider ${isActive ? 'text-white' : 'text-gray-500'}`}>
-                    {count} Cards
-                  </span>
+                  <span className={`text-[9px] font-black uppercase tracking-wider ${isActive ? 'text-white' : 'text-gray-600'}`}>x{count}</span>
                 </div>
               );
             })}
@@ -175,59 +192,50 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* --- NEW: TRAINING BAG OVERLAY --- */}
+      {/* FIRST LOGIN BAG OVERLAY */}
       {showBagOverlay && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
-          
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
           {bagStage === 'closed' && (
             <div className="text-center animate-in zoom-in duration-300">
-              <h2 className="text-2xl font-bold text-white mb-8 uppercase tracking-widest">Training Kit Ready</h2>
-              <div 
-                onClick={handleOpenBag}
-                className="w-48 h-48 bg-gray-800 rounded-2xl flex items-center justify-center border-4 border-yellow-500 cursor-pointer hover:scale-105 transition-transform shadow-[0_0_30px_rgba(234,179,8,0.4)] mx-auto mb-8"
+              <h2 className="text-3xl font-black text-white mb-8 uppercase tracking-widest italic">Kit Delivery</h2>
+              <button 
+                onClick={handleOpenBag} 
+                className="w-48 h-48 bg-gray-900 rounded-3xl flex items-center justify-center border-2 border-yellow-500/50 cursor-pointer hover:scale-105 transition-transform shadow-[0_0_50px_rgba(234,179,8,0.2)] mx-auto mb-8 group"
               >
-                 {/* Replaced Image tag with icon since I can't generate the file */}
-                 <ShoppingBag className="w-24 h-24 text-yellow-500" />
-              </div>
-              <p className="text-gray-400 text-sm animate-pulse">Tap the bag to equip your squad</p>
+                 <ShoppingBag className="w-20 h-20 text-yellow-500 group-hover:text-yellow-400 transition-colors drop-shadow-[0_0_15px_rgba(234,179,8,0.6)]" />
+              </button>
+              <p className="text-white/50 text-xs uppercase tracking-[0.2em] animate-pulse">Tap to Equip</p>
             </div>
           )}
-
           {bagStage === 'opening' && (
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="text-white font-mono uppercase">Rummaging through equipment...</p>
+            <div className="flex flex-col items-center gap-6">
+              <Loader2 className="w-16 h-16 text-yellow-500 animate-spin" />
+              <p className="text-white font-mono uppercase text-sm tracking-widest">Unpacking Gear...</p>
             </div>
           )}
-
           {bagStage === 'rewards' && (
             <div className="w-full max-w-lg text-center animate-in zoom-in slide-in-from-bottom duration-500">
-              <h2 className="text-3xl font-black text-white mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">
-                KIT ACQUIRED!
-              </h2>
-              <p className="text-gray-400 text-xs mb-8 uppercase tracking-widest">Added to Inventory</p>
-              
-              <div className="flex justify-center flex-wrap gap-4 mb-8">
+              <h2 className="text-4xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 mb-2 uppercase tracking-tighter">Squad Ready</h2>
+              <p className="text-gray-500 text-[10px] mb-10 uppercase tracking-[0.3em] font-bold">New Assets Added to Inventory</p>
+              <div className="flex justify-center flex-wrap gap-3 mb-12">
                 {newCards.map((card, idx) => (
-                  <div key={idx} className="flex flex-col items-center animate-in slide-in-from-bottom fade-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                    <div className="w-16 h-20 bg-gray-800 rounded border border-gray-600 overflow-hidden relative shadow-lg">
-                       <img src={card.img} className="w-full h-full object-contain" alt={card.label} />
+                  <div key={idx} className="flex flex-col items-center animate-in slide-in-from-bottom fade-in duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
+                    <div className="w-14 h-20 bg-gray-800/80 rounded border border-yellow-500/30 overflow-hidden relative shadow-[0_0_15px_rgba(234,179,8,0.1)]">
+                       <img src={card.img} className="w-full h-full object-contain p-1" alt={card.label} />
                     </div>
                   </div>
                 ))}
               </div>
-
               <button 
-                onClick={closeOverlay}
-                className="px-8 py-3 bg-white text-black font-black uppercase tracking-widest rounded hover:bg-gray-200 transition-colors"
+                onClick={() => setShowBagOverlay(false)} 
+                className="w-full py-4 bg-white hover:bg-gray-200 text-black font-black uppercase tracking-widest rounded-xl transition-transform active:scale-95 shadow-xl"
               >
-                Collect & Continue
+                Enter Dressing Room
               </button>
             </div>
           )}
         </div>
       )}
-
     </div>
   );
 }

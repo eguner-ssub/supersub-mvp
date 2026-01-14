@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom'; // Removed useNavigate since we are using hard reload
 import { supabase } from '../supabaseClient';
 import { Loader2, ArrowLeft, Mail, Key, Eye, EyeOff } from 'lucide-react';
 
@@ -9,12 +9,10 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState(null);
-  const navigate = useNavigate();
 
-  // FIX: This must be INSIDE the component
+  // FORCE CLEANUP ON MOUNT
   useEffect(() => {
     const clearSession = async () => {
-      // Force sign out to ensure no stale cookies block the new login
       await supabase.auth.signOut();
       localStorage.removeItem('supabase.auth.token'); 
       console.log("Session cleared for fresh login attempt.");
@@ -29,7 +27,7 @@ const Login = () => {
   };
 
   const handlePasswordLogin = async (e) => {
-    e.preventDefault(); // Standard preventDefault
+    e.preventDefault();
     if (loading) return;
   
     setLoading(true);
@@ -49,8 +47,11 @@ const Login = () => {
         setLoading(false);
       } else {
         console.log("Login Success:", data);
-        // Using replace: true to prevent back-button loops
-        navigate('/dashboard', { replace: true });
+        
+        // --- THE FIX: BRUTE FORCE ENTRY ---
+        // React Router's navigate() is too fast for Supabase state updates sometimes.
+        // This forces a hard browser reload, guaranteeing the App checks the server session again.
+        window.location.href = '/dashboard'; 
       }
     } catch (err) {
       console.error("Fatal Crash:", err);
