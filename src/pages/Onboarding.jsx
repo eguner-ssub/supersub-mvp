@@ -51,7 +51,7 @@ const Onboarding = () => {
       {/* DYNAMIC BACKGROUND */}
       <div 
         className={`fixed inset-0 bg-cover bg-center bg-no-repeat z-0 transition-all duration-1000 ${hasSignedContract ? 'scale-110 blur-sm' : 'scale-100'}`}
-        style={{ backgroundImage: "url('/bg-clubroom.png')" }}
+        style={{ backgroundImage: "url('/bg-clubroom.webp')" }}
       >
         <div className={`absolute inset-0 bg-black transition-opacity duration-1000 ${hasSignedContract ? 'opacity-80' : 'opacity-40'}`}></div>
       </div>

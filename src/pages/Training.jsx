@@ -113,7 +113,7 @@ const Training = () => {
   if (phase === 'briefing') {
     const hasEnergy = userProfile.energy > 0;
     return (
-      <MobileLayout bgImage="/bg-training-brief.png">
+      <MobileLayout bgImage="/bg-training-brief.webp">
         <div className="w-full max-w-md h-full flex flex-col justify-center p-6 relative">
           <button onClick={() => navigate('/dashboard')} className="absolute top-6 left-4 flex items-center gap-2 text-gray-300 hover:text-white z-50">
             <ArrowLeft className="w-5 h-5" />
@@ -160,7 +160,7 @@ const Training = () => {
   if (phase === 'complete') {
     const passed = score >= 3;
     return (
-      <MobileLayout bgImage="/bg-training-quiz.png">
+      <MobileLayout bgImage="/bg-training-quiz.webp">
         <div className="h-full flex flex-col items-center justify-center p-6 relative z-50">
           <div className="w-full max-w-md bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-gray-700 text-center relative overflow-hidden">
             <div className={`absolute top-0 left-0 w-full h-2 ${passed ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
@@ -194,7 +194,7 @@ const Training = () => {
   const currentQuestion = questions[currentQIndex];
 
   return (
-    <MobileLayout bgImage="/bg-training-quiz.png">
+    <MobileLayout bgImage="/bg-training-quiz.webp">
       <div className="flex flex-col h-full relative p-4 max-w-md mx-auto">
         <div className="flex items-center justify-between mb-8 mt-4">
           <div className="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">

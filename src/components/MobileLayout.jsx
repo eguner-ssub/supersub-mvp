@@ -1,4 +1,4 @@
-const MobileLayout = ({ children, bgImage = '/bg-dashboard.png' }) => {
+const MobileLayout = ({ children, bgImage = '/bg-dashboard.webp' }) => {
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-4 relative bg-cover bg-center bg-no-repeat"

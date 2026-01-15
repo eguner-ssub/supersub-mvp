@@ -84,7 +84,7 @@ const MatchHub = () => {
   const userData = userProfile;
 
   return (
-    <MobileLayout bgImage="/bg-stadium.png"> 
+    <MobileLayout bgImage="/bg-stadium.webp"> 
       
       <div className="w-full h-full flex flex-col relative font-sans select-none">
         

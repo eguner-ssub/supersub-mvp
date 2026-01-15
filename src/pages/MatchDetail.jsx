@@ -14,10 +14,10 @@ const MatchDetail = () => {
 
   // CARD TYPES DEFINITION
   const cardTypes = [
-    { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.png' },
-    { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.png' },
-    { id: 'c_player_score', label: 'Player Score', img: '/cards/card_player_score.png' },
-    { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.png' }, 
+    { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.webp' },
+    { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.webp' },
+    { id: 'c_player_score', label: 'Player Score', img: '/cards/card_player_score.webp' },
+    { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.webp' }, 
   ];
 
   // REAL INVENTORY CHECK
@@ -79,7 +79,7 @@ const MatchDetail = () => {
       {/* 1. BACKGROUND IMAGE */}
       <div className="absolute inset-0 z-0">
         <img 
-            src="/bg-dugout.png" 
+            src="/bg-dugout.webp" 
             alt="Tunnel Background" 
             className="w-full h-full object-cover opacity-100"
             onError={(e) => { e.target.onerror = null; e.target.src = "/bg-dugout.jpg"; }}

@@ -18,7 +18,7 @@ const Landing = () => {
       {/* BACKGROUND IMAGE */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-transform duration-1000 scale-105"
-        style={{ backgroundImage: "url('/bg-benchview.png')" }}
+        style={{ backgroundImage: "url('/bg-benchview.webp')" }}
       >
         {/* Aggressive vignette/overlay for tactical focus */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/80 backdrop-blur-[1px]"></div>
@@ -32,7 +32,7 @@ const Landing = () => {
             {/* Ambient Green Glow behind shield */}
             <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full group-hover:bg-green-500/30 transition-all duration-700"></div>
             <img 
-              src="/logo.png" 
+              src="/logo.webp" 
               alt="SUPERSUB Shield" 
               className="relative w-72 h-auto drop-shadow-[0_0_35px_rgba(34,197,94,0.4)] transition-transform duration-500 hover:scale-105"
             />

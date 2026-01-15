@@ -29,10 +29,10 @@ export default function Dashboard() {
 
   // 3. CARD DEFINITIONS
   const cardTypes = [
-    { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.png' },
-    { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.png' },
-    { id: 'c_player_score', label: 'Player Score', img: '/cards/card_player_score.png' },
-    { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.png' }, 
+    { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.webp' },
+    { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.webp' },
+    { id: 'c_player_score', label: 'Player Score', img: '/cards/card_player_score.webp' },
+    { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.webp' }, 
   ];
 
   // 4. THE REAL LOADING CHECK
@@ -103,7 +103,7 @@ export default function Dashboard() {
       {/* BACKGROUND */}
       <div className="absolute inset-0 z-0">
         <img 
-          src="/bg-dashboard.png" 
+          src="/bg-dashboard.webp" 
           alt="Dressing Room" 
           className="w-full h-full object-cover opacity-80"
           onError={(e) => e.target.style.display = 'none'} 
