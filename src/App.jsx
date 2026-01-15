@@ -19,7 +19,6 @@ import Settings from './pages/Settings';
 const ProtectedRoute = ({ children, requireOnboarding = true }) => {
   const { userProfile, loading } = useGame();
   
-  // MAGIC LINK CHECK
   const isLoggingIn = 
     window.location.hash.includes('access_token') || 
     window.location.search.includes('token=') ||
@@ -33,34 +32,25 @@ const ProtectedRoute = ({ children, requireOnboarding = true }) => {
     );
   }
 
-  // 1. Not logged in? Get out.
   if (!userProfile) {
     return <Navigate to="/login" replace />;
   }
 
-  // 2. Logged in, but trying to access Dashboard without a Club Name?
   if (requireOnboarding && !userProfile.club_name) {
     return <Navigate to="/onboarding" replace />;
   }
 
-  // --- REMOVED LOGIC #3 ---
-  // We removed the rule that kicks you out of Onboarding if you have a name.
-  // Why? Because the "Welcome Bonus" screen IS on the Onboarding route.
-  // We need to let the user stay there to see their rewards.
-
-  // 4. All good. Enter.
   return children;
 };
 
-const AppRoutes = () => {
+// 1. EXPORT THIS SEPARATELY SO TESTS CAN USE IT
+export const AppRoutes = () => {
   return (
     <Routes>
-      {/* PUBLIC ROUTES */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
 
-      {/* ONBOARDING (Protected, but doesn't require club_name yet) */}
       <Route 
         path="/onboarding" 
         element={
@@ -70,7 +60,6 @@ const AppRoutes = () => {
         } 
       />
 
-      {/* DASHBOARD & GAME (Protected AND requires club_name) */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
       <Route path="/match-hub" element={<ProtectedRoute><MatchHub /></ProtectedRoute>} />
@@ -78,7 +67,6 @@ const AppRoutes = () => {
       <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
-      {/* Fallback logic */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

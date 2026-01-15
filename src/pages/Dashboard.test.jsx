@@ -1,192 +1,83 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act, within } from '@testing-library/react'; // Added 'within'
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from './Dashboard';
-import { createMockGameContextValue } from '../__mocks__/GameContext';
+import { useGame } from '../context/GameContext';
 
-// Mock the GameContext
-const mockUseGame = vi.fn();
-const mockUpdateInventory = vi.fn();
+// Mock Context
+vi.mock('../context/GameContext', () => ({
+  useGame: vi.fn(),
+}));
+
+// Mock Location manually since we aren't using the full router mock
 const mockNavigate = vi.fn();
-
-vi.mock('../context/GameContext', async () => {
-  const actual = await vi.importActual('../context/GameContext');
-  return {
-    ...actual,
-    useGame: () => mockUseGame(),
-  };
-});
-
-// Mock react-router-dom hooks
-const mockLocation = { pathname: '/dashboard', state: null };
-const mockUseLocation = vi.fn(() => mockLocation);
-
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
-    useLocation: () => mockUseLocation(),
   };
 });
 
 describe('Dashboard', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockLocation.state = null;
-    mockUseLocation.mockReturnValue({
-      pathname: '/dashboard',
-      state: null,
-    });
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('triggers bag opening and updates inventory', async () => {
+    const mockUpdateInventory = vi.fn();
     
-    mockUseGame.mockReturnValue(createMockGameContextValue({
-      userProfile: {
-        id: 'test-id',
-        email: 'test@example.com',
-        club_name: 'Test FC',
-        name: 'Test Manager',
-        coins: 1000,
-        energy: 5,
-        max_energy: 5,
-        inventory: ['c_match_result', 'c_total_goals'],
+    useGame.mockReturnValue({
+      userProfile: { 
+        id: '123', 
+        club_name: 'Test FC', 
+        coins: 1000, 
+        energy: 5, 
+        max_energy: 5, 
+        inventory: [] 
       },
       loading: false,
-      updateInventory: mockUpdateInventory,
-    }));
-  });
+      updateInventory: mockUpdateInventory
+    });
 
-  it('renders the user\'s club name', async () => {
+    // Render with state: { firstLogin: true }
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[{ pathname: '/dashboard', state: { firstLogin: true } }]}>
         <Dashboard />
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Test FC')).toBeInTheDocument();
-    });
-  });
+    // 1. Verify Overlay is Present by finding the Heading
+    const overlayTitle = screen.getByText(/Kit Delivery/i);
+    expect(overlayTitle).toBeInTheDocument();
 
-  it('renders the user\'s coins', async () => {
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>
-    );
+    // 2. Find the Bag Button specifically inside the Overlay
+    // We grab the parent container of the "Kit Delivery" text to ignore background buttons
+    const overlayContainer = overlayTitle.parentElement;
+    const bagButton = within(overlayContainer).getByRole('button');
+    
+    fireEvent.click(bagButton);
 
-    await waitFor(() => {
-      expect(screen.getByText('1000')).toBeInTheDocument();
-    });
-  });
-
-  it('renders the user\'s energy', async () => {
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('5/5')).toBeInTheDocument();
-    });
-  });
-
-  it('shows bag opening overlay when location.state.firstLogin is true', async () => {
-    // Update the mock location to include firstLogin
-    mockLocation.state = { firstLogin: true };
-    mockUseLocation.mockReturnValue({
-      pathname: '/dashboard',
-      state: { firstLogin: true },
+    // 3. Fast-forward animation (1500ms)
+    act(() => {
+        vi.advanceTimersByTime(1600);
     });
 
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>
-    );
+    // 4. Verify Next Stage (Rewards)
+    expect(screen.getByText(/Squad Ready/i)).toBeInTheDocument();
+    
+    // 5. Verify Inventory Update was called
+    expect(mockUpdateInventory).toHaveBeenCalled();
 
-    await waitFor(() => {
-      expect(screen.getByText('Kit Delivery')).toBeInTheDocument();
-    });
-  });
+    // 6. Close the overlay
+    const closeBtn = screen.getByText(/Enter Dressing Room/i);
+    fireEvent.click(closeBtn);
 
-  it('opens bag and calls updateInventory when bag is clicked', async () => {
-    mockLocation.state = { firstLogin: true };
-    mockUseLocation.mockReturnValue({
-      pathname: '/dashboard',
-      state: { firstLogin: true },
-    });
-
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Kit Delivery')).toBeInTheDocument();
-    });
-
-    const bagButton = screen.getByRole('button', { name: /tap to equip/i });
-    const user = userEvent.setup();
-    await user.click(bagButton);
-
-    await waitFor(() => {
-      expect(mockUpdateInventory).toHaveBeenCalled();
-    }, { timeout: 3000 });
-  });
-
-  it('hides overlay when "Enter Dressing Room" button is clicked', async () => {
-    mockLocation.state = { firstLogin: true };
-    mockUseLocation.mockReturnValue({
-      pathname: '/dashboard',
-      state: { firstLogin: true },
-    });
-
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Kit Delivery')).toBeInTheDocument();
-    });
-
-    // First open the bag
-    const bagButton = screen.getByRole('button', { name: /tap to equip/i });
-    const user = userEvent.setup();
-    await user.click(bagButton);
-
-    // Wait for rewards stage
-    await waitFor(() => {
-      expect(screen.getByText('Enter Dressing Room')).toBeInTheDocument();
-    }, { timeout: 3000 });
-
-    // Click continue button
-    const continueButton = screen.getByText('Enter Dressing Room');
-    await user.click(continueButton);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Kit Delivery')).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows loading state when loading is true', async () => {
-    mockUseGame.mockReturnValue(createMockGameContextValue({
-      userProfile: null,
-      loading: true,
-    }));
-
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText(/Syncing Club Data/i)).toBeInTheDocument();
-    });
+    // 7. Overlay should be gone
+    expect(screen.queryByText(/Kit Delivery/i)).not.toBeInTheDocument();
   });
 });

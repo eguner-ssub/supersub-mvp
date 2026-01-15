@@ -1,152 +1,63 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import App from './App';
-import { createMockGameContextValue } from './__mocks__/GameContext';
+import { AppRoutes } from './App'; // IMPORT THE NAMED EXPORT
+import { useGame } from './context/GameContext';
 
 // Mock the GameContext
-const mockUseGame = vi.fn();
-vi.mock('./context/GameContext', async () => {
-  const actual = await vi.importActual('./context/GameContext');
-  return {
-    ...actual,
-    useGame: () => mockUseGame(),
-    GameProvider: ({ children }) => children,
-  };
-});
+vi.mock('./context/GameContext', () => ({
+  GameProvider: ({ children }) => <div>{children}</div>,
+  useGame: vi.fn(),
+}));
 
-describe('App - ProtectedRoute', () => {
-  beforeEach(() => {
-    // Reset window location
-    Object.defineProperty(window, 'location', {
-      value: { hash: '', search: '', pathname: '/' },
-      writable: true,
-    });
-    vi.clearAllMocks();
-  });
+// Mock the Page Components to simplify testing
+vi.mock('./pages/Login', () => ({ default: () => <div>Login Page</div> }));
+vi.mock('./pages/Onboarding', () => ({ default: () => <div>Onboarding Page</div> }));
+vi.mock('./pages/Dashboard', () => ({ default: () => <div>Dashboard Page</div> }));
 
-  it('redirects unauthenticated users to /login when accessing /dashboard', async () => {
-    mockUseGame.mockReturnValue(createMockGameContextValue({
+describe('App Routing (The Bouncer)', () => {
+  it('redirects unauthenticated users to /login', () => {
+    useGame.mockReturnValue({
       userProfile: null,
       loading: false,
-    }));
+    });
 
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
-        <App />
+        <AppRoutes />
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(mockUseGame).toHaveBeenCalled();
-    });
+    expect(screen.getByText('Login Page')).toBeInTheDocument();
   });
 
-  it('redirects users without club_name to /onboarding when accessing /dashboard', async () => {
-    mockUseGame.mockReturnValue(createMockGameContextValue({
-      userProfile: {
-        id: 'test-id',
-        email: 'test@example.com',
-        club_name: null,
-      },
+  it('redirects users without a club name to /onboarding', () => {
+    useGame.mockReturnValue({
+      userProfile: { id: '123', email: 'test@test.com', club_name: null },
       loading: false,
-    }));
+    });
 
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
-        <App />
+        <AppRoutes />
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(mockUseGame).toHaveBeenCalled();
-    });
+    expect(screen.getByText('Onboarding Page')).toBeInTheDocument();
   });
 
-  it('allows authenticated users with club_name to access /dashboard', async () => {
-    mockUseGame.mockReturnValue(createMockGameContextValue({
-      userProfile: {
-        id: 'test-id',
-        email: 'test@example.com',
-        club_name: 'Test FC',
-        coins: 1000,
-        energy: 5,
-      },
+  it('allows full users to access /dashboard', () => {
+    useGame.mockReturnValue({
+      userProfile: { id: '123', club_name: 'Test FC' },
       loading: false,
-    }));
+    });
 
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
-        <App />
+        <AppRoutes />
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(mockUseGame).toHaveBeenCalled();
-    });
-  });
-
-  it('allows access to /onboarding for authenticated users without club_name', async () => {
-    mockUseGame.mockReturnValue(createMockGameContextValue({
-      userProfile: {
-        id: 'test-id',
-        email: 'test@example.com',
-        club_name: null,
-      },
-      loading: false,
-    }));
-
-    render(
-      <MemoryRouter initialEntries={['/onboarding']}>
-        <App />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(mockUseGame).toHaveBeenCalled();
-    });
-  });
-
-  it('shows loading spinner when loading is true', async () => {
-    mockUseGame.mockReturnValue(createMockGameContextValue({
-      userProfile: null,
-      loading: true,
-    }));
-
-    const { container } = render(
-      <MemoryRouter initialEntries={['/dashboard']}>
-        <App />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(mockUseGame).toHaveBeenCalled();
-    });
-  });
-
-  it('handles magic link authentication in progress', async () => {
-    Object.defineProperty(window, 'location', {
-      value: { 
-        hash: '#access_token=test_token', 
-        search: '', 
-        pathname: '/dashboard' 
-      },
-      writable: true,
-    });
-
-    mockUseGame.mockReturnValue(createMockGameContextValue({
-      userProfile: null,
-      loading: false,
-    }));
-
-    render(
-      <MemoryRouter initialEntries={['/dashboard']}>
-        <App />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(mockUseGame).toHaveBeenCalled();
-    });
+    expect(screen.getByText('Dashboard Page')).toBeInTheDocument();
   });
 });
