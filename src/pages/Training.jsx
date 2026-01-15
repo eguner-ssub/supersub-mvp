@@ -6,7 +6,8 @@ import MobileLayout from '../components/MobileLayout';
 import gameData from '../data/gameData.json';
 
 const Training = () => {
-  const { userProfile, spendEnergy, addCard, loading } = useGame(); // Import loading
+  // FIX 1: Replaced 'addCard' with 'updateInventory'
+  const { userProfile, spendEnergy, updateInventory, loading } = useGame(); 
   const navigate = useNavigate();
   
   const [phase, setPhase] = useState('briefing'); 
@@ -75,7 +76,9 @@ const Training = () => {
 
   const handleFinish = () => {
     if (score >= 3) {
-      addCard('c_match_result'); 
+      // FIX 2: Use correct function name AND pass as an array
+      // updateInventory expects an array of strings ['c_match_result', ...]
+      updateInventory(['c_match_result']); 
     }
     
     try {
