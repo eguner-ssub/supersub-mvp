@@ -14,6 +14,7 @@ import MatchDetail from './pages/MatchDetail';
 import Training from './pages/Training';
 import Inventory from './pages/Inventory';
 import Settings from './pages/Settings'; 
+import Account from './pages/Account'; // <--- 1. IMPORT ADDED HERE
 
 // --- THE BOUNCER (Security Guard) ---
 const ProtectedRoute = ({ children, requireOnboarding = true }) => {
@@ -47,10 +48,12 @@ const ProtectedRoute = ({ children, requireOnboarding = true }) => {
 export const AppRoutes = () => {
   return (
     <Routes>
+      {/* PUBLIC ROUTES */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
 
+      {/* ONBOARDING */}
       <Route 
         path="/onboarding" 
         element={
@@ -60,13 +63,19 @@ export const AppRoutes = () => {
         } 
       />
 
+      {/* DASHBOARD & GAME */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      
+      {/* --- 2. ACCOUNT ROUTE ADDED HERE --- */}
+      <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
+      
       <Route path="/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
       <Route path="/match-hub" element={<ProtectedRoute><MatchHub /></ProtectedRoute>} />
       <Route path="/match/:id" element={<ProtectedRoute><MatchDetail /></ProtectedRoute>} />
       <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
+      {/* Fallback logic */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

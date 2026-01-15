@@ -1,9 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // Added useEffect
 import { useNavigate } from 'react-router-dom';
+import { useGame } from '../context/GameContext'; // Added GameContext
 import { LogIn, UserPlus } from 'lucide-react';
 
 const Landing = () => {
   const navigate = useNavigate();
+  const { userProfile } = useGame(); // Get the profile
+
+  // --- AUTO-REDIRECT LOGIC ---
+  // If the user is already logged in (has a club name), kick them straight to the game.
+  useEffect(() => {
+    if (userProfile?.club_name) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [userProfile, navigate]);
 
   // Tactical Carbon Fiber CSS texture
   const carbonStyle = {
@@ -20,16 +30,14 @@ const Landing = () => {
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-transform duration-1000 scale-105"
         style={{ backgroundImage: "url('/bg-benchview.webp')" }}
       >
-        {/* Aggressive vignette/overlay for tactical focus */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/80 backdrop-blur-[1px]"></div>
       </div>
 
       <div className="relative z-10 max-w-md w-full flex flex-col items-center text-center">
         
-        {/* LOGO SECTION - Now the pure focal point */}
+        {/* LOGO SECTION */}
         <div className="mb-16 animate-in fade-in slide-in-from-top-6 duration-1000">
           <div className="relative group">
-            {/* Ambient Green Glow behind shield */}
             <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full group-hover:bg-green-500/30 transition-all duration-700"></div>
             <img 
               src="/logo.webp" 
@@ -42,7 +50,6 @@ const Landing = () => {
         {/* Action Buttons */}
         <div className="space-y-6 w-full flex flex-col items-center">
           
-          {/* JOIN THE SQUAD BUTTON (Primary - Gold/Green Chrome) */}
           <button
             onClick={() => navigate('/signup')}
             className="group relative w-full max-w-[300px] h-[68px] rounded-full p-[2px] transition-all active:scale-95 shadow-[0_0_30px_rgba(34,197,94,0.4)]"
@@ -57,7 +64,6 @@ const Landing = () => {
             </div>
           </button>
 
-          {/* LOGIN BUTTON (Secondary - Silver/Carbon) */}
           <button
             onClick={() => navigate('/login')}
             className="group relative w-full max-w-[300px] h-[64px] rounded-full p-[2px] transition-all active:scale-95 shadow-lg"

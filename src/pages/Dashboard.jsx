@@ -2,24 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom'; 
 import { useGame } from '../context/GameContext'; 
 import { Zap, Coins, Cone, Trophy, ShoppingBag, Loader2 } from 'lucide-react'; 
-// Safe import with fallback
 import gameDataRaw from '../data/gameData.json';
 
 export default function Dashboard() {
   const navigate = useNavigate(); 
   const location = useLocation();
   
-  // 1. GET THE REAL LOADING STATE
   const { userProfile, updateInventory, loading } = useGame(); 
   
   const [showBagOverlay, setShowBagOverlay] = useState(false);
   const [bagStage, setBagStage] = useState('closed'); 
   const [newCards, setNewCards] = useState([]);
 
-  // Safety: Handle missing JSON
   const gameData = gameDataRaw || { cardTypes: [] };
 
-  // 2. FIRST LOGIN DETECTION
   useEffect(() => {
     if (location.state?.firstLogin) {
       setShowBagOverlay(true);
@@ -27,7 +23,6 @@ export default function Dashboard() {
     }
   }, [location, navigate]);
 
-  // 3. CARD DEFINITIONS
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.webp' },
     { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.webp' },
@@ -35,8 +30,6 @@ export default function Dashboard() {
     { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.webp' }, 
   ];
 
-  // 4. THE REAL LOADING CHECK
-  // We only spin if the GameContext explicitly tells us it's working
   if (loading) {
     return (
       <div className="w-full h-screen bg-black flex flex-col items-center justify-center gap-4">
@@ -46,8 +39,6 @@ export default function Dashboard() {
     );
   }
 
-  // 5. THE "MISSING DATA" FALLBACK
-  // If loading is done but profile is missing, we show this instead of spinning forever
   if (!userProfile) {
     return (
       <div className="w-full h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
@@ -65,7 +56,6 @@ export default function Dashboard() {
     );
   }
 
-  // 6. SAFE DATA ACCESS (Prevents crashes)
   const userData = userProfile;
   
   const getCardCount = (cardId) => {
@@ -76,7 +66,6 @@ export default function Dashboard() {
   const handleOpenBag = () => {
     setBagStage('opening');
     setTimeout(() => {
-      // Pick random cards safely
       const possibleIds = gameData.cardTypes?.length > 0 
         ? gameData.cardTypes.map(c => c.id) 
         : ['c_match_result', 'c_total_goals']; 
@@ -88,7 +77,6 @@ export default function Dashboard() {
 
       setNewCards(drawnCards);
       
-      // Update DB via Context
       if (updateInventory) {
         updateInventory(drawnCards.map(c => c.id));
       }
@@ -121,10 +109,13 @@ export default function Dashboard() {
           </span>
         </div>
 
-        {/* Manager Name */}
-        <div className="absolute left-1/2 -translate-x-1/2 text-white text-lg font-black uppercase tracking-widest drop-shadow-lg truncate max-w-[150px] text-center">
+        {/* Manager Name - CLICKABLE LINK TO ACCOUNT */}
+        <button 
+          onClick={() => navigate('/account')}
+          className="absolute left-1/2 -translate-x-1/2 text-white text-lg font-black uppercase tracking-widest drop-shadow-lg truncate max-w-[150px] text-center hover:text-yellow-400 hover:scale-105 transition-all cursor-pointer"
+        >
           {userData.club_name || userData.name}
-        </div>
+        </button>
 
         {/* Coins */}
         <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">

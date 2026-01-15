@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, within } from '@testing-library/react'; // Added 'within'
+import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from './Dashboard';
 import { useGame } from '../context/GameContext';
@@ -28,18 +28,22 @@ describe('Dashboard', () => {
     vi.useRealTimers();
   });
 
+  // --- DEFINE DATA HERE SO ALL TESTS CAN USE IT ---
+  const mockProfile = { 
+    id: '123', 
+    club_name: 'Test FC', 
+    name: 'Test Manager',
+    coins: 1000, 
+    energy: 5, 
+    max_energy: 5, 
+    inventory: [] 
+  };
+
   it('triggers bag opening and updates inventory', async () => {
     const mockUpdateInventory = vi.fn();
     
     useGame.mockReturnValue({
-      userProfile: { 
-        id: '123', 
-        club_name: 'Test FC', 
-        coins: 1000, 
-        energy: 5, 
-        max_energy: 5, 
-        inventory: [] 
-      },
+      userProfile: mockProfile,
       loading: false,
       updateInventory: mockUpdateInventory
     });
@@ -51,12 +55,11 @@ describe('Dashboard', () => {
       </MemoryRouter>
     );
 
-    // 1. Verify Overlay is Present by finding the Heading
+    // 1. Verify Overlay is Present
     const overlayTitle = screen.getByText(/Kit Delivery/i);
     expect(overlayTitle).toBeInTheDocument();
 
     // 2. Find the Bag Button specifically inside the Overlay
-    // We grab the parent container of the "Kit Delivery" text to ignore background buttons
     const overlayContainer = overlayTitle.parentElement;
     const bagButton = within(overlayContainer).getByRole('button');
     
@@ -79,5 +82,28 @@ describe('Dashboard', () => {
 
     // 7. Overlay should be gone
     expect(screen.queryByText(/Kit Delivery/i)).not.toBeInTheDocument();
+  }); // <--- OLD TEST CLOSES HERE
+
+  // --- NEW TEST LIVES HERE (OUTSIDE THE OTHER ONE) ---
+  it('navigates to account when club name is clicked', async () => {
+    useGame.mockReturnValue({
+      userProfile: mockProfile,
+      loading: false,
+      updateInventory: vi.fn()
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    // Find the club name button
+    const clubNameBtn = screen.getByText('Test FC');
+    fireEvent.click(clubNameBtn);
+
+    // Verify navigation
+    expect(mockNavigate).toHaveBeenCalledWith('/account');
   });
+
 });

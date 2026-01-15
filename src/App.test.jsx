@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { AppRoutes } from './App'; // IMPORT THE NAMED EXPORT
+import { AppRoutes } from './App'; 
 import { useGame } from './context/GameContext';
 
 // Mock the GameContext
@@ -10,10 +10,11 @@ vi.mock('./context/GameContext', () => ({
   useGame: vi.fn(),
 }));
 
-// Mock the Page Components to simplify testing
+// Mock the Page Components (Add Account here!)
 vi.mock('./pages/Login', () => ({ default: () => <div>Login Page</div> }));
 vi.mock('./pages/Onboarding', () => ({ default: () => <div>Onboarding Page</div> }));
 vi.mock('./pages/Dashboard', () => ({ default: () => <div>Dashboard Page</div> }));
+vi.mock('./pages/Account', () => ({ default: () => <div>Account Page</div> })); // <--- NEW MOCK
 
 describe('App Routing (The Bouncer)', () => {
   it('redirects unauthenticated users to /login', () => {
@@ -59,5 +60,37 @@ describe('App Routing (The Bouncer)', () => {
     );
 
     expect(screen.getByText('Dashboard Page')).toBeInTheDocument();
+  });
+
+  // --- NEW TEST CASE ---
+  it('allows full users to access /account', () => {
+    useGame.mockReturnValue({
+      userProfile: { id: '123', club_name: 'Test FC' },
+      loading: false,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/account']}>
+        <AppRoutes />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Account Page')).toBeInTheDocument();
+  });
+
+  // --- SECURITY CHECK FOR NEW ROUTE ---
+  it('protects /account from unauthenticated users', () => {
+    useGame.mockReturnValue({
+      userProfile: null,
+      loading: false,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/account']}>
+        <AppRoutes />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Login Page')).toBeInTheDocument();
   });
 });

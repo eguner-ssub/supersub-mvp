@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
 const GameContext = createContext();
@@ -8,112 +8,139 @@ export const useGame = () => useContext(GameContext);
 export const GameProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // TRACKING REF: This is the "Ticket Number" for the current request.
+  // If a request finishes and its ticket doesn't match this, we ignore it.
+  const activeRequestId = useRef(0);
 
-  // --- 1. INITIALIZATION & SESSION MANAGEMENT ---
-  useEffect(() => {
-    let mounted = true;
-
-    // A. DEADMAN'S SWITCH: Force loading to stop after 4 seconds
-    // This guarantees the app never gets "stuck" infinitely.
-    const safetyTimeout = setTimeout(() => {
-      if (loading && mounted) {
-        console.warn("⚠️ DATABASE TIMEOUT: Forcing application load.");
-        setLoading(false);
-      }
-    }, 4000);
-
-    const initSession = async () => {
-      console.log("⚡ INIT: Starting Session Check...");
+  // --- HELPER: Fetch with Retry & Timeout ---
+  const fetchProfileSafely = async (userId, retries = 3) => {
+    for (let i = 0; i < retries; i++) {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          console.log("✅ USER FOUND:", session.user.id);
-          if (mounted) await loadProfile(session.user);
-        } else {
-          console.log("❌ NO USER SESSION");
-          if (mounted) setLoading(false);
-        }
+        // 1. Timeout Promise (7s)
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("DB_TIMEOUT")), 7000)
+        );
+
+        // 2. DB Promise
+        const dbPromise = supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        // 3. Race
+        const { data, error } = await Promise.race([dbPromise, timeoutPromise]);
+
+        if (error) throw error;
+        return data; 
+
       } catch (err) {
-        console.error("💀 FATAL SESSION ERROR:", err);
-        if (mounted) setLoading(false);
+        console.warn(`⚠️ Attempt ${i + 1} Failed: ${err.message}`);
+        if (i === retries - 1) throw err;
+        await new Promise(r => setTimeout(r, 1000));
       }
-    };
+    }
+  };
 
-    initSession();
-
-    // B. AUTH LISTENER
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`🔔 AUTH EVENT: ${event}`);
-
-      if (event === 'SIGNED_OUT') {
-        setUserProfile(null);
-        setLoading(false);
-        localStorage.clear(); 
-      } else if (session?.user) {
-        await loadProfile(session.user);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      clearTimeout(safetyTimeout); // Clean up the timer
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // --- 2. LOAD PROFILE (READ) ---
+  // --- 1. CORE LOAD LOGIC ---
   const loadProfile = async (user) => {
-    console.log("📂 LOADING PROFILE FOR:", user.email);
-    try {
-      // Fetch Core Profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle(); // Changed from single() to maybeSingle() to prevent error throwing on new users
+    // GENERATE NEW TICKET
+    const myRequestId = Date.now();
+    activeRequestId.current = myRequestId;
 
-      if (profileError) {
-        console.error('⚠️ PROFILE FETCH ERROR:', profileError.message);
+    console.log(`📂 LOADING PROFILE (ReqID: ${myRequestId}) FOR:`, user.email);
+    
+    try {
+      const profileData = await fetchProfileSafely(user.id);
+
+      // ZOMBIE CHECK 1: If a newer request started while we were waiting, STOP.
+      if (activeRequestId.current !== myRequestId) {
+          console.log(`✋ Request ${myRequestId} aborted (Stale).`);
+          return;
       }
 
-      // Fetch Inventory
-      const { data: inventoryData } = await supabase
-        .from('inventory')
-        .select('card_id')
-        .eq('user_id', user.id);
+      let inventoryData = [];
+      if (profileData) {
+        const { data } = await supabase.from('inventory').select('card_id').eq('user_id', user.id);
+        inventoryData = data || [];
+      }
 
       if (profileData) {
         console.log("✅ PROFILE LOADED:", profileData.club_name);
         setUserProfile({
           ...profileData,
           email: user.email,
-          inventory: inventoryData ? inventoryData.map(i => i.card_id) : []
+          inventory: inventoryData.map(i => i.card_id)
         });
       } else {
-        console.log("🆕 NEW USER DETECTED (No Profile DB Row)");
-        // THIS IS CRITICAL: We must set userProfile even if DB row is missing
-        // so App.jsx doesn't kick us out, but sends us to Onboarding instead.
-        setUserProfile({ 
-          id: user.id, 
-          email: user.email, 
-          club_name: null 
-        });
+        console.log("🆕 NEW USER DETECTED");
+        setUserProfile({ id: user.id, email: user.email, club_name: null });
       }
     } catch (error) {
-      console.error('🔥 CRITICAL PROFILE FAILURE:', error);
+      // ZOMBIE CHECK 2: If we are stale, do NOT kill the session.
+      if (activeRequestId.current !== myRequestId) {
+          console.log(`ignored error from stale request ${myRequestId}`);
+          return;
+      }
+
+      console.error('🔥 CRITICAL CONNECTION FAILURE:', error.message);
+      
+      // ONLY KILL SESSION IF WE ARE THE CURRENT ACTIVE REQUEST
+      console.log("🛑 Force-clearing session due to active failure...");
+      await supabase.auth.signOut();
+      localStorage.clear();
+      window.location.href = '/login'; 
+      return;
     } finally {
-      setLoading(false);
+      // Only turn off loading if we are still the active request
+      if (activeRequestId.current === myRequestId) {
+          setLoading(false);
+      }
     }
   };
 
-  // --- 3. CREATE PROFILE (WRITE) ---
+  // --- 2. AUTH LISTENER ---
+  useEffect(() => {
+    console.log("⚡ INIT: Starting Auth Listener...");
+    
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn("🛑 DEADMAN SWITCH: Forcing app load.");
+        setLoading(false);
+      }
+    }, 12000);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`🔔 AUTH EVENT: ${event}`);
+
+      if (event === 'SIGNED_OUT') {
+        setUserProfile(null);
+        setLoading(false);
+        activeRequestId.current = 0; // Clear active requests
+        localStorage.removeItem('sb-access-token');
+      } else if (session?.user) {
+        // ALWAYS LOAD on Signed In, effectively cancelling any previous hangs
+        if (userProfile?.id !== session.user.id) {
+            await loadProfile(session.user);
+        } else {
+            setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // --- 3. WRITE ACTIONS ---
   const createProfile = async (managerName) => {
     if (!userProfile?.id) return;
-    console.log("✍️ CREATING PROFILE:", managerName);
-
+    
     const newProfile = {
       id: userProfile.id,
       name: managerName,
@@ -125,30 +152,15 @@ export const GameProvider = ({ children }) => {
     };
 
     try {
-      // FIX IS HERE: Change .insert() to .upsert()
       const { error } = await supabase.from('profiles').upsert([newProfile]);
-      
-      if (error) {
-        console.error("Database Error:", error.message);
-        throw error;
-      }
-
-      // 2. Insert Starter Inventory
-      const starterCards = ['c_match_result', 'c_total_goals', 'c_player_score'];
-      await updateInventory(starterCards);
-
-      // 3. Update Local State (This triggers the Onboarding screen to switch)
-      setUserProfile(prev => ({
-        ...prev,
-        ...newProfile
-      }));
-
+      if (error) throw error;
+      await updateInventory(['c_match_result', 'c_total_goals', 'c_player_score']);
+      setUserProfile(prev => ({ ...prev, ...newProfile }));
     } catch (error) {
       console.error('Error creating profile:', error.message);
     }
   };
 
-  // --- 4. GAME ACTIONS ---
   const spendEnergy = async (amount) => {
     if (!userProfile) return;
     const newEnergy = Math.max(0, userProfile.energy - amount);
@@ -158,14 +170,8 @@ export const GameProvider = ({ children }) => {
 
   const updateInventory = async (newCardIds) => {
     if (!userProfile?.id) return;
+    setUserProfile(prev => ({ ...prev, inventory: [...(prev.inventory || []), ...newCardIds] }));
     const rows = newCardIds.map(cid => ({ user_id: userProfile.id, card_id: cid }));
-    
-    // Optimistic update
-    setUserProfile(prev => ({
-      ...prev,
-      inventory: [...(prev.inventory || []), ...newCardIds]
-    }));
-
     const { error } = await supabase.from('inventory').insert(rows);
     if (error) console.error('Inventory Sync Failed:', error.message);
   };
@@ -173,6 +179,7 @@ export const GameProvider = ({ children }) => {
   const value = {
     userProfile,
     loading,
+    supabase, 
     createProfile,
     spendEnergy,
     updateInventory
@@ -184,4 +191,5 @@ export const GameProvider = ({ children }) => {
     </GameContext.Provider>
   );
 };
+
 export default GameProvider;
