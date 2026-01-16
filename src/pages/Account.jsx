@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { ArrowLeft, LogOut, User, Mail, Shield, ChevronRight } from 'lucide-react';
+import { ArrowLeft, LogOut, User, Mail, Shield, ChevronRight, Backpack } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
 
 const Account = () => {
@@ -13,10 +13,10 @@ const Account = () => {
       console.log("🛑 SIGNING OUT...");
       // 1. Kill the Supabase session
       await supabase.auth.signOut();
-      
+
       // 2. Nuke local storage (The "Memory Wipe")
       localStorage.clear();
-      
+
       // 3. Hard Redirect to login (Safer than navigate for clearing state)
       window.location.href = '/login';
     } catch (error) {
@@ -27,10 +27,10 @@ const Account = () => {
   return (
     <MobileLayout>
       <div className="flex flex-col h-full font-sans">
-        
+
         {/* Header */}
         <div className="p-4 pt-6 flex items-center gap-4 border-b border-gray-800 bg-black/40 backdrop-blur-md">
-          <button 
+          <button
             onClick={() => navigate('/dashboard')}
             className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
           >
@@ -41,7 +41,7 @@ const Account = () => {
 
         {/* Content */}
         <div className="p-4 space-y-6 flex-1 overflow-y-auto">
-          
+
           {/* Profile Card */}
           <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 flex flex-col items-center border border-white/10 shadow-xl">
             <div className="w-20 h-20 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-full flex items-center justify-center border-4 border-black/50 shadow-lg mb-4">
@@ -61,7 +61,7 @@ const Account = () => {
           <div>
             <h3 className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] mb-3 pl-2">Credentials</h3>
             <div className="bg-gray-900/80 rounded-xl border border-white/5 overflow-hidden">
-              
+
               <div className="flex items-center justify-between p-4 border-b border-white/5">
                 <div className="flex items-center gap-3">
                   <Mail className="w-5 h-5 text-blue-400" />
@@ -81,8 +81,20 @@ const Account = () => {
             </div>
           </div>
 
+          {/* My Inventory Button */}
+          <button
+            onClick={() => navigate('/inventory')}
+            className="w-full bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 border border-yellow-500/30 text-yellow-500 p-4 rounded-xl flex items-center justify-between transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <Backpack className="w-5 h-5" />
+              <span className="font-bold uppercase tracking-wide text-sm">My Inventory</span>
+            </div>
+            <ChevronRight className="w-5 h-5 opacity-50 group-hover:translate-x-1 transition-transform" />
+          </button>
+
           {/* Danger Zone */}
-          <button 
+          <button
             onClick={handleLogout}
             className="w-full bg-red-500/10 hover:bg-red-500/20 active:scale-95 border border-red-500/30 text-red-500 p-4 rounded-xl flex items-center justify-between transition-all group mt-8"
           >

@@ -13,15 +13,16 @@ import MatchHub from './pages/MatchHub';
 import MatchDetail from './pages/MatchDetail';
 import Training from './pages/Training';
 import Inventory from './pages/Inventory';
-import Settings from './pages/Settings'; 
+import CardsInPlay from './pages/CardsInPlay';
+import Settings from './pages/Settings';
 import Account from './pages/Account'; // <--- 1. IMPORT ADDED HERE
 
 // --- THE BOUNCER (Security Guard) ---
 const ProtectedRoute = ({ children, requireOnboarding = true }) => {
   const { userProfile, loading } = useGame();
-  
-  const isLoggingIn = 
-    window.location.hash.includes('access_token') || 
+
+  const isLoggingIn =
+    window.location.hash.includes('access_token') ||
     window.location.search.includes('token=') ||
     window.location.search.includes('type=magiclink');
 
@@ -54,27 +55,28 @@ export const AppRoutes = () => {
       <Route path="/signup" element={<Signup />} />
 
       {/* ONBOARDING */}
-      <Route 
-        path="/onboarding" 
+      <Route
+        path="/onboarding"
         element={
           <ProtectedRoute requireOnboarding={false}>
             <Onboarding />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* DASHBOARD & GAME */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      
+
       {/* --- 2. ACCOUNT ROUTE ADDED HERE --- */}
       <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
-      
+
       <Route path="/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
       <Route path="/match-hub" element={<ProtectedRoute><MatchHub /></ProtectedRoute>} />
       <Route path="/match/:id" element={<ProtectedRoute><MatchDetail /></ProtectedRoute>} />
       <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+      <Route path="/inventory/active" element={<ProtectedRoute><CardsInPlay /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-      
+
       {/* Fallback logic */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { ArrowLeft, CheckCircle, XCircle, Zap, HelpCircle, Clock, Loader2, Brain, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Zap, HelpCircle, Clock, Loader2, Brain, Trophy, PlayCircle } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
+import AdOverlay from '../components/AdOverlay';
 import gameData from '../data/gameData.json';
 
 const Training = () => {
@@ -16,6 +17,7 @@ const Training = () => {
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
+  const [showAd, setShowAd] = useState(false);
 
   // --- 1. INITIALIZATION & BALANCING ENGINE ---
   useEffect(() => {
@@ -100,6 +102,26 @@ const Training = () => {
     }
   };
 
+
+  // WATCH AD HANDLER
+  const handleAdReward = async () => {
+    try {
+      const { data, error } = await supabase.rpc('watch_ad_reward', {
+        p_user_id: userProfile.id
+      });
+
+      if (error) throw error;
+
+      console.log('✅ Ad reward granted:', data);
+      setShowAd(false);
+      window.location.reload();
+    } catch (error) {
+      console.error('❌ Ad reward error:', error);
+      alert('Failed to grant reward. Please try again.');
+      setShowAd(false);
+    }
+  };
+
   // --- SAFETY SHIELD: LOADING ---
   if (loading) {
     return (
@@ -116,6 +138,7 @@ const Training = () => {
   if (phase === 'briefing') {
     const hasEnergy = userProfile.energy > 0;
     return (
+      <>
       <MobileLayout bgImage="/bg-training-brief.webp">
         <div className="w-full max-w-md h-full flex flex-col justify-center p-6 relative">
           <button onClick={() => navigate('/dashboard')} className="absolute top-6 left-4 flex items-center gap-2 text-gray-300 hover:text-white z-50">
@@ -148,14 +171,26 @@ const Training = () => {
             {hasEnergy ? (
               <button onClick={handleStartSession} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-lg transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800">START SESSION</button>
             ) : (
-              <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4 text-center">
-                <p className="text-red-400 font-bold mb-1">Low Energy</p>
-                <p className="text-xs text-gray-400">Wait for recharge or buy energy.</p>
-              </div>
+              <button 
+                onClick={() => setShowAd(true)}
+                className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold rounded-xl text-lg transition-all shadow-lg active:scale-95 border-b-4 border-green-800 flex items-center justify-center gap-2"
+              >
+                <PlayCircle className="w-5 h-5" />
+                Watch Ad (+3 Energy)
+              </button>
             )}
           </div>
         </div>
       </MobileLayout>
+      
+      {/* Ad Overlay */}
+      {showAd && (
+        <AdOverlay
+          onReward={handleAdReward}
+          onClose={() => setShowAd(false)}
+        />
+      )}
+      </>
     );
   }
 
@@ -197,6 +232,7 @@ const Training = () => {
   const currentQuestion = questions[currentQIndex];
 
   return (
+    <>
     <MobileLayout bgImage="/bg-training-quiz.webp">
       <div className="flex flex-col h-full relative p-4 max-w-md mx-auto">
         <div className="flex items-center justify-between mb-8 mt-4">
@@ -235,6 +271,18 @@ const Training = () => {
         </div>
       </div>
     </MobileLayout>
+  );
+};
+
+
+    {/* Ad Overlay */}
+    {showAd && (
+      <AdOverlay
+        onReward={handleAdReward}
+        onClose={() => setShowAd(false)}
+      />
+    )}
+    </>
   );
 };
 
