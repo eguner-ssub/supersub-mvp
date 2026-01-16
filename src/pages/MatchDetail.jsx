@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Zap, Loader2, Lock, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Zap, Loader2, Lock, TrendingUp, CheckCircle } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 
 const MatchDetail = () => {
@@ -17,6 +17,7 @@ const MatchDetail = () => {
   const [selectedCard, setSelectedCard] = useState(null);
   const [draftPrediction, setDraftPrediction] = useState(null);
   const [isDeckOpen, setIsDeckOpen] = useState(true);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // CARD TYPES DEFINITION
   const cardTypes = [
@@ -67,11 +68,6 @@ const MatchDetail = () => {
           setMatch(matchData.response[0]);
 
           // Use mock odds for now to avoid API limits
-          // TODO: Switch to real API when ready
-          // const oddsResponse = await fetch(`/api/odds?fixture=${id}`);
-          // const oddsData = await oddsResponse.json();
-          // setOdds(oddsData.odds);
-
           setOdds(getMockOdds(id));
         } else {
           throw new Error("Match not found");
@@ -87,19 +83,32 @@ const MatchDetail = () => {
     if (id) fetchMatchDetail();
   }, [id]);
 
-  // CARD SELECTION HANDLER
+  // CARD SELECTION HANDLER WITH TOGGLE
   const handleCardSelect = (cardId) => {
     if (getCardCount(cardId) === 0) return; // Can't select cards you don't have
     if (cardId !== 'c_match_result') return; // Only Match Result cards work for now
 
-    setSelectedCard(cardId);
-    setDraftPrediction(null); // Clear any existing draft
+    // TOGGLE LOGIC: If clicking the same card, deselect it
+    if (selectedCard === cardId) {
+      setSelectedCard(null);
+      setDraftPrediction(null);
+    } else {
+      setSelectedCard(cardId);
+      setDraftPrediction(null); // Clear any existing draft
+    }
   };
 
-  // PREDICTION SELECTION HANDLER
+  // PREDICTION SELECTION HANDLER WITH TOGGLE
   const handlePredictionSelect = (type) => {
     if (!selectedCard) return; // Must select a card first
     if (!hasMatchResultCard()) return; // Must have the card
+
+    // TOGGLE LOGIC: If clicking the same prediction, cancel it
+    if (draftPrediction?.type === type) {
+      setDraftPrediction(null);
+      setIsDeckOpen(true);
+      return;
+    }
 
     let oddsValue;
     switch (type) {
@@ -127,16 +136,43 @@ const MatchDetail = () => {
     setIsDeckOpen(false); // Dim the deck
   };
 
-  // PLAY PREDICTION HANDLER (Placeholder)
+  // BACKDROP CLICK HANDLER - Cancel prediction
+  const handleBackdropClick = () => {
+    setDraftPrediction(null);
+    setIsDeckOpen(true);
+  };
+
+  // GET DISPLAY NAME FOR PREDICTION
+  const getPredictionDisplayName = () => {
+    if (!draftPrediction || !match) return '';
+
+    switch (draftPrediction.type) {
+      case 'HOME_WIN':
+        return `${match.teams.home.name} Win`;
+      case 'AWAY_WIN':
+        return `${match.teams.away.name} Win`;
+      case 'DRAW':
+        return 'Draw';
+      default:
+        return draftPrediction.type;
+    }
+  };
+
+  // PLAY PREDICTION HANDLER - Show Success Modal
   const handlePlayPrediction = () => {
     console.log('🎯 PLAYING PREDICTION:', draftPrediction);
     // TODO: Submit to backend, deduct card from inventory, etc.
-    alert(`Prediction Placed: ${draftPrediction.type} for ${draftPrediction.potentialReward} coins!`);
 
-    // Reset state
+    setShowSuccessModal(true);
+  };
+
+  // CLOSE SUCCESS MODAL AND NAVIGATE
+  const handleContinue = () => {
+    setShowSuccessModal(false);
     setDraftPrediction(null);
     setSelectedCard(null);
     setIsDeckOpen(true);
+    navigate('/match-hub');
   };
 
   const formatTime = (d) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -280,7 +316,15 @@ const MatchDetail = () => {
             </div>
           </div>
 
-          {/* 5. CARDS TO BE PLAYED PANEL */}
+          {/* 5. BACKDROP FOR CANCELLATION */}
+          {draftPrediction && (
+            <div
+              className="absolute inset-0 z-35"
+              onClick={handleBackdropClick}
+            />
+          )}
+
+          {/* 6. CARDS TO BE PLAYED PANEL */}
           {draftPrediction && (
             <div className="absolute bottom-36 left-0 w-full z-40 px-4">
               <div className="bg-gradient-to-b from-gray-900 to-black border-2 border-yellow-500 rounded-xl p-4 shadow-[0_0_30px_rgba(234,179,8,0.5)]">
@@ -288,7 +332,7 @@ const MatchDetail = () => {
                   <div className="flex items-center gap-3">
                     <TrendingUp className="w-6 h-6 text-yellow-400" />
                     <div>
-                      <p className="text-white font-black text-sm uppercase">{draftPrediction.type.replace('_', ' ')}</p>
+                      <p className="text-white font-black text-sm uppercase">{getPredictionDisplayName()}</p>
                       <p className="text-gray-400 text-xs">Odds: {draftPrediction.odds.toFixed(2)}x</p>
                     </div>
                   </div>
@@ -307,7 +351,7 @@ const MatchDetail = () => {
             </div>
           )}
 
-          {/* 6. SHELF & INVENTORY */}
+          {/* 7. SHELF & INVENTORY */}
           <div className="absolute bottom-0 w-full z-30">
             <div className={`w-full flex justify-center items-end gap-3 pb-4 px-4 z-40 relative translate-y-2 transition-opacity duration-300 ${!isDeckOpen ? 'opacity-50' : 'opacity-100'}`}>
               {cardTypes.map((card) => {
@@ -344,6 +388,44 @@ const MatchDetail = () => {
             </div>
           </div>
         </>
+      )}
+
+      {/* 8. SUCCESS MODAL */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 max-w-sm w-full border-2 border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.5)] animate-in fade-in zoom-in duration-300">
+
+            {/* Success Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-12 h-12 text-green-500" />
+              </div>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-white text-2xl font-black uppercase text-center mb-2">
+              Success!
+            </h2>
+
+            {/* Message */}
+            <p className="text-gray-300 text-center mb-6">
+              Prediction Placed:<br />
+              <span className="text-yellow-400 font-bold text-lg">
+                {getPredictionDisplayName()}
+              </span>
+              <br />
+              for <span className="text-green-400 font-bold">{draftPrediction?.potentialReward} coins</span>!
+            </p>
+
+            {/* Continue Button */}
+            <button
+              onClick={handleContinue}
+              className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase rounded-lg transition-all active:scale-95 shadow-lg"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
       )}
 
       <style>{`.clip-path-trapezoid { clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%); }`}</style>

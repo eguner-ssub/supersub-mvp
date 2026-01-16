@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext'; 
-import { LogIn, UserPlus, Loader2 } from 'lucide-react'; // Added Loader2
+import { useGame } from '../context/GameContext';
+import { LogIn, UserPlus, Loader2 } from 'lucide-react';
 
 const Landing = () => {
   const navigate = useNavigate();
-  // Get loading state to prevent the "Flash of Unauthenticated Content"
-  const { userProfile, loading } = useGame(); 
+  // We grab 'loading' to know if the DB check is finished
+  const { userProfile, loading } = useGame();
 
   // --- AUTO-REDIRECT LOGIC ---
   useEffect(() => {
@@ -16,9 +16,9 @@ const Landing = () => {
     }
   }, [userProfile, loading, navigate]);
 
-  // --- LOADING STATE ---
-  // If we are still checking the DB, show a spinner. 
-  // This prevents the "Login" buttons from appearing for 0.5s before the redirect happens.
+  // --- THE LOADING SHIELD ---
+  // If we are still checking the DB (even if it takes 10 seconds), 
+  // show this spinner. Do NOT show the buttons.
   if (loading) {
     return (
       <div className="min-h-screen w-full bg-black flex items-center justify-center">
@@ -36,9 +36,9 @@ const Landing = () => {
 
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 overflow-hidden">
-      
+
       {/* BACKGROUND IMAGE */}
-      <div 
+      <div
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-transform duration-1000 scale-105"
         style={{ backgroundImage: "url('/bg-benchview.webp')" }}
       >
@@ -46,14 +46,14 @@ const Landing = () => {
       </div>
 
       <div className="relative z-10 max-w-md w-full flex flex-col items-center text-center">
-        
+
         {/* LOGO SECTION */}
         <div className="mb-16 animate-in fade-in slide-in-from-top-6 duration-1000">
           <div className="relative group">
             <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full group-hover:bg-green-500/30 transition-all duration-700"></div>
-            <img 
-              src="/logo.webp" 
-              alt="SUPERSUB Shield" 
+            <img
+              src="/logo.webp"
+              alt="SUPERSUB Shield"
               className="relative w-72 h-auto drop-shadow-[0_0_35px_rgba(34,197,94,0.4)] transition-transform duration-500 hover:scale-105"
             />
           </div>
@@ -61,14 +61,15 @@ const Landing = () => {
 
         {/* Action Buttons */}
         <div className="space-y-6 w-full flex flex-col items-center">
-          
+
+          {/* JOIN BUTTON */}
           <button
             onClick={() => navigate('/signup')}
             className="group relative w-full max-w-[300px] h-[68px] rounded-full p-[2px] transition-all active:scale-95 shadow-[0_0_30px_rgba(34,197,94,0.4)]"
             style={{ background: 'linear-gradient(180deg, #D4AF37 0%, #1a1a1a 100%)' }}
           >
-            <div 
-              className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[1px] border-green-400/50" 
+            <div
+              className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[1px] border-green-400/50"
               style={carbonStyle}
             >
               <UserPlus className="w-5 h-5 text-green-400 group-hover:scale-110 transition-transform" />
@@ -76,13 +77,14 @@ const Landing = () => {
             </div>
           </button>
 
+          {/* LOGIN BUTTON */}
           <button
             onClick={() => navigate('/login')}
             className="group relative w-full max-w-[300px] h-[64px] rounded-full p-[2px] transition-all active:scale-95 shadow-lg"
             style={{ background: 'linear-gradient(180deg, #666 0%, #111 100%)' }}
           >
-            <div 
-              className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[1px] border-white/10" 
+            <div
+              className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[1px] border-white/10"
               style={carbonStyle}
             >
               <LogIn className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />

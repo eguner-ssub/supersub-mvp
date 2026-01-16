@@ -22,7 +22,7 @@ vi.mock('react-router-dom', async () => {
 // Mock fetch globally
 global.fetch = vi.fn();
 
-describe('MatchDetail - Prediction Flow', () => {
+describe('MatchDetail - Prediction Flow with Toggles', () => {
     const mockProfile = {
         id: '123',
         club_name: 'Test FC',
@@ -134,7 +134,45 @@ describe('MatchDetail - Prediction Flow', () => {
         });
     });
 
-    it('creates draft prediction when prediction button is clicked', async () => {
+    // NEW TEST 1: Card Toggle (Deselection)
+    it('tapping a selected card again deselects it', async () => {
+        useGame.mockReturnValue({
+            userProfile: mockProfile,
+            loading: false,
+        });
+
+        render(
+            <MemoryRouter initialEntries={['/match/12345']}>
+                <Routes>
+                    <Route path="/match/:id" element={<MatchDetail />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Arsenal')).toBeInTheDocument();
+        });
+
+        // Find and click the Match Result card
+        const matchResultCards = screen.getAllByAltText('Match Result');
+        fireEvent.click(matchResultCards[0]);
+
+        // Verify it's selected
+        await waitFor(() => {
+            expect(screen.getByText('✓ Card Selected')).toBeInTheDocument();
+        });
+
+        // Click the same card again
+        fireEvent.click(matchResultCards[0]);
+
+        // Verify it's deselected (back to default message)
+        await waitFor(() => {
+            expect(screen.getByText('Select a Card')).toBeInTheDocument();
+        });
+    });
+
+    // NEW TEST 2: Prediction Toggle (Cancellation)
+    it('tapping a selected prediction button again cancels the prediction', async () => {
         useGame.mockReturnValue({
             userProfile: mockProfile,
             loading: false,
@@ -163,8 +201,102 @@ describe('MatchDetail - Prediction Flow', () => {
         // Verify queue panel appears
         await waitFor(() => {
             expect(screen.getByText('⚡ PLAY PREDICTION')).toBeInTheDocument();
-            expect(screen.getByText(/HOME WIN/i)).toBeInTheDocument();
         });
+
+        // Click the same prediction button again
+        fireEvent.click(homeWinButton);
+
+        // Verify queue panel disappears
+        await waitFor(() => {
+            expect(screen.queryByText('⚡ PLAY PREDICTION')).not.toBeInTheDocument();
+        });
+    });
+
+    // NEW TEST 3: Success Overlay with Team Names
+    it('clicking Play triggers the Success Overlay with the correct Team Name (not raw ID)', async () => {
+        useGame.mockReturnValue({
+            userProfile: mockProfile,
+            loading: false,
+        });
+
+        render(
+            <MemoryRouter initialEntries={['/match/12345']}>
+                <Routes>
+                    <Route path="/match/:id" element={<MatchDetail />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Arsenal')).toBeInTheDocument();
+        });
+
+        // Select a card
+        const matchResultCards = screen.getAllByAltText('Match Result');
+        fireEvent.click(matchResultCards[0]);
+
+        // Select Home Win prediction
+        const homeWinButton = screen.getByText(/Arsenal Win/i);
+        fireEvent.click(homeWinButton);
+
+        // Click PLAY button
+        const playButton = screen.getByText('⚡ PLAY PREDICTION');
+        fireEvent.click(playButton);
+
+        // Verify Success Modal appears
+        await waitFor(() => {
+            expect(screen.getByText('Success!')).toBeInTheDocument();
+        });
+
+        // Verify team name is displayed (NOT "HOME_WIN")
+        const successModal = screen.getByText('Success!').closest('div');
+        expect(successModal).toHaveTextContent('Arsenal Win');
+        expect(successModal).not.toHaveTextContent('HOME_WIN');
+
+        // Verify Continue button exists
+        expect(screen.getByText('Continue')).toBeInTheDocument();
+    });
+
+    // BONUS TEST: Success Modal Navigation
+    it('clicking Continue in success modal navigates to match-hub', async () => {
+        useGame.mockReturnValue({
+            userProfile: mockProfile,
+            loading: false,
+        });
+
+        render(
+            <MemoryRouter initialEntries={['/match/12345']}>
+                <Routes>
+                    <Route path="/match/:id" element={<MatchDetail />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Arsenal')).toBeInTheDocument();
+        });
+
+        // Complete the flow: Select card -> Select prediction -> Play
+        const matchResultCards = screen.getAllByAltText('Match Result');
+        fireEvent.click(matchResultCards[0]);
+
+        const homeWinButton = screen.getByText(/Arsenal Win/i);
+        fireEvent.click(homeWinButton);
+
+        const playButton = screen.getByText('⚡ PLAY PREDICTION');
+        fireEvent.click(playButton);
+
+        // Wait for modal
+        await waitFor(() => {
+            expect(screen.getByText('Success!')).toBeInTheDocument();
+        });
+
+        // Click Continue
+        const continueButton = screen.getByText('Continue');
+        fireEvent.click(continueButton);
+
+        // Verify navigation
+        expect(mockNavigate).toHaveBeenCalledWith('/match-hub');
     });
 
     it('displays correct reward calculation', async () => {
@@ -184,10 +316,6 @@ describe('MatchDetail - Prediction Flow', () => {
         await waitFor(() => {
             expect(screen.getByText('Arsenal')).toBeInTheDocument();
         });
-
-        // The mock odds function generates odds based on fixture ID
-        // For ID 12345, we expect specific values
-        // Reward should be odds * 100, floored
 
         // Just verify that coin values are displayed
         const coinLabels = screen.getAllByText('Coins');
