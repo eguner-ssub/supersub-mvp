@@ -262,6 +262,7 @@ const MatchDetail = () => {
 
           {/* 4. PREDICTION STAGE */}
           <div className="absolute top-56 left-0 w-full z-30 px-4">
+            {/* Container with relative positioning for locked overlay */}
             <div className="relative">
               {/* Prediction Buttons */}
               <div className="flex flex-col gap-3">
@@ -299,34 +300,36 @@ const MatchDetail = () => {
                 />
               </div>
 
-              {/* LOCKED OVERLAY */}
+              {/* LOCKED OVERLAY - Positioned relative to parent container */}
               {isLocked && (
                 <div className="absolute inset-0 backdrop-blur-sm bg-black/40 rounded-xl flex flex-col items-center justify-center z-50">
-                  <Lock className="w-12 h-12 text-yellow-500 mb-3" />
-                  <p className="text-white font-bold text-lg mb-2">Locked</p>
-                  <p className="text-gray-300 text-sm mb-4">You need a Match Result card</p>
-                  <button
-                    onClick={() => navigate('/training')}
-                    className="px-6 py-2 bg-yellow-500 text-black font-black uppercase rounded-lg hover:bg-yellow-400 transition-all"
-                  >
-                    Get Cards
-                  </button>
+                  <div className="flex flex-col items-center justify-center">
+                    <Lock className="w-12 h-12 text-yellow-500 mb-3" />
+                    <p className="text-white font-bold text-lg mb-2">Locked</p>
+                    <p className="text-gray-300 text-sm mb-4">You need a Match Result card</p>
+                    <button
+                      onClick={() => navigate('/training')}
+                      className="px-6 py-2 bg-yellow-500 text-black font-black uppercase rounded-lg hover:bg-yellow-400 transition-all"
+                    >
+                      Get Cards
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* 5. BACKDROP FOR CANCELLATION */}
+          {/* 5. BACKDROP FOR CANCELLATION - z-50 to sit above deck but below queue */}
           {draftPrediction && (
             <div
-              className="absolute inset-0 z-35"
+              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
               onClick={handleBackdropClick}
             />
           )}
 
-          {/* 6. CARDS TO BE PLAYED PANEL */}
+          {/* 6. CARDS TO BE PLAYED PANEL - z-[55] to sit above backdrop */}
           {draftPrediction && (
-            <div className="absolute bottom-36 left-0 w-full z-40 px-4">
+            <div className="fixed bottom-36 left-0 w-full z-[55] px-4">
               <div className="bg-gradient-to-b from-gray-900 to-black border-2 border-yellow-500 rounded-xl p-4 shadow-[0_0_30px_rgba(234,179,8,0.5)]">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -343,7 +346,7 @@ const MatchDetail = () => {
                 </div>
                 <button
                   onClick={handlePlayPrediction}
-                  className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase rounded-lg transition-all active:scale-95 shadow-lg"
+                  className="w-full min-h-[48px] py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase rounded-lg transition-all active:scale-95 shadow-lg"
                 >
                   ⚡ PLAY PREDICTION
                 </button>
@@ -353,7 +356,7 @@ const MatchDetail = () => {
 
           {/* 7. SHELF & INVENTORY */}
           <div className="absolute bottom-0 w-full z-30">
-            <div className={`w-full flex justify-center items-end gap-3 pb-4 px-4 z-40 relative translate-y-2 transition-opacity duration-300 ${!isDeckOpen ? 'opacity-50' : 'opacity-100'}`}>
+            <div className={`w-full flex justify-center items-end gap-3 pb-6 px-6 z-40 relative translate-y-2 transition-opacity duration-300 ${!isDeckOpen ? 'opacity-50' : 'opacity-100'}`}>
               {cardTypes.map((card) => {
                 const count = getCardCount(card.id);
                 const isActive = count > 0;
@@ -390,9 +393,9 @@ const MatchDetail = () => {
         </>
       )}
 
-      {/* 8. SUCCESS MODAL */}
+      {/* 8. SUCCESS MODAL - z-[60] highest layer */}
       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
           <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 max-w-sm w-full border-2 border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.5)] animate-in fade-in zoom-in duration-300">
 
             {/* Success Icon */}
@@ -420,7 +423,7 @@ const MatchDetail = () => {
             {/* Continue Button */}
             <button
               onClick={handleContinue}
-              className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase rounded-lg transition-all active:scale-95 shadow-lg"
+              className="w-full min-h-[48px] py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase rounded-lg transition-all active:scale-95 shadow-lg"
             >
               Continue
             </button>
@@ -459,26 +462,30 @@ const PredictionButton = ({ type, label, logo, odds, isSelected, isLocked, onCli
         {/* Left: Logo or Icon */}
         <div className="flex items-center gap-3">
           {logo ? (
-            <img src={logo} alt={label} className="w-10 h-10 object-contain drop-shadow-lg" />
+            <img
+              src={logo}
+              alt={label}
+              className="w-10 h-10 shrink-0 object-contain drop-shadow-lg"
+            />
           ) : (
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-              <span className="text-white font-black text-xl">=</span>
+            <div className="w-10 h-10 shrink-0 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-white font-black text-xl drop-shadow-md">=</span>
             </div>
           )}
           <div className="text-left">
-            <p className={`font-black text-sm uppercase tracking-wide ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
+            <p className={`font-black text-sm uppercase tracking-wide drop-shadow-md ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
               {label}
             </p>
-            <p className="text-gray-300 text-xs">Odds: {parseFloat(odds).toFixed(2)}x</p>
+            <p className="text-gray-300 text-xs drop-shadow-sm">Odds: {parseFloat(odds).toFixed(2)}x</p>
           </div>
         </div>
 
         {/* Right: Reward */}
-        <div className="text-right">
-          <p className={`font-black text-2xl ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
+        <div className="text-right shrink-0">
+          <p className={`font-black text-2xl drop-shadow-md ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
             {potentialReward}
           </p>
-          <p className="text-gray-300 text-xs uppercase">Coins</p>
+          <p className="text-gray-300 text-xs uppercase drop-shadow-sm">Coins</p>
         </div>
       </div>
     </button>
