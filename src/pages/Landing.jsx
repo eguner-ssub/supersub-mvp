@@ -1,19 +1,31 @@
-import React, { useEffect } from 'react'; // Added useEffect
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext'; // Added GameContext
-import { LogIn, UserPlus } from 'lucide-react';
+import { useGame } from '../context/GameContext'; 
+import { LogIn, UserPlus, Loader2 } from 'lucide-react'; // Added Loader2
 
 const Landing = () => {
   const navigate = useNavigate();
-  const { userProfile } = useGame(); // Get the profile
+  // Get loading state to prevent the "Flash of Unauthenticated Content"
+  const { userProfile, loading } = useGame(); 
 
   // --- AUTO-REDIRECT LOGIC ---
-  // If the user is already logged in (has a club name), kick them straight to the game.
   useEffect(() => {
-    if (userProfile?.club_name) {
+    // Only redirect if we are done loading AND have a valid profile
+    if (!loading && userProfile?.club_name) {
       navigate('/dashboard', { replace: true });
     }
-  }, [userProfile, navigate]);
+  }, [userProfile, loading, navigate]);
+
+  // --- LOADING STATE ---
+  // If we are still checking the DB, show a spinner. 
+  // This prevents the "Login" buttons from appearing for 0.5s before the redirect happens.
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full bg-black flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
+      </div>
+    );
+  }
 
   // Tactical Carbon Fiber CSS texture
   const carbonStyle = {

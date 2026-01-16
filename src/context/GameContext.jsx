@@ -77,27 +77,25 @@ export const GameProvider = ({ children }) => {
         console.log("🆕 NEW USER DETECTED");
         setUserProfile({ id: user.id, email: user.email, club_name: null });
       }
-    } catch (error) {
-      // ZOMBIE CHECK 2: If we are stale, do NOT kill the session.
-      if (activeRequestId.current !== myRequestId) {
-          console.log(`ignored error from stale request ${myRequestId}`);
-          return;
-      }
+    // ... inside loadProfile function ...
+  } catch (error) {
+    // ZOMBIE CHECK 2
+    if (activeRequestId.current !== myRequestId) return;
 
-      console.error('🔥 CRITICAL CONNECTION FAILURE:', error.message);
-      
-      // ONLY KILL SESSION IF WE ARE THE CURRENT ACTIVE REQUEST
-      console.log("🛑 Force-clearing session due to active failure...");
-      await supabase.auth.signOut();
-      localStorage.clear();
-      window.location.href = '/login'; 
-      return;
-    } finally {
-      // Only turn off loading if we are still the active request
-      if (activeRequestId.current === myRequestId) {
-          setLoading(false);
-      }
+    console.error('🔥 CONNECTION FAILURE:', error.message);
+    
+    // FIX: DO NOT LOG OUT. JUST STOP LOADING.
+    // We assume the user is still valid, just disconnected.
+    // This prevents the "Kick to Login" loop.
+    console.warn("⚠️ Database is slow/unreachable. Staying logged in but in 'Offline Mode'.");
+    
+    // Optionally set a flag here like setConnectionError(true) if you want to show a specific UI
+    
+  } finally {
+    if (activeRequestId.current === myRequestId) {
+      setLoading(false);
     }
+  }
   };
 
   // --- 2. AUTH LISTENER ---
