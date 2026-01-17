@@ -4,16 +4,21 @@ import { useGame } from '../context/GameContext';
 import { Zap, Coins, Cone, Trophy, Backpack, ShoppingBag, Loader2 } from 'lucide-react';
 import gameDataRaw from '../data/gameData.json';
 import { mockCards } from '../data/mockInventory';
+import WinModal from '../components/WinModal';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { userProfile, updateInventory, loading } = useGame();
+  const { userProfile, updateInventory, loading, supabase, checkActiveBets, loadProfile } = useGame();
 
   const [showBagOverlay, setShowBagOverlay] = useState(false);
   const [bagStage, setBagStage] = useState('closed');
   const [newCards, setNewCards] = useState([]);
+
+  // Win celebration state
+  const [showWinModal, setShowWinModal] = useState(false);
+  const [winAmount, setWinAmount] = useState(0);
 
   const gameData = gameDataRaw || { cardTypes: [] };
 
@@ -23,6 +28,52 @@ export default function Dashboard() {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location, navigate]);
+
+  // Real-time subscription for win celebrations
+  useEffect(() => {
+    if (!userProfile?.id || !supabase) return;
+
+    const channel = supabase
+      .channel('predictions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'predictions',
+          filter: `user_id=eq.${userProfile.id}`
+        },
+        (payload) => {
+          const { old: oldRecord, new: newRecord } = payload;
+
+          if (newRecord.status === 'WON' && oldRecord.status !== 'WON') {
+            setWinAmount(newRecord.potential_reward);
+            setShowWinModal(true);
+
+            // Reload profile to update coins
+            if (loadProfile) {
+              supabase.auth.getSession().then(({ data }) => {
+                if (data.session) loadProfile(data.session);
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userProfile?.id, supabase, loadProfile]);
+
+  // Check active bets periodically
+  useEffect(() => {
+    if (userProfile && checkActiveBets) {
+      checkActiveBets(); // Initial check
+      const interval = setInterval(checkActiveBets, 10000); // Check every 10s
+      return () => clearInterval(interval);
+    }
+  }, [userProfile, checkActiveBets]);
 
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.webp' },
@@ -272,6 +323,14 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Win Celebration Modal */}
+      {showWinModal && (
+        <WinModal
+          amount={winAmount}
+          onClose={() => setShowWinModal(false)}
+        />
       )}
     </div>
   );

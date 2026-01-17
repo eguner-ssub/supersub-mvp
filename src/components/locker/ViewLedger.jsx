@@ -1,9 +1,17 @@
 import React from 'react';
-import { getCardsByStatus } from '../../data/mockInventory';
+import { usePredictions } from '../../hooks/usePredictions';
 import { Coins, TrendingUp, TrendingDown } from 'lucide-react';
 
 const ViewLedger = () => {
-    const settledBets = getCardsByStatus('SETTLED');
+    const { predictions: settledBets, loading } = usePredictions('SETTLED');
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <p className="text-gray-500">Loading...</p>
+            </div>
+        );
+    }
 
     if (settledBets.length === 0) {
         return (
@@ -14,8 +22,8 @@ const ViewLedger = () => {
         );
     }
 
-    const totalWon = settledBets.filter(b => b.result === 'WON').reduce((sum, b) => sum + b.payout, 0);
-    const totalLost = settledBets.filter(b => b.result === 'LOST').reduce((sum, b) => sum + b.stake, 0);
+    const totalWon = settledBets.filter(b => b.status === 'WON').reduce((sum, b) => sum + b.potential_reward, 0);
+    const totalLost = settledBets.filter(b => b.status === 'LOST').reduce((sum, b) => sum + b.stake, 0);
     const netProfit = totalWon - totalLost;
 
     return (
@@ -70,21 +78,15 @@ const ViewLedger = () => {
                         {/* Match & Result */}
                         <div className="flex justify-between items-start mb-3">
                             <div>
-                                <h3 className="text-lg font-bold text-amber-900">{bet.match}</h3>
-                                <p className="text-sm text-amber-700">{bet.predictionLabel}</p>
+                                <h3 className="text-lg font-bold text-amber-900">{bet.team_name}</h3>
+                                <p className="text-sm text-amber-700">{bet.selection}</p>
                             </div>
-                            <div className={`px-3 py-1 rounded-full font-bold text-sm ${bet.result === 'WON'
+                            <div className={`px-3 py-1 rounded-full font-bold text-sm ${bet.status === 'WON'
                                     ? 'bg-green-100 text-green-700 border border-green-300'
                                     : 'bg-red-100 text-red-700 border border-red-300'
                                 }`}>
-                                {bet.result}
+                                {bet.status}
                             </div>
-                        </div>
-
-                        {/* Final Score */}
-                        <div className="mb-3">
-                            <p className="text-xs text-amber-600 uppercase tracking-wide">Final Score</p>
-                            <p className="text-xl font-bold text-amber-900">{bet.finalScore}</p>
                         </div>
 
                         {/* Financial Details */}
@@ -99,12 +101,17 @@ const ViewLedger = () => {
                             <div className="text-right">
                                 <p className="text-xs text-amber-600">Payout</p>
                                 <div className="flex items-center gap-1 justify-end">
-                                    <Coins className={`w-3 h-3 ${bet.result === 'WON' ? 'text-green-600' : 'text-red-600'}`} />
-                                    <p className={`text-sm font-bold ${bet.result === 'WON' ? 'text-green-600' : 'text-red-600'}`}>
-                                        {bet.payout}
+                                    <Coins className={`w-3 h-3 ${bet.status === 'WON' ? 'text-green-600' : 'text-red-600'}`} />
+                                    <p className={`text-sm font-bold ${bet.status === 'WON' ? 'text-green-600' : 'text-red-600'}`}>
+                                        {bet.status === 'WON' ? bet.potential_reward : 0}
                                     </p>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Timestamp */}
+                        <div className="mt-2 text-xs text-amber-600">
+                            Settled: {new Date(bet.updated_at).toLocaleString()}
                         </div>
                     </div>
                 ))}

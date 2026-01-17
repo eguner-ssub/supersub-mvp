@@ -81,6 +81,41 @@ const Account = () => {
             </div>
           </div>
 
+          {/* Simulate Bet Button (Testing Tool) */}
+          <button
+            onClick={async () => {
+              try {
+                const { error } = await supabase
+                  .from('predictions')
+                  .insert({
+                    user_id: userProfile.id,
+                    match_id: Math.floor(Math.random() * 1000),
+                    team_name: `Test Match ${Date.now()}`,
+                    selection: 'HOME_WIN',
+                    odds: 2.5,
+                    stake: 100,
+                    potential_reward: 250,
+                    status: 'PENDING'
+                  });
+
+                if (!error) {
+                  alert('✅ Dummy bet created! Check Locker Room → Whiteboard');
+                } else {
+                  alert('❌ Error: ' + error.message);
+                }
+              } catch (err) {
+                alert('❌ Exception: ' + err.message);
+              }
+            }}
+            className="w-full bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 border border-blue-500/30 text-blue-400 p-4 rounded-xl flex items-center justify-between transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🎲</span>
+              <span className="font-bold uppercase tracking-wide text-sm">Simulate Bet (Testing)</span>
+            </div>
+            <ChevronRight className="w-5 h-5 opacity-50 group-hover:translate-x-1 transition-transform" />
+          </button>
+
           {/* My Inventory Button */}
           <button
             onClick={() => navigate('/inventory')}

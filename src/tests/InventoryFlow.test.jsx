@@ -29,6 +29,17 @@ describe('Locker Room Flow Tests', () => {
         inventory: ['c_match_result', 'c_match_result', 'c_total_goals']
     };
 
+    const mockSupabase = {
+        channel: vi.fn(() => ({
+            on: vi.fn().mockReturnThis(),
+            subscribe: vi.fn()
+        })),
+        removeChannel: vi.fn(),
+        auth: {
+            getSession: vi.fn().mockResolvedValue({ data: { session: null } })
+        }
+    };
+
     beforeEach(() => {
         vi.clearAllMocks();
         useGame.mockReturnValue({
@@ -36,7 +47,9 @@ describe('Locker Room Flow Tests', () => {
             loading: false,
             updateInventory: vi.fn(),
             spendEnergy: vi.fn(),
-            supabase: { auth: { signOut: vi.fn() } }
+            supabase: mockSupabase,
+            checkActiveBets: vi.fn(),
+            loadProfile: vi.fn()
         });
     });
 
@@ -58,7 +71,7 @@ describe('Locker Room Flow Tests', () => {
             </MemoryRouter>
         );
 
-        // Should show either "Live" or "Pending" banner
+        // Should show either "Live" or "Pending" banner based on mock data
         const hasLiveBanner = screen.queryByText(/Live/i);
         const hasPendingBanner = screen.queryByText(/Pending/i);
 

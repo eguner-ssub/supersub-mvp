@@ -1,9 +1,17 @@
 import React from 'react';
-import { getCardsByStatus } from '../../data/mockInventory';
+import { usePredictions } from '../../hooks/usePredictions';
 import { Coins, Calendar } from 'lucide-react';
 
 const ViewPending = () => {
-    const pendingBets = getCardsByStatus('PENDING');
+    const { predictions: pendingBets, loading } = usePredictions('PENDING');
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <p className="text-gray-500">Loading...</p>
+            </div>
+        );
+    }
 
     if (pendingBets.length === 0) {
         return (
@@ -35,13 +43,13 @@ const ViewPending = () => {
                     >
                         {/* Match */}
                         <h3 className="text-xl font-black text-gray-900 mb-3">
-                            {bet.match}
+                            {bet.team_name}
                         </h3>
 
                         {/* Prediction */}
                         <div className="mb-3">
                             <p className="text-sm text-gray-700 uppercase tracking-wide">Prediction:</p>
-                            <p className="text-lg font-bold text-gray-900">{bet.predictionLabel}</p>
+                            <p className="text-lg font-bold text-gray-900">{bet.selection}</p>
                         </div>
 
                         {/* Stake & Potential Win */}
@@ -57,15 +65,15 @@ const ViewPending = () => {
                                 <p className="text-xs text-gray-700">Potential Win</p>
                                 <div className="flex items-center gap-1 justify-end">
                                     <Coins className="w-4 h-4 text-green-700" />
-                                    <p className="text-lg font-bold text-green-700">{bet.potentialWin}</p>
+                                    <p className="text-lg font-bold text-green-700">{bet.potential_reward}</p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Kickoff Time */}
+                        {/* Created Time */}
                         <div className="flex items-center gap-2 text-sm text-gray-700 border-t border-yellow-400 pt-3">
                             <Calendar className="w-4 h-4" />
-                            <span>{bet.kickoffLabel}</span>
+                            <span>{new Date(bet.created_at).toLocaleString()}</span>
                         </div>
                     </div>
                 ))}

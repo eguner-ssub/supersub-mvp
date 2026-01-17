@@ -84,6 +84,57 @@ export const GameProvider = ({ children }) => {
       }
     });
 
+    // Settlement Logic: Auto-transition bets through lifecycle
+    const checkActiveBets = async () => {
+      if (!userProfile?.id) return;
+
+      try {
+        // Fetch active bets (PENDING or LIVE)
+        const { data: bets, error } = await supabase
+          .from('predictions')
+          .select('*')
+          .eq('user_id', userProfile.id)
+          .in('status', ['PENDING', 'LIVE']);
+
+        if (error || !bets) return;
+
+        for (const bet of bets) {
+          if (bet.status === 'PENDING') {
+            // Simulate kickoff - move to LIVE immediately
+            await supabase
+              .from('predictions')
+              .update({ status: 'LIVE', updated_at: new Date().toISOString() })
+              .eq('id', bet.id);
+
+            console.log(`✅ Bet ${bet.id} moved to LIVE`);
+
+          } else if (bet.status === 'LIVE') {
+            // Check if 30 seconds have passed since it went LIVE
+            const liveTime = new Date() - new Date(bet.updated_at);
+
+            if (liveTime > 30000) { // 30 seconds
+              // Simulate win - call settlement RPC
+              const { data, error: rpcError } = await supabase.rpc('settle_prediction', {
+                p_prediction_id: bet.id,
+                p_new_status: 'WON'
+              });
+
+              if (!rpcError && data && data.length > 0) {
+                console.log(`🎉 Bet ${bet.id} WON! New coins: ${data[0].new_coins}`);
+                // Reload profile to update coins
+                const session = await supabase.auth.getSession();
+                if (session.data.session) {
+                  loadProfile(session.data.session);
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking active bets:', error);
+      }
+    };
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
@@ -138,7 +189,9 @@ export const GameProvider = ({ children }) => {
     supabase,
     createProfile,
     spendEnergy,
-    updateInventory
+    updateInventory,
+    checkActiveBets,
+    loadProfile
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
