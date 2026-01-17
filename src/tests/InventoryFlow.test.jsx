@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from '../pages/Dashboard';
 import LockerRoom from '../pages/LockerRoom';
@@ -30,6 +30,37 @@ describe('Locker Room Flow Tests', () => {
     };
 
     const mockSupabase = {
+        from: vi.fn((table) => {
+            if (table === 'predictions') {
+                return {
+                    select: vi.fn(() => ({
+                        eq: vi.fn(() => ({
+                            eq: vi.fn((field, value) => {
+                                // Return LIVE bets for test 2 & 3
+                                if (value === 'LIVE') {
+                                    return Promise.resolve({
+                                        data: [{
+                                            id: 'bet-1',
+                                            status: 'LIVE',
+                                            team_name: 'Arsenal vs Chelsea',
+                                            selection: 'HOME_WIN'
+                                        }],
+                                        error: null
+                                    });
+                                }
+                                // Return empty for PENDING
+                                return Promise.resolve({ data: [], error: null });
+                            })
+                        }))
+                    }))
+                };
+            }
+            return {
+                select: vi.fn(() => ({
+                    eq: vi.fn(() => Promise.resolve({ data: [], error: null }))
+                }))
+            };
+        }),
         channel: vi.fn(() => ({
             on: vi.fn().mockReturnThis(),
             subscribe: vi.fn()
@@ -64,38 +95,39 @@ describe('Locker Room Flow Tests', () => {
         expect(screen.queryByText('Shop')).not.toBeInTheDocument();
     });
 
-    it('Test 2: Live Action or Pending Bets banner appears above the deck', () => {
+    it('Test 2: Live Action or Pending Bets banner appears above the deck', async () => {
         render(
             <MemoryRouter>
                 <Dashboard />
             </MemoryRouter>
         );
 
-        // Should show either "Live" or "Pending" banner based on mock data
-        const hasLiveBanner = screen.queryByText(/Live/i);
-        const hasPendingBanner = screen.queryByText(/Pending/i);
-
-        expect(hasLiveBanner || hasPendingBanner).toBeTruthy();
+        // Wait for async data to load
+        await waitFor(() => {
+            const hasLiveBanner = screen.queryByText(/Live Match/i);
+            const hasPendingBanner = screen.queryByText(/Pending Bet/i);
+            expect(hasLiveBanner || hasPendingBanner).toBeTruthy();
+        }, { timeout: 3000 });
     });
 
-    it('Test 3: Clicking Watch Now/View All navigates correctly', () => {
+    it('Test 3: Clicking Watch Now/View All navigates correctly', async () => {
         render(
             <MemoryRouter>
                 <Dashboard />
             </MemoryRouter>
         );
 
-        // Try to find either "Watch Now" or "View All" button
-        const watchNowButton = screen.queryByText(/Watch Now/i);
-        const viewAllButton = screen.queryByText(/View All/i);
+        // Wait for banner to appear
+        const button = await waitFor(() => {
+            const watchNowButton = screen.queryByText(/Watch Now/i);
+            const viewAllButton = screen.queryByText(/View All/i);
+            const foundButton = watchNowButton || viewAllButton;
+            expect(foundButton).toBeInTheDocument();
+            return foundButton;
+        }, { timeout: 3000 });
 
-        const button = watchNowButton || viewAllButton;
-        expect(button).toBeInTheDocument();
-
-        if (button) {
-            fireEvent.click(button);
-            expect(mockNavigate).toHaveBeenCalled();
-        }
+        fireEvent.click(button);
+        expect(mockNavigate).toHaveBeenCalled();
     });
 
     it('Test 4: Inventory button navigates to /inventory', () => {

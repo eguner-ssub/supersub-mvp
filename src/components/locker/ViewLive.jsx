@@ -51,10 +51,6 @@ const ViewLive = () => {
             {/* Live Match Cards */}
             <div className="space-y-4 max-w-2xl mx-auto">
                 {liveBets.map((bet) => {
-                    // Calculate how long the bet has been live
-                    const liveTime = Math.floor((new Date() - new Date(bet.updated_at)) / 1000);
-                    const remainingTime = Math.max(0, 30 - liveTime);
-
                     return (
                         <div
                             key={bet.id}
@@ -72,15 +68,19 @@ const ViewLive = () => {
                                 </div>
                             </div>
 
-                            {/* Live Status */}
-                            <div className="bg-black/50 rounded-lg p-4 mb-4">
-                                <div className="flex items-center justify-center gap-2 mb-2">
-                                    <Clock className="w-4 h-4 text-emerald-400" />
-                                    <span className="text-emerald-400 font-bold text-lg">
-                                        {remainingTime > 0 ? `Settling in ${remainingTime}s` : 'Settling...'}
-                                    </span>
+                            {/* Real Match Status - No Mock Overlay */}
+                            <div className="bg-black/50 rounded-lg p-4 mb-4 border border-emerald-500/30">
+                                <div className="flex items-center justify-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                        <span className="text-emerald-400 font-bold text-lg uppercase">
+                                            Match In Progress
+                                        </span>
+                                    </div>
                                 </div>
-                                <p className="text-gray-500 text-xs text-center">Match simulation in progress</p>
+                                <p className="text-gray-400 text-xs text-center mt-2">
+                                    Settlement occurs automatically when match finishes
+                                </p>
                             </div>
 
                             {/* Bet Details */}

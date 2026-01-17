@@ -33,6 +33,27 @@ describe('MatchDetail - Prediction Flow with Toggles', () => {
         inventory: ['c_match_result', 'c_match_result', 'c_total_goals']
     };
 
+    const mockSupabase = {
+        from: vi.fn((table) => {
+            if (table === 'predictions') {
+                return {
+                    insert: vi.fn(() => Promise.resolve({ data: [{ id: 'bet-123' }], error: null }))
+                };
+            } else if (table === 'inventory') {
+                return {
+                    delete: vi.fn(() => ({
+                        eq: vi.fn(() => ({
+                            eq: vi.fn(() => ({
+                                limit: vi.fn(() => Promise.resolve({ error: null }))
+                            }))
+                        }))
+                    }))
+                };
+            }
+            return {};
+        })
+    };
+
     const mockMatch = {
         fixture: {
             id: 12345,
@@ -217,6 +238,7 @@ describe('MatchDetail - Prediction Flow with Toggles', () => {
         useGame.mockReturnValue({
             userProfile: mockProfile,
             loading: false,
+            supabase: mockSupabase
         });
 
         render(
@@ -262,6 +284,7 @@ describe('MatchDetail - Prediction Flow with Toggles', () => {
         useGame.mockReturnValue({
             userProfile: mockProfile,
             loading: false,
+            supabase: mockSupabase
         });
 
         render(
