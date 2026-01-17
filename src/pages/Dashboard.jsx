@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
 import { Zap, Coins, Cone, Trophy, Backpack, ShoppingBag, Loader2 } from 'lucide-react';
 import gameDataRaw from '../data/gameData.json';
-import { mockCardsInPlay } from '../data/mockInventory';
+import { mockCards } from '../data/mockInventory';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -157,20 +157,49 @@ export default function Dashboard() {
       <div className="absolute bottom-0 w-full z-30">
         <div className="w-full bg-gradient-to-t from-black via-black/90 to-transparent pt-12 pb-6 px-4">
 
-          {/* Cards in Play Status Bar */}
-          <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-xl p-4 mb-4 mx-2">
-            <div className="flex justify-between items-center">
-              <span className="text-white font-bold text-sm">
-                {mockCardsInPlay.length} Cards in Play
-              </span>
-              <button
-                onClick={() => navigate('/inventory/active')}
-                className="text-emerald-400 hover:text-emerald-300 text-sm font-bold transition-colors"
-              >
-                View All →
-              </button>
-            </div>
-          </div>
+          {/* Dynamic Status Bar - Live Action or Pending Bets */}
+          {(() => {
+            const liveCards = mockCards.filter(c => c.status === 'LIVE');
+            const pendingCards = mockCards.filter(c => c.status === 'PENDING');
+
+            if (liveCards.length > 0) {
+              return (
+                <div className="bg-red-600/20 backdrop-blur-md border border-red-500 rounded-xl p-4 mb-4 mx-2 animate-pulse">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+                      <span className="text-red-400 font-bold text-sm uppercase">
+                        🔴 {liveCards.length} Live {liveCards.length === 1 ? 'Match' : 'Matches'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => navigate('/inventory?tab=live')}
+                      className="text-red-300 hover:text-red-200 text-sm font-bold transition-colors"
+                    >
+                      Watch Now →
+                    </button>
+                  </div>
+                </div>
+              );
+            } else if (pendingCards.length > 0) {
+              return (
+                <div className="bg-yellow-600/20 backdrop-blur-md border border-yellow-500/30 rounded-xl p-4 mb-4 mx-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-yellow-400 font-bold text-sm">
+                      📋 {pendingCards.length} Pending {pendingCards.length === 1 ? 'Bet' : 'Bets'}
+                    </span>
+                    <button
+                      onClick={() => navigate('/inventory?tab=pending')}
+                      className="text-yellow-300 hover:text-yellow-200 text-sm font-bold transition-colors"
+                    >
+                      View All →
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           <div className="flex justify-between items-end mb-3 px-2">
             <h3 className="text-white/50 font-bold text-[10px] tracking-[0.2em] uppercase">Tactical Deck</h3>

@@ -12,7 +12,7 @@ import Dashboard from './pages/Dashboard';
 import MatchHub from './pages/MatchHub';
 import MatchDetail from './pages/MatchDetail';
 import Training from './pages/Training';
-import Inventory from './pages/Inventory';
+import LockerRoom from './pages/LockerRoom';
 import CardsInPlay from './pages/CardsInPlay';
 import Settings from './pages/Settings';
 import Account from './pages/Account'; // <--- 1. IMPORT ADDED HERE
@@ -73,7 +73,7 @@ export const AppRoutes = () => {
       <Route path="/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
       <Route path="/match-hub" element={<ProtectedRoute><MatchHub /></ProtectedRoute>} />
       <Route path="/match/:id" element={<ProtectedRoute><MatchDetail /></ProtectedRoute>} />
-      <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+      <Route path="/inventory" element={<ProtectedRoute><LockerRoom /></ProtectedRoute>} />
       <Route path="/inventory/active" element={<ProtectedRoute><CardsInPlay /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 

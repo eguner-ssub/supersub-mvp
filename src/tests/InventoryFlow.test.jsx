@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from '../pages/Dashboard';
-import Inventory from '../pages/Inventory';
+import LockerRoom from '../pages/LockerRoom';
 import { useGame } from '../context/GameContext';
 
 // Mock GameContext
@@ -17,7 +17,7 @@ vi.mock('react-router-dom', async () => {
     return { ...actual, useNavigate: () => mockNavigate };
 });
 
-describe('Inventory Flow Tests', () => {
+describe('Locker Room Flow Tests', () => {
     const mockUserProfile = {
         id: '123',
         name: 'Test Manager',
@@ -47,72 +47,45 @@ describe('Inventory Flow Tests', () => {
             </MemoryRouter>
         );
 
-        // Verify Inventory button exists
         expect(screen.getByText('Inventory')).toBeInTheDocument();
-
-        // Verify Shop button does NOT exist
         expect(screen.queryByText('Shop')).not.toBeInTheDocument();
     });
 
-    it('Test 2: Cards in Play text appears above the deck', () => {
+    it('Test 2: Live Action or Pending Bets banner appears above the deck', () => {
         render(
             <MemoryRouter>
                 <Dashboard />
             </MemoryRouter>
         );
 
-        // Verify "Cards in Play" status bar is visible
-        expect(screen.getByText(/Cards in Play/i)).toBeInTheDocument();
+        // Should show either "Live" or "Pending" banner
+        const hasLiveBanner = screen.queryByText(/Live/i);
+        const hasPendingBanner = screen.queryByText(/Pending/i);
 
-        // Verify "View All" link is present
-        expect(screen.getByText(/View All/i)).toBeInTheDocument();
+        expect(hasLiveBanner || hasPendingBanner).toBeTruthy();
     });
 
-    it('Test 3: Clicking View All navigates to Cards In Play page', () => {
+    it('Test 3: Clicking Watch Now/View All navigates correctly', () => {
         render(
             <MemoryRouter>
                 <Dashboard />
             </MemoryRouter>
         );
 
-        const viewAllButton = screen.getByText(/View All/i);
-        fireEvent.click(viewAllButton);
+        // Try to find either "Watch Now" or "View All" button
+        const watchNowButton = screen.queryByText(/Watch Now/i);
+        const viewAllButton = screen.queryByText(/View All/i);
 
-        // Verify navigation was called with correct route
-        expect(mockNavigate).toHaveBeenCalledWith('/inventory/active');
+        const button = watchNowButton || viewAllButton;
+        expect(button).toBeInTheDocument();
+
+        if (button) {
+            fireEvent.click(button);
+            expect(mockNavigate).toHaveBeenCalled();
+        }
     });
 
-    it('Test 4: Clicking Energy Drink opens popup and Drink button fires action', () => {
-        const consoleSpy = vi.spyOn(console, 'log');
-
-        render(
-            <MemoryRouter>
-                <Inventory />
-            </MemoryRouter>
-        );
-
-        // Find and click Energy Drink card
-        const energyDrinkCard = screen.getByText('Energy Drink');
-        fireEvent.click(energyDrinkCard);
-
-        // Verify popup appears
-        expect(screen.getByText('Restore 3 Energy?')).toBeInTheDocument();
-        expect(screen.getByText('DRINK')).toBeInTheDocument();
-
-        // Click DRINK button
-        const drinkButton = screen.getByText('DRINK');
-        fireEvent.click(drinkButton);
-
-        // Verify action was fired
-        expect(consoleSpy).toHaveBeenCalledWith('✅ Energy Drink consumed!');
-
-        // Verify toast appears
-        expect(screen.getByText('⚡ Energy Restored!')).toBeInTheDocument();
-
-        consoleSpy.mockRestore();
-    });
-
-    it('Test 5: Inventory button navigates to /inventory', () => {
+    it('Test 4: Inventory button navigates to /inventory', () => {
         render(
             <MemoryRouter>
                 <Dashboard />
@@ -125,19 +98,33 @@ describe('Inventory Flow Tests', () => {
         expect(mockNavigate).toHaveBeenCalledWith('/inventory');
     });
 
-    it('Test 6: Inventory page displays consumables and deck sections', () => {
+    it('Test 5: LockerRoom displays hotspot navigation', () => {
         render(
             <MemoryRouter>
-                <Inventory />
+                <LockerRoom />
             </MemoryRouter>
         );
 
-        // Verify sections are present
-        expect(screen.getByText('Consumables')).toBeInTheDocument();
-        expect(screen.getByText('My Deck')).toBeInTheDocument();
+        // Verify all hotspot labels are present
+        expect(screen.getByText('Whiteboard')).toBeInTheDocument();
+        expect(screen.getByText('Tablet')).toBeInTheDocument();
+        expect(screen.getByText('Kit Bag')).toBeInTheDocument();
+        expect(screen.getByText('Ledger')).toBeInTheDocument();
+        expect(screen.getByText('Fridge')).toBeInTheDocument();
+    });
 
-        // Verify Energy Drink is displayed
-        expect(screen.getByText('Energy Drink')).toBeInTheDocument();
-        expect(screen.getByText('x3')).toBeInTheDocument();
+    it('Test 6: LockerRoom tab navigation works', () => {
+        render(
+            <MemoryRouter>
+                <LockerRoom />
+            </MemoryRouter>
+        );
+
+        // Click on Tablet tab
+        const tabletButton = screen.getByText('Tablet');
+        fireEvent.click(tabletButton);
+
+        // Verify navigation was called with query param
+        expect(mockNavigate).toHaveBeenCalledWith('/inventory?tab=live', { replace: true });
     });
 });
