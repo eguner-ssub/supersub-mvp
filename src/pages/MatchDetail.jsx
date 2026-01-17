@@ -6,7 +6,7 @@ import { useGame } from '../context/GameContext';
 const MatchDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { userProfile, loading: gameLoading } = useGame();
+  const { userProfile, loading: gameLoading, supabase } = useGame();
 
   const [match, setMatch] = useState(null);
   const [odds, setOdds] = useState(null);
@@ -41,16 +41,7 @@ const MatchDetail = () => {
     e.target.style.opacity = 0.5;
   };
 
-  // MOCK ODDS FUNCTION (for testing without API limits)
-  const getMockOdds = (fixtureId) => {
-    // Generate semi-realistic odds based on fixture ID
-    const seed = parseInt(fixtureId) % 100;
-    return {
-      home: (1.5 + (seed % 30) / 10).toFixed(2),
-      draw: (2.8 + (seed % 15) / 10).toFixed(2),
-      away: (1.8 + (seed % 25) / 10).toFixed(2)
-    };
-  };
+  // Real odds will be fetched from API
 
   // FETCH MATCH DATA & ODDS
   useEffect(() => {
@@ -58,22 +49,34 @@ const MatchDetail = () => {
       try {
         setLoading(true);
 
-        // Fetch match data
-        const matchResponse = await fetch(`/api/matches?id=${id}`);
-        if (!matchResponse.ok) throw new Error("Match unavailable");
+        console.log('🎯 [MatchDetail] Fetching data for fixture:', id);
 
-        const matchData = await matchResponse.json();
+        // Fetch match data and odds in parallel
+        const [matchRes, oddsRes] = await Promise.all([
+          fetch(`/api/matches?id=${id}`),
+          fetch(`/api/odds?fixture=${id}`)
+        ]);
+
+        if (!matchRes.ok) throw new Error("Match unavailable");
+
+        const matchData = await matchRes.json();
+        const oddsData = await oddsRes.json();
+
+        console.log('📊 [MatchDetail] Raw odds response:', oddsData);
+        console.log('📊 [MatchDetail] Odds object:', oddsData.odds);
 
         if (matchData.response && matchData.response.length > 0) {
           setMatch(matchData.response[0]);
 
-          // Use mock odds for now to avoid API limits
-          setOdds(getMockOdds(id));
+          // Safety check: ensure oddsData.odds exists, otherwise default to 2.0
+          const finalOdds = oddsData.odds || { home: 2.0, draw: 3.0, away: 2.0 };
+          console.log('✅ [MatchDetail] Setting odds:', finalOdds);
+          setOdds(finalOdds);
         } else {
           throw new Error("Match not found");
         }
       } catch (err) {
-        console.error("Match Detail Error:", err);
+        console.error("❌ [MatchDetail] Error:", err);
         setError("Could not retrieve match intelligence.");
       } finally {
         setLoading(false);
@@ -158,12 +161,75 @@ const MatchDetail = () => {
     }
   };
 
-  // PLAY PREDICTION HANDLER - Show Success Modal
-  const handlePlayPrediction = () => {
+  // PLAY PREDICTION HANDLER - Complete Bet Placement
+  const handlePlayPrediction = async () => {
     console.log('🎯 PLAYING PREDICTION:', draftPrediction);
-    // TODO: Submit to backend, deduct card from inventory, etc.
 
-    setShowSuccessModal(true);
+    try {
+      // 1. Inventory Check: Verify user has a Match Result card
+      if (!hasMatchResultCard()) {
+        alert('❌ No Match Result card available!');
+        return;
+      }
+
+      // 2. Determine team name based on selection
+      let teamName = '';
+      if (draftPrediction.type === 'HOME_WIN') {
+        teamName = `${match.teams.home.name} vs ${match.teams.away.name}`;
+      } else if (draftPrediction.type === 'AWAY_WIN') {
+        teamName = `${match.teams.home.name} vs ${match.teams.away.name}`;
+      } else if (draftPrediction.type === 'DRAW') {
+        teamName = `${match.teams.home.name} vs ${match.teams.away.name}`;
+      }
+
+      // 3. Database Insert: Create prediction
+      const { data: insertData, error: insertError } = await supabase
+        .from('predictions')
+        .insert({
+          user_id: userProfile.id,
+          match_id: match.fixture.id,
+          team_name: teamName,
+          selection: draftPrediction.type,
+          odds: parseFloat(draftPrediction.odds),
+          stake: draftPrediction.stake,
+          potential_reward: draftPrediction.potentialReward,
+          status: 'PENDING'
+        });
+
+      if (insertError) {
+        console.error('Database insert error:', insertError);
+        alert('❌ Failed to place bet. Please try again.');
+        return;
+      }
+
+      // 4. Card Consumption: Remove one c_match_result from inventory
+      const updatedInventory = [...userProfile.inventory];
+      const cardIndex = updatedInventory.indexOf('c_match_result');
+      if (cardIndex > -1) {
+        updatedInventory.splice(cardIndex, 1);
+      }
+
+      // Update inventory in database
+      const { error: inventoryError } = await supabase
+        .from('inventory')
+        .delete()
+        .eq('user_id', userProfile.id)
+        .eq('card_id', 'c_match_result')
+        .limit(1);
+
+      if (inventoryError) {
+        console.error('Inventory update error:', inventoryError);
+        // Continue anyway - bet is placed
+      }
+
+      // 5. UI Feedback: Show success modal
+      console.log('✅ Bet placed successfully!');
+      setShowSuccessModal(true);
+
+    } catch (error) {
+      console.error('Error placing bet:', error);
+      alert('❌ An error occurred. Please try again.');
+    }
   };
 
   // CLOSE SUCCESS MODAL AND NAVIGATE

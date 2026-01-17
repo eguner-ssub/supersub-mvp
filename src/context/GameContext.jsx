@@ -53,61 +53,104 @@ export const GameProvider = ({ children }) => {
   };
 
   // --- LAZY SETTLEMENT ENGINE ---
-  // Moved OUTSIDE useEffect so it can be exported
+
+  // Helper: Determine bet outcome based on real match result
+  const determineOutcome = (bet, matchData) => {
+    const homeGoals = matchData.goals?.home || 0;
+    const awayGoals = matchData.goals?.away || 0;
+
+    if (bet.selection === 'HOME_WIN') {
+      return homeGoals > awayGoals ? 'WON' : 'LOST';
+    } else if (bet.selection === 'AWAY_WIN') {
+      return awayGoals > homeGoals ? 'WON' : 'LOST';
+    } else if (bet.selection === 'DRAW') {
+      return homeGoals === awayGoals ? 'WON' : 'LOST';
+    }
+
+    // Default to LOST if selection is unknown
+    return 'LOST';
+  };
+
+  // Settlement Logic: Real API-based transitions
   const checkActiveBets = async () => {
     if (!userProfile?.id) return;
 
     try {
-      // 1. Fetch active bets (PENDING or LIVE)
+      // Fetch active bets (PENDING or LIVE)
       const { data: bets, error } = await supabase
         .from('predictions')
         .select('*')
         .eq('user_id', userProfile.id)
         .in('status', ['PENDING', 'LIVE']);
 
-      if (error || !bets || bets.length === 0) return;
+      if (error || !bets) return;
 
       for (const bet of bets) {
+        try {
+          // Fetch real match data from API
+          const response = await fetch(`/api/matches?id=${bet.match_id}`);
 
-        // SCENARIO A: Kickoff (PENDING -> LIVE)
-        if (bet.status === 'PENDING') {
-          // In a real app, we check match time. Here, we assume instant kickoff.
-          console.log(`⚽ Kickoff for bet ${bet.id}`);
-          await supabase
-            .from('predictions')
-            .update({ status: 'LIVE', created_at: new Date().toISOString() }) // Reset timer
-            .eq('id', bet.id);
-        }
+          if (!response.ok) {
+            console.warn(`Failed to fetch match ${bet.match_id}`);
+            continue;
+          }
 
-        // SCENARIO B: Settlement (LIVE -> WON)
-        else if (bet.status === 'LIVE') {
-          // Check if 30 seconds have passed since creation/update
-          const betTime = new Date(bet.created_at).getTime();
-          const now = new Date().getTime();
-          const timeAlive = now - betTime;
+          const data = await response.json();
+          const matchData = data.response?.[0];
 
-          // If > 30 seconds, simulate a WIN
-          if (timeAlive > 30000) {
-            console.log(`🏆 Match Finished! Settle WIN for ${bet.id}`);
+          if (!matchData) {
+            console.warn(`No match data for ${bet.match_id}`);
+            continue;
+          }
 
-            // Call the Database Function (RPC) to handle money safely
-            const { data, error: rpcError } = await supabase.rpc('settle_prediction', {
-              prediction_id: bet.id,
-              new_status: 'WON'
-            });
+          const matchStatus = matchData.fixture?.status?.short;
 
-            if (rpcError) {
-              console.error("Settlement Error:", rpcError);
-            } else {
-              // Reload profile to see new coin balance
-              const { data: { session } } = await supabase.auth.getSession();
-              if (session) loadProfile(session);
+          // PENDING -> LIVE: Match has started
+          if (bet.status === 'PENDING') {
+            // If status is NOT 'NS' (Not Started) and NOT finished
+            if (matchStatus && matchStatus !== 'NS' && matchStatus !== 'FT' && matchStatus !== 'AET' && matchStatus !== 'PEN') {
+              await supabase
+                .from('predictions')
+                .update({ status: 'LIVE', updated_at: new Date().toISOString() })
+                .eq('id', bet.id);
+
+              console.log(`✅ Bet ${bet.id} moved to LIVE (Match Status: ${matchStatus})`);
             }
           }
+          // LIVE -> SETTLED: Match has finished
+          else if (bet.status === 'LIVE') {
+            // If status is FT (Full Time), AET (After Extra Time), or PEN (Penalties)
+            if (matchStatus === 'FT' || matchStatus === 'AET' || matchStatus === 'PEN') {
+              const outcome = determineOutcome(bet, matchData);
+
+              // Call settlement RPC
+              const { data: settlementData, error: rpcError } = await supabase.rpc('settle_prediction', {
+                p_prediction_id: bet.id,
+                p_new_status: outcome
+              });
+
+              if (!rpcError && settlementData && settlementData.length > 0) {
+                console.log(`🎉 Bet ${bet.id} ${outcome}! New coins: ${settlementData[0].new_coins}`);
+
+                // Reload profile to update coins
+                const session = await supabase.auth.getSession();
+                if (session.data.session) {
+                  loadProfile(session.data.session);
+                }
+              }
+            }
+          }
+
+          // Rate limiting: 1 second delay between API calls
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+        } catch (betError) {
+          console.error(`Error processing bet ${bet.id}:`, betError);
+          // Continue to next bet even if this one fails
         }
       }
-    } catch (err) {
-      console.error("⚠️ Settlement Engine Stalled:", err);
+    } catch (error) {
+      console.error('Error checking active bets:', error);
     }
   };
 
