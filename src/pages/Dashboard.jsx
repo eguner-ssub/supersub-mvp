@@ -20,6 +20,10 @@ export default function Dashboard() {
   const [showWinModal, setShowWinModal] = useState(false);
   const [winAmount, setWinAmount] = useState(0);
 
+  // Live and pending bets state
+  const [liveBets, setLiveBets] = useState([]);
+  const [pendingBets, setPendingBets] = useState([]);
+
   const gameData = gameDataRaw || { cardTypes: [] };
 
   useEffect(() => {
@@ -74,6 +78,45 @@ export default function Dashboard() {
       return () => clearInterval(interval);
     }
   }, [userProfile, checkActiveBets]);
+
+  // Fetch live and pending bets
+  useEffect(() => {
+    const fetchActiveBets = async () => {
+      if (!userProfile?.id || !supabase) return;
+
+      try {
+        // Fetch LIVE bets
+        const { data: live, error: liveError } = await supabase
+          .from('predictions')
+          .select('*')
+          .eq('user_id', userProfile.id)
+          .eq('status', 'LIVE');
+
+        if (!liveError && live) {
+          setLiveBets(live);
+        }
+
+        // Fetch PENDING bets
+        const { data: pending, error: pendingError } = await supabase
+          .from('predictions')
+          .select('*')
+          .eq('user_id', userProfile.id)
+          .eq('status', 'PENDING');
+
+        if (!pendingError && pending) {
+          setPendingBets(pending);
+        }
+      } catch (error) {
+        console.error('Error fetching active bets:', error);
+      }
+    };
+
+    fetchActiveBets();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchActiveBets, 30000);
+    return () => clearInterval(interval);
+  }, [userProfile?.id, supabase]);
 
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.webp' },
@@ -210,17 +253,15 @@ export default function Dashboard() {
 
           {/* Dynamic Status Bar - Live Action or Pending Bets */}
           {(() => {
-            const liveCards = mockCards.filter(c => c.status === 'LIVE');
-            const pendingCards = mockCards.filter(c => c.status === 'PENDING');
-
-            if (liveCards.length > 0) {
+            // Use real predictions data instead of mock
+            if (liveBets?.length > 0) {
               return (
                 <div className="bg-red-600/20 backdrop-blur-md border border-red-500 rounded-xl p-4 mb-4 mx-2 animate-pulse">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
                       <span className="text-red-400 font-bold text-sm uppercase">
-                        🔴 {liveCards.length} Live {liveCards.length === 1 ? 'Match' : 'Matches'}
+                        🔥 {liveBets.length} Live {liveBets.length === 1 ? 'Match' : 'Matches'}
                       </span>
                     </div>
                     <button
@@ -232,12 +273,12 @@ export default function Dashboard() {
                   </div>
                 </div>
               );
-            } else if (pendingCards.length > 0) {
+            } else if (pendingBets?.length > 0) {
               return (
                 <div className="bg-yellow-600/20 backdrop-blur-md border border-yellow-500/30 rounded-xl p-4 mb-4 mx-2">
                   <div className="flex justify-between items-center">
                     <span className="text-yellow-400 font-bold text-sm">
-                      📋 {pendingCards.length} Pending {pendingCards.length === 1 ? 'Bet' : 'Bets'}
+                      📋 {pendingBets.length} Pending {pendingBets.length === 1 ? 'Bet' : 'Bets'}
                     </span>
                     <button
                       onClick={() => navigate('/inventory?tab=pending')}

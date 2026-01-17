@@ -5,6 +5,24 @@ import { Coins, Calendar } from 'lucide-react';
 const ViewPending = () => {
     const { predictions: pendingBets, loading } = usePredictions('PENDING');
 
+    // Helper: Format bet selection for display
+    const formatBetSelection = (bet) => {
+        if (bet.selection === 'DRAW') {
+            return 'Draw';
+        } else if (bet.selection === 'HOME_WIN' || bet.selection === 'AWAY_WIN') {
+            // Extract just the team name from team_name field
+            // team_name format: "Arsenal vs Chelsea"
+            const teams = bet.team_name?.split(' vs ');
+            if (bet.selection === 'HOME_WIN' && teams?.[0]) {
+                return `${teams[0]} to Win`;
+            } else if (bet.selection === 'AWAY_WIN' && teams?.[1]) {
+                return `${teams[1]} to Win`;
+            }
+        }
+        // Fallback: capitalize the selection
+        return bet.selection?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -49,7 +67,7 @@ const ViewPending = () => {
                         {/* Prediction */}
                         <div className="mb-3">
                             <p className="text-sm text-gray-700 uppercase tracking-wide">Prediction:</p>
-                            <p className="text-lg font-bold text-gray-900">{bet.selection}</p>
+                            <p className="text-lg font-bold text-gray-900">{formatBetSelection(bet)}</p>
                         </div>
 
                         {/* Stake & Potential Win */}

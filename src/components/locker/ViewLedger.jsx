@@ -5,6 +5,21 @@ import { Coins, TrendingUp, TrendingDown } from 'lucide-react';
 const ViewLedger = () => {
     const { predictions: settledBets, loading } = usePredictions('SETTLED');
 
+    // Helper: Format bet selection for display
+    const formatBetSelection = (bet) => {
+        if (bet.selection === 'DRAW') {
+            return 'Draw';
+        } else if (bet.selection === 'HOME_WIN' || bet.selection === 'AWAY_WIN') {
+            const teams = bet.team_name?.split(' vs ');
+            if (bet.selection === 'HOME_WIN' && teams?.[0]) {
+                return `${teams[0]} to Win`;
+            } else if (bet.selection === 'AWAY_WIN' && teams?.[1]) {
+                return `${teams[1]} to Win`;
+            }
+        }
+        return bet.selection?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -79,11 +94,11 @@ const ViewLedger = () => {
                         <div className="flex justify-between items-start mb-3">
                             <div>
                                 <h3 className="text-lg font-bold text-amber-900">{bet.team_name}</h3>
-                                <p className="text-sm text-amber-700">{bet.selection}</p>
+                                <p className="text-sm text-amber-700">{formatBetSelection(bet)}</p>
                             </div>
                             <div className={`px-3 py-1 rounded-full font-bold text-sm ${bet.status === 'WON'
-                                    ? 'bg-green-100 text-green-700 border border-green-300'
-                                    : 'bg-red-100 text-red-700 border border-red-300'
+                                ? 'bg-green-100 text-green-700 border border-green-300'
+                                : 'bg-red-100 text-red-700 border border-red-300'
                                 }`}>
                                 {bet.status}
                             </div>

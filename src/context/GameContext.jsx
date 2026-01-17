@@ -253,14 +253,36 @@ export const GameProvider = ({ children }) => {
     if (error) console.error('Inventory Sync Failed:', error.message);
   };
 
+  const gainEnergy = async (amount) => {
+    if (!userProfile) return;
+
+    // Calculate new energy, don't exceed max
+    const newEnergy = Math.min(userProfile.max_energy || 5, userProfile.energy + amount);
+
+    // Optimistic Update
+    setUserProfile(prev => ({ ...prev, energy: newEnergy }));
+
+    // DB Update
+    const { error } = await supabase
+      .from('profiles')
+      .update({ energy: newEnergy })
+      .eq('id', userProfile.id);
+
+    if (error) {
+      console.error('Energy update failed:', error);
+      throw error;
+    }
+  };
+
   const value = {
     userProfile,
     loading,
     supabase,
     createProfile,
     spendEnergy,
+    gainEnergy,
     updateInventory,
-    checkActiveBets, // <--- NOW CORRECTLY DEFINED
+    checkActiveBets,
     loadProfile
   };
 

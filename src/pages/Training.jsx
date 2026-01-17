@@ -8,16 +8,17 @@ import gameData from '../data/gameData.json';
 
 const Training = () => {
   // FIX 1: Replaced 'addCard' with 'updateInventory'
-  const { userProfile, spendEnergy, updateInventory, loading } = useGame(); 
+  const { userProfile, spendEnergy, gainEnergy, updateInventory, loading } = useGame();
   const navigate = useNavigate();
-  
-  const [phase, setPhase] = useState('briefing'); 
+
+  const [phase, setPhase] = useState('briefing');
   const [questions, setQuestions] = useState([]);
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [showAd, setShowAd] = useState(false);
+  const [showReward, setShowReward] = useState(false);
 
   // --- 1. INITIALIZATION & BALANCING ENGINE ---
   useEffect(() => {
@@ -26,7 +27,7 @@ const Training = () => {
 
     // NOW check profile. If still null, kick out.
     if (!userProfile) {
-      navigate('/dashboard'); 
+      navigate('/dashboard');
       return;
     }
 
@@ -50,7 +51,7 @@ const Training = () => {
   };
 
   const handleOptionClick = (index) => {
-    if (isAnswered) return; 
+    if (isAnswered) return;
 
     setSelectedOption(index);
     setIsAnswered(true);
@@ -80,15 +81,15 @@ const Training = () => {
     if (score >= 3) {
       // FIX 2: Use correct function name AND pass as an array
       // updateInventory expects an array of strings ['c_match_result', ...]
-      updateInventory(['c_match_result']); 
+      updateInventory(['c_match_result']);
     }
-    
+
     try {
       spendEnergy(1);
     } catch (e) {
       console.error("Energy spend failed", e);
     }
-    
+
     navigate('/dashboard');
   };
 
@@ -106,17 +107,16 @@ const Training = () => {
   // WATCH AD HANDLER
   const handleAdReward = async () => {
     try {
-      const { data, error } = await supabase.rpc('watch_ad_reward', {
-        p_user_id: userProfile.id
-      });
+      // Use the new gainEnergy function from GameContext
+      await gainEnergy(3);
 
-      if (error) throw error;
-
-      console.log('✅ Ad reward granted:', data);
+      console.log('✅ Energy recharged! (+3)');
       setShowAd(false);
-      window.location.reload();
+      // Show reward popup for 3 seconds
+      setShowReward(true);
+      setTimeout(() => { setShowReward(false); }, 3000);
     } catch (error) {
-      console.error('❌ Ad reward error:', error);
+      console.error('❌ Energy recharge error:', error);
       alert('Failed to grant reward. Please try again.');
       setShowAd(false);
     }
@@ -139,57 +139,57 @@ const Training = () => {
     const hasEnergy = userProfile.energy > 0;
     return (
       <>
-      <MobileLayout bgImage="/bg-training-brief.webp">
-        <div className="w-full max-w-md h-full flex flex-col justify-center p-6 relative">
-          <button onClick={() => navigate('/dashboard')} className="absolute top-6 left-4 flex items-center gap-2 text-gray-300 hover:text-white z-50">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          
-          <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded-2xl p-8 shadow-2xl">
-            <div className="flex justify-center mb-4">
-              <div className="p-4 bg-emerald-500/20 rounded-full border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]"><Brain className="w-10 h-10 text-emerald-400" /></div>
+        <MobileLayout bgImage="/bg-training-brief.webp">
+          <div className="w-full max-w-md h-full flex flex-col justify-center p-6 relative">
+            <button onClick={() => navigate('/dashboard')} className="absolute top-6 left-4 flex items-center gap-2 text-gray-300 hover:text-white z-50">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+
+            <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded-2xl p-8 shadow-2xl">
+              <div className="flex justify-center mb-4">
+                <div className="p-4 bg-emerald-500/20 rounded-full border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]"><Brain className="w-10 h-10 text-emerald-400" /></div>
+              </div>
+              <h1 className="text-3xl font-black text-white mb-2 text-center uppercase tracking-wide">Training Camp</h1>
+              <p className="text-gray-400 mb-8 text-center text-sm">Answer 3 out of 5 correctly to earn a <span className="text-yellow-400 font-bold">Match Card</span>.</p>
+              <div className="grid grid-cols-3 gap-3 mb-8">
+                <div className="bg-gray-900/50 border border-white/10 rounded-lg p-3 text-center">
+                  <Zap className={`w-5 h-5 mx-auto mb-1 ${hasEnergy ? 'text-yellow-400' : 'text-red-500'}`} />
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Cost</p>
+                  <p className={`font-bold ${hasEnergy ? 'text-white' : 'text-red-500'}`}>1 Energy</p>
+                </div>
+                <div className="bg-gray-900/50 border border-white/10 rounded-lg p-3 text-center">
+                  <HelpCircle className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Questions</p>
+                  <p className="text-white font-bold">5</p>
+                </div>
+                <div className="bg-gray-900/50 border border-white/10 rounded-lg p-3 text-center">
+                  <Clock className="w-5 h-5 text-blue-400 mx-auto mb-1" />
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Time</p>
+                  <p className="text-white font-bold">Unlimited</p>
+                </div>
+              </div>
+              {hasEnergy ? (
+                <button onClick={handleStartSession} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-lg transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800">START SESSION</button>
+              ) : (
+                <button
+                  onClick={() => setShowAd(true)}
+                  className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold rounded-xl text-lg transition-all shadow-lg active:scale-95 border-b-4 border-green-800 flex items-center justify-center gap-2"
+                >
+                  <PlayCircle className="w-5 h-5" />
+                  Watch Ad (+3 Energy)
+                </button>
+              )}
             </div>
-            <h1 className="text-3xl font-black text-white mb-2 text-center uppercase tracking-wide">Training Camp</h1>
-            <p className="text-gray-400 mb-8 text-center text-sm">Answer 3 out of 5 correctly to earn a <span className="text-yellow-400 font-bold">Match Card</span>.</p>
-            <div className="grid grid-cols-3 gap-3 mb-8">
-              <div className="bg-gray-900/50 border border-white/10 rounded-lg p-3 text-center">
-                <Zap className={`w-5 h-5 mx-auto mb-1 ${hasEnergy ? 'text-yellow-400' : 'text-red-500'}`} />
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Cost</p>
-                <p className={`font-bold ${hasEnergy ? 'text-white' : 'text-red-500'}`}>1 Energy</p>
-              </div>
-              <div className="bg-gray-900/50 border border-white/10 rounded-lg p-3 text-center">
-                <HelpCircle className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Questions</p>
-                <p className="text-white font-bold">5</p>
-              </div>
-              <div className="bg-gray-900/50 border border-white/10 rounded-lg p-3 text-center">
-                <Clock className="w-5 h-5 text-blue-400 mx-auto mb-1" />
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Time</p>
-                <p className="text-white font-bold">Unlimited</p>
-              </div>
-            </div>
-            {hasEnergy ? (
-              <button onClick={handleStartSession} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-lg transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800">START SESSION</button>
-            ) : (
-              <button 
-                onClick={() => setShowAd(true)}
-                className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold rounded-xl text-lg transition-all shadow-lg active:scale-95 border-b-4 border-green-800 flex items-center justify-center gap-2"
-              >
-                <PlayCircle className="w-5 h-5" />
-                Watch Ad (+3 Energy)
-              </button>
-            )}
           </div>
-        </div>
-      </MobileLayout>
-      
-      {/* Ad Overlay */}
-      {showAd && (
-        <AdOverlay
-          onReward={handleAdReward}
-          onClose={() => setShowAd(false)}
-        />
-      )}
+        </MobileLayout>
+
+        {/* Ad Overlay */}
+        {showAd && (
+          <AdOverlay
+            onReward={handleAdReward}
+            onClose={() => setShowAd(false)}
+          />
+        )}
       </>
     );
   }
@@ -208,8 +208,8 @@ const Training = () => {
                 <h2 className="text-3xl font-black text-white mb-2">SESSION CLEAR!</h2>
                 <p className="text-gray-400 mb-6">Excellent work, manager.</p>
                 <div className="bg-gray-800 rounded-xl p-4 mb-6 border border-gray-700 flex justify-between items-center">
-                   <div className="text-left"><p className="text-xs text-gray-500 uppercase">Score</p><p className="text-2xl font-bold text-white">{score}/5</p></div>
-                   <div className="text-right"><p className="text-xs text-gray-500 uppercase">Reward</p><p className="text-emerald-400 font-bold text-lg">+1 Card</p></div>
+                  <div className="text-left"><p className="text-xs text-gray-500 uppercase">Score</p><p className="text-2xl font-bold text-white">{score}/5</p></div>
+                  <div className="text-right"><p className="text-xs text-gray-500 uppercase">Reward</p><p className="text-emerald-400 font-bold text-lg">+1 Card</p></div>
                 </div>
               </>
             ) : (
@@ -233,55 +233,74 @@ const Training = () => {
 
   return (
     <>
-    <MobileLayout bgImage="/bg-training-quiz.webp">
-      <div className="flex flex-col h-full relative p-4 max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-8 mt-4">
-          <div className="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
-            <span className="text-xs text-gray-400 uppercase tracking-widest">Question</span>
-            <span className="text-white font-bold">{currentQIndex + 1}<span className="text-gray-500">/5</span></span>
-          </div>
-          <button onClick={() => navigate('/dashboard')} className="p-2 bg-black/40 rounded-full text-gray-400 hover:text-white border border-white/10"><XCircle className="w-5 h-5" /></button>
-        </div>
-        <div className="flex-1 flex flex-col">
-          <div className="flex gap-2 mb-4">
-            <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-900/30 text-blue-300 border border-blue-500/30 uppercase tracking-wider">{currentQuestion.category}</span>
-            <span className={`px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getDifficultyColor(currentQuestion.difficulty)}`}>{currentQuestion.difficulty}</span>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-8 leading-snug drop-shadow-md">{currentQuestion.text}</h2>
-          <div className="grid gap-3">
-            {currentQuestion.options.map((option, index) => {
-              let btnStyle = "bg-gray-800/80 border-gray-600 text-gray-200 hover:bg-gray-700 hover:border-gray-500";
-              if (isAnswered) {
-                if (index === currentQuestion.correctIndex) btnStyle = "bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold"; 
-                else if (index === selectedOption) btnStyle = "bg-red-500/20 border-red-500 text-red-400"; 
-                else btnStyle = "bg-gray-900/50 border-gray-800 text-gray-600 opacity-40"; 
-              }
-              return (
-                <button key={index} onClick={() => handleOptionClick(index)} disabled={isAnswered} className={`relative p-5 rounded-xl border-2 text-left transition-all duration-200 shadow-lg ${btnStyle} active:scale-[0.98]`}>
-                  <div className="flex justify-between items-center"><span className="text-sm">{option}</span>{isAnswered && index === currentQuestion.correctIndex && (<CheckCircle className="w-5 h-5 text-emerald-400" />)}{isAnswered && index === selectedOption && index !== currentQuestion.correctIndex && (<XCircle className="w-5 h-5 text-red-400" />)}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="mt-6 mb-4">
-            <div className="w-full bg-gray-800/50 rounded-full h-1.5 overflow-hidden">
-                <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${((currentQIndex + 1) / 5) * 100}%` }}></div>
+      <MobileLayout bgImage="/bg-training-quiz.webp">
+        <div className="flex flex-col h-full relative p-4 max-w-md mx-auto">
+          <div className="flex items-center justify-between mb-8 mt-4">
+            <div className="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
+              <span className="text-xs text-gray-400 uppercase tracking-widest">Question</span>
+              <span className="text-white font-bold">{currentQIndex + 1}<span className="text-gray-500">/5</span></span>
             </div>
+            <button onClick={() => navigate('/dashboard')} className="p-2 bg-black/40 rounded-full text-gray-400 hover:text-white border border-white/10"><XCircle className="w-5 h-5" /></button>
+          </div>
+          <div className="flex-1 flex flex-col">
+            <div className="flex gap-2 mb-4">
+              <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-900/30 text-blue-300 border border-blue-500/30 uppercase tracking-wider">{currentQuestion.category}</span>
+              <span className={`px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getDifficultyColor(currentQuestion.difficulty)}`}>{currentQuestion.difficulty}</span>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-8 leading-snug drop-shadow-md">{currentQuestion.text}</h2>
+            <div className="grid gap-3">
+              {currentQuestion.options.map((option, index) => {
+                let btnStyle = "bg-gray-800/80 border-gray-600 text-gray-200 hover:bg-gray-700 hover:border-gray-500";
+                if (isAnswered) {
+                  if (index === currentQuestion.correctIndex) btnStyle = "bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold";
+                  else if (index === selectedOption) btnStyle = "bg-red-500/20 border-red-500 text-red-400";
+                  else btnStyle = "bg-gray-900/50 border-gray-800 text-gray-600 opacity-40";
+                }
+                return (
+                  <button key={index} onClick={() => handleOptionClick(index)} disabled={isAnswered} className={`relative p-5 rounded-xl border-2 text-left transition-all duration-200 shadow-lg ${btnStyle} active:scale-[0.98]`}>
+                    <div className="flex justify-between items-center"><span className="text-sm">{option}</span>{isAnswered && index === currentQuestion.correctIndex && (<CheckCircle className="w-5 h-5 text-emerald-400" />)}{isAnswered && index === selectedOption && index !== currentQuestion.correctIndex && (<XCircle className="w-5 h-5 text-red-400" />)}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="mt-6 mb-4">
+            <div className="w-full bg-gray-800/50 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${((currentQIndex + 1) / 5) * 100}%` }}></div>
+            </div>
+          </div>
         </div>
-      </div>
-    </MobileLayout>
-  );
-};
+      </MobileLayout>
 
-
-    {/* Ad Overlay */}
-    {showAd && (
-      <AdOverlay
-        onReward={handleAdReward}
-        onClose={() => setShowAd(false)}
-      />
-    )}
+      {/* Ad Overlay */}
+      {showAd && (
+        <AdOverlay
+          onReward={handleAdReward}
+          onClose={() => setShowAd(false)}
+        />
+      )}
+      
+      {/* Reward Earned Popup */}
+      {showReward && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-8 shadow-2xl border-4 border-yellow-400 max-w-sm mx-4 animate-in zoom-in duration-500">
+            <div className="text-center">
+              <div className="mb-4 inline-block p-4 bg-white/20 rounded-full">
+                <Zap className="w-16 h-16 text-yellow-300 animate-bounce" />
+              </div>
+              <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-wide">
+                Energy Recharged!
+              </h2>
+              <p className="text-yellow-200 text-xl font-bold mb-4">
+                +3 Energy
+              </p>
+              <p className="text-white/80 text-sm">
+                You're ready to train again!
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

@@ -5,6 +5,21 @@ import { Coins, Clock } from 'lucide-react';
 const ViewLive = () => {
     const { predictions: liveBets, loading } = usePredictions('LIVE');
 
+    // Helper: Format bet selection for display
+    const formatBetSelection = (bet) => {
+        if (bet.selection === 'DRAW') {
+            return 'Draw';
+        } else if (bet.selection === 'HOME_WIN' || bet.selection === 'AWAY_WIN') {
+            const teams = bet.team_name?.split(' vs ');
+            if (bet.selection === 'HOME_WIN' && teams?.[0]) {
+                return `${teams[0]} to Win`;
+            } else if (bet.selection === 'AWAY_WIN' && teams?.[1]) {
+                return `${teams[1]} to Win`;
+            }
+        }
+        return bet.selection?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -49,7 +64,7 @@ const ViewLive = () => {
                             <div className="flex justify-between items-start mb-4">
                                 <div>
                                     <h3 className="text-xl font-bold text-white mb-1">{bet.team_name}</h3>
-                                    <p className="text-sm text-gray-400">{bet.selection}</p>
+                                    <p className="text-sm text-gray-400">{formatBetSelection(bet)}</p>
                                 </div>
                                 <div className="flex items-center gap-2 bg-red-600 px-3 py-1 rounded-full">
                                     <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
