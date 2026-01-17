@@ -37,12 +37,11 @@ export default async function handler(req, res) {
     };
 
     try {
-        console.log('📡 [ODDS API] Fetching from:', `${baseUrl}/odds?fixture=${fixture}&bookmaker=6`);
+        console.log('📡 [ODDS API] Fetching from:', `${baseUrl}/odds?fixture=${fixture}`);
 
-        // Fetch odds from API-Football
-        // Bookmaker 6 = Bwin (reliable for 1x2 odds)
+        // Fetch odds from API-Football (any bookmaker)
         const response = await fetch(
-            `${baseUrl}/odds?fixture=${fixture}&bookmaker=6`,
+            `${baseUrl}/odds?fixture=${fixture}`,
             { headers }
         );
 
@@ -61,20 +60,31 @@ export default async function handler(req, res) {
         // Check if we got valid odds data
         if (!data.response || data.response.length === 0) {
             console.warn("⚠️ [ODDS API] No odds data available, using defaults");
+            console.warn("⚠️ [ODDS API] Empty Response. Errors:", JSON.stringify(data.errors));
             return res.status(200).json(defaultOdds);
         }
 
-        // Extract the "Match Winner" market (1x2)
+        // Extract the "Match Winner" market (1x2) from first available bookmaker
         const oddsData = data.response[0];
         console.log('🎯 [ODDS API] Odds data bookmakers:', oddsData.bookmakers?.length || 0);
 
-        const matchWinnerMarket = oddsData.bookmakers?.[0]?.bets?.find(
+        // Take the first available bookmaker
+        const bookmaker = oddsData.bookmakers?.[0];
+
+        if (!bookmaker) {
+            console.warn("⚠️ [ODDS API] No bookmakers found, using defaults");
+            return res.status(200).json(defaultOdds);
+        }
+
+        console.log('📚 [ODDS API] Using bookmaker:', bookmaker.name);
+
+        const matchWinnerMarket = bookmaker.bets?.find(
             bet => bet.name === "Match Winner"
         );
 
         if (!matchWinnerMarket || !matchWinnerMarket.values) {
             console.warn("⚠️ [ODDS API] Match Winner odds not found, using defaults");
-            console.log('🔍 [ODDS API] Available markets:', oddsData.bookmakers?.[0]?.bets?.map(b => b.name));
+            console.log('🔍 [ODDS API] Available markets for selected bookmaker:', bookmaker.bets?.map(b => b.name));
             return res.status(200).json(defaultOdds);
         }
 
