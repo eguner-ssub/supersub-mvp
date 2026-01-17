@@ -141,6 +141,21 @@ export const GameProvider = ({ children }) => {
     };
   }, []);
 
+  // Heartbeat: Auto-check active bets every 10 seconds
+  useEffect(() => {
+    if (!userProfile) return;
+
+    // 1. Run immediately on load
+    checkActiveBets();
+
+    // 2. Run every 10 seconds
+    const interval = setInterval(() => {
+      checkActiveBets();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [userProfile]); // Re-run if profile changes
+
   // --- GAME ACTIONS ---
   const createProfile = async (managerName) => {
     if (!userProfile?.id) return;
