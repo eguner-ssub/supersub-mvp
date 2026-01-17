@@ -24,7 +24,7 @@ export const GameProvider = ({ children }) => {
     activeRequestId.current = myRequestId;
 
     try {
-      setLoading(true); // Ensure loading is true while we fetch
+      setLoading(true);
 
       const { data, error } = await supabase
         .from('profiles')
@@ -32,7 +32,7 @@ export const GameProvider = ({ children }) => {
         .eq('id', session.user.id)
         .single();
 
-      // ZOMBIE CHECK 1: If a newer request started, ignore this result
+      // ZOMBIE CHECK 1
       if (activeRequestId.current !== myRequestId) return;
 
       if (error) throw error;
@@ -42,20 +42,72 @@ export const GameProvider = ({ children }) => {
     } catch (error) {
       // ZOMBIE CHECK 2
       if (activeRequestId.current !== myRequestId) return;
-
       console.error('🔥 CONNECTION FAILURE:', error.message);
-
-      // --- THE CRITICAL FIX ---
-      // WE REMOVED THE "signOut()" CALL HERE.
-      // If the DB fails, we just log the error and stop loading.
-      // The user remains "Authenticated" but with "No Profile Data" (Offline Mode).
       console.warn("⚠️ Database is slow/unreachable. Staying logged in.");
 
     } finally {
-      // Final Zombie Check: Only turn off loading if this was the latest request
       if (activeRequestId.current === myRequestId) {
         setLoading(false);
       }
+    }
+  };
+
+  // --- LAZY SETTLEMENT ENGINE ---
+  // Moved OUTSIDE useEffect so it can be exported
+  const checkActiveBets = async () => {
+    if (!userProfile?.id) return;
+
+    try {
+      // 1. Fetch active bets (PENDING or LIVE)
+      const { data: bets, error } = await supabase
+        .from('predictions')
+        .select('*')
+        .eq('user_id', userProfile.id)
+        .in('status', ['PENDING', 'LIVE']);
+
+      if (error || !bets || bets.length === 0) return;
+
+      for (const bet of bets) {
+
+        // SCENARIO A: Kickoff (PENDING -> LIVE)
+        if (bet.status === 'PENDING') {
+          // In a real app, we check match time. Here, we assume instant kickoff.
+          console.log(`⚽ Kickoff for bet ${bet.id}`);
+          await supabase
+            .from('predictions')
+            .update({ status: 'LIVE', created_at: new Date().toISOString() }) // Reset timer
+            .eq('id', bet.id);
+        }
+
+        // SCENARIO B: Settlement (LIVE -> WON)
+        else if (bet.status === 'LIVE') {
+          // Check if 30 seconds have passed since creation/update
+          const betTime = new Date(bet.created_at).getTime();
+          const now = new Date().getTime();
+          const timeAlive = now - betTime;
+
+          // If > 30 seconds, simulate a WIN
+          if (timeAlive > 30000) {
+            console.log(`🏆 Match Finished! Settle WIN for ${bet.id}`);
+
+            // Call the Database Function (RPC) to handle money safely
+            const { data, error: rpcError } = await supabase.rpc('settle_prediction', {
+              prediction_id: bet.id,
+              new_status: 'WON'
+            });
+
+            if (rpcError) {
+              console.error("Settlement Error:", rpcError);
+            } else {
+              // Reload profile to see new coin balance
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session) loadProfile(session);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("⚠️ Settlement Engine Stalled:", err);
     }
   };
 
@@ -78,62 +130,10 @@ export const GameProvider = ({ children }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (mounted) {
-        // Reset ID on auth change to kill old requests
         activeRequestId.current += 1;
         loadProfile(session);
       }
     });
-
-    // Settlement Logic: Auto-transition bets through lifecycle
-    const checkActiveBets = async () => {
-      if (!userProfile?.id) return;
-
-      try {
-        // Fetch active bets (PENDING or LIVE)
-        const { data: bets, error } = await supabase
-          .from('predictions')
-          .select('*')
-          .eq('user_id', userProfile.id)
-          .in('status', ['PENDING', 'LIVE']);
-
-        if (error || !bets) return;
-
-        for (const bet of bets) {
-          if (bet.status === 'PENDING') {
-            // Simulate kickoff - move to LIVE immediately
-            await supabase
-              .from('predictions')
-              .update({ status: 'LIVE', updated_at: new Date().toISOString() })
-              .eq('id', bet.id);
-
-            console.log(`✅ Bet ${bet.id} moved to LIVE`);
-
-          } else if (bet.status === 'LIVE') {
-            // Check if 30 seconds have passed since it went LIVE
-            const liveTime = new Date() - new Date(bet.updated_at);
-
-            if (liveTime > 30000) { // 30 seconds
-              // Simulate win - call settlement RPC
-              const { data, error: rpcError } = await supabase.rpc('settle_prediction', {
-                p_prediction_id: bet.id,
-                p_new_status: 'WON'
-              });
-
-              if (!rpcError && data && data.length > 0) {
-                console.log(`🎉 Bet ${bet.id} WON! New coins: ${data[0].new_coins}`);
-                // Reload profile to update coins
-                const session = await supabase.auth.getSession();
-                if (session.data.session) {
-                  loadProfile(session.data.session);
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error checking active bets:', error);
-      }
-    };
 
     return () => {
       mounted = false;
@@ -158,8 +158,9 @@ export const GameProvider = ({ children }) => {
     try {
       const { error } = await supabase.from('profiles').upsert([newProfile]);
       if (error) throw error;
-
       // Give starter cards
+      // Note: Assuming updateInventory is adjusted to handle array logic we fixed earlier
+      // For now, simple insert logic:
       await updateInventory(['c_match_result', 'c_total_goals', 'c_player_score']);
 
       setUserProfile(prev => ({ ...prev, ...newProfile }));
@@ -177,9 +178,20 @@ export const GameProvider = ({ children }) => {
 
   const updateInventory = async (newCardIds) => {
     if (!userProfile?.id) return;
-    setUserProfile(prev => ({ ...prev, inventory: [...(prev.inventory || []), ...newCardIds] }));
-    const rows = newCardIds.map(cid => ({ user_id: userProfile.id, card_id: cid }));
-    const { error } = await supabase.from('inventory').insert(rows);
+
+    // Optimistic UI Update
+    // Assuming inventory is stored as JSONB array in DB based on your previous fixes
+    const currentInv = Array.isArray(userProfile.inventory) ? userProfile.inventory : [];
+    const updatedInv = [...currentInv, ...newCardIds];
+
+    setUserProfile(prev => ({ ...prev, inventory: updatedInv }));
+
+    // DB Update
+    const { error } = await supabase
+      .from('profiles')
+      .update({ inventory: updatedInv })
+      .eq('id', userProfile.id);
+
     if (error) console.error('Inventory Sync Failed:', error.message);
   };
 
@@ -190,7 +202,7 @@ export const GameProvider = ({ children }) => {
     createProfile,
     spendEnergy,
     updateInventory,
-    checkActiveBets,
+    checkActiveBets, // <--- NOW CORRECTLY DEFINED
     loadProfile
   };
 
