@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Zap, Loader2, Lock, TrendingUp, CheckCircle } from 'lucide-react';
 import { useGame } from '../context/GameContext';
@@ -43,6 +43,54 @@ const MatchDetail = () => {
 
   // Real odds will be fetched from API
 
+  // Ref to track timeout ID for cleanup
+  const pollingTimeoutRef = useRef(null);
+
+  // Calculate next polling delay based on match state
+  const calculateNextDelay = (matchData) => {
+    if (!matchData || !matchData.fixture) {
+      console.log('📅 [MatchDetail] No match data - Next poll in 60 minutes');
+      return 60 * 60 * 1000; // 60 minutes
+    }
+
+    const now = new Date();
+    const kickoffTime = new Date(matchData.fixture.date);
+    const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'PEN', 'LIVE', 'P'];
+
+    // Check if match is LIVE
+    const isLive = LIVE_STATUSES.includes(matchData.fixture.status.short);
+
+    if (isLive) {
+      console.log('🔴 [MatchDetail] Match is LIVE - Next poll in 30 seconds');
+      return 30 * 1000; // 30 seconds
+    }
+
+    // Calculate hours until kickoff
+    const hoursUntilKickoff = (kickoffTime - now) / (1000 * 60 * 60);
+
+    // Kickoff in < 3 hours
+    if (hoursUntilKickoff > 0 && hoursUntilKickoff < 3) {
+      console.log(`⏰ [MatchDetail] Kickoff in ${hoursUntilKickoff.toFixed(1)} hours - Next poll in 5 minutes`);
+      return 5 * 60 * 1000; // 5 minutes
+    }
+
+    // Check if kickoff is today (but > 3 hours away)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    const isToday = kickoffTime >= todayStart && kickoffTime < todayEnd;
+
+    if (isToday && hoursUntilKickoff > 0) {
+      console.log('📆 [MatchDetail] Kickoff today (> 3 hours) - Next poll in 30 minutes');
+      return 30 * 60 * 1000; // 30 minutes
+    }
+
+    // Kickoff on a future date
+    console.log('📅 [MatchDetail] Future match - Next poll in 60 minutes');
+    return 60 * 60 * 1000; // 60 minutes
+  };
+
   // FETCH MATCH DATA & ODDS
   useEffect(() => {
     const fetchMatchDetail = async () => {
@@ -66,24 +114,44 @@ const MatchDetail = () => {
         console.log('📊 [MatchDetail] Odds object:', oddsData.odds);
 
         if (matchData.response && matchData.response.length > 0) {
-          setMatch(matchData.response[0]);
+          const matchObj = matchData.response[0];
+          setMatch(matchObj);
 
           // Safety check: ensure oddsData.odds exists, otherwise default to 2.0
           const finalOdds = oddsData.odds || { home: 2.0, draw: 3.0, away: 2.0 };
           console.log('✅ [MatchDetail] Setting odds:', finalOdds);
           setOdds(finalOdds);
+
+          // Calculate next delay and schedule next poll
+          const delay = calculateNextDelay(matchObj);
+          pollingTimeoutRef.current = setTimeout(fetchMatchDetail, delay);
         } else {
           throw new Error("Match not found");
         }
       } catch (err) {
         console.error("❌ [MatchDetail] Error:", err);
         setError("Could not retrieve match intelligence.");
+
+        // Retry after 5 minutes on error
+        console.log('❌ [MatchDetail] Error occurred - Retry in 5 minutes');
+        pollingTimeoutRef.current = setTimeout(fetchMatchDetail, 5 * 60 * 1000);
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) fetchMatchDetail();
+    if (id) {
+      // Initial fetch (immediate)
+      fetchMatchDetail();
+    }
+
+    // Cleanup function
+    return () => {
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+        console.log('🧹 [MatchDetail] Polling cleanup - timeout cleared');
+      }
+    };
   }, [id]);
 
   // CARD SELECTION HANDLER WITH TOGGLE

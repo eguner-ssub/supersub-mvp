@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Zap, Coins, Loader2 } from 'lucide-react';
-import { useGame } from '../context/GameContext'; 
+import { useGame } from '../context/GameContext';
 import MobileLayout from '../components/MobileLayout';
 
 const MatchHub = () => {
   const navigate = useNavigate();
-  const { userProfile, loading: gameLoading } = useGame(); 
+  const { userProfile, loading: gameLoading } = useGame();
 
   const [matches, setMatches] = useState([]);
   const [currentRound, setCurrentRound] = useState('');
@@ -14,8 +14,71 @@ const MatchHub = () => {
   const [error, setError] = useState(null);
 
   // CONFIGURATION
-  const LEAGUE_ID = 39; 
-  const SEASON = 2025;  
+  const LEAGUE_ID = 39;
+  const SEASON = 2025;
+
+  // Ref to track timeout ID for cleanup
+  const pollingTimeoutRef = useRef(null);
+
+  // Calculate next polling delay based on match states
+  const calculateNextDelay = (matchesData) => {
+    if (!matchesData || matchesData.length === 0) {
+      console.log('📅 No matches found - Next poll in 60 minutes');
+      return 60 * 60 * 1000; // 60 minutes
+    }
+
+    const now = new Date();
+    const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'PEN', 'LIVE', 'P'];
+
+    // Check for LIVE matches
+    const hasLiveMatch = matchesData.some(m =>
+      LIVE_STATUSES.includes(m.fixture.status.short)
+    );
+
+    if (hasLiveMatch) {
+      console.log('🔴 LIVE match detected - Next poll in 30 seconds');
+      return 30 * 1000; // 30 seconds
+    }
+
+    // Find earliest upcoming match
+    const upcomingMatches = matchesData
+      .filter(m => new Date(m.fixture.date) > now)
+      .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+
+    if (upcomingMatches.length === 0) {
+      console.log('📅 No upcoming matches - Next poll in 60 minutes');
+      return 60 * 60 * 1000; // 60 minutes
+    }
+
+    const earliestMatch = upcomingMatches[0];
+    const kickoffTime = new Date(earliestMatch.fixture.date);
+    const hoursUntilKickoff = (kickoffTime - now) / (1000 * 60 * 60);
+
+    // Match starting in < 3 hours
+    if (hoursUntilKickoff < 3) {
+      console.log(`⏰ Match starting in ${hoursUntilKickoff.toFixed(1)} hours - Next poll in 5 minutes`);
+      return 5 * 60 * 1000; // 5 minutes
+    }
+
+    // Check if it's a matchday (matches today but > 3 hours away)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    const hasMatchesToday = matchesData.some(m => {
+      const matchDate = new Date(m.fixture.date);
+      return matchDate >= todayStart && matchDate < todayEnd;
+    });
+
+    if (hasMatchesToday) {
+      console.log('📆 Matchday detected (> 3 hours) - Next poll in 30 minutes');
+      return 30 * 60 * 1000; // 30 minutes
+    }
+
+    // No matches today
+    console.log('📅 No matches today - Next poll in 60 minutes');
+    return 60 * 60 * 1000; // 60 minutes
+  };
 
   useEffect(() => {
     const fetchMatches = async () => {
@@ -32,11 +95,11 @@ const MatchHub = () => {
         if (!response.ok) throw new Error(`Server Error: ${response.status}`);
 
         const data = await response.json();
-        
+
         if (data.errors && Object.keys(data.errors).length > 0) {
-           throw new Error("API refused connection");
+          throw new Error("API refused connection");
         }
-        
+
         // The backend tells us the active round name
         if (data.active_round) {
           setCurrentRound(data.active_round.replace("Regular Season - ", "Matchweek "));
@@ -44,23 +107,40 @@ const MatchHub = () => {
 
         // The backend returns the matches in 'response'
         const matchesData = data.response || [];
-        
+
         // Client-side sort by date
-        const sortedMatches = matchesData.sort((a, b) => 
+        const sortedMatches = matchesData.sort((a, b) =>
           new Date(a.fixture.date) - new Date(b.fixture.date)
         );
 
         setMatches(sortedMatches);
 
+        // Calculate next delay and schedule next poll
+        const delay = calculateNextDelay(sortedMatches);
+        pollingTimeoutRef.current = setTimeout(fetchMatches, delay);
+
       } catch (err) {
         console.error("Fetch error:", err);
         setError("Could not load matches.");
+
+        // Retry after 5 minutes on error
+        console.log('❌ Error occurred - Retry in 5 minutes');
+        pollingTimeoutRef.current = setTimeout(fetchMatches, 5 * 60 * 1000);
       } finally {
         setDataLoading(false);
       }
     };
 
+    // Initial fetch (immediate)
     fetchMatches();
+
+    // Cleanup function
+    return () => {
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+        console.log('🧹 Polling cleanup - timeout cleared');
+      }
+    };
   }, []);
 
   const formatDate = (dateString) => {
@@ -74,20 +154,20 @@ const MatchHub = () => {
 
   // SAFETY SHIELD
   if (gameLoading || !userProfile) {
-     return (
-        <div className="h-screen w-full bg-black flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
-        </div>
-     );
+    return (
+      <div className="h-screen w-full bg-black flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
+      </div>
+    );
   }
 
   const userData = userProfile;
 
   return (
-    <MobileLayout bgImage="/bg-stadium.webp"> 
-      
+    <MobileLayout bgImage="/bg-stadium.webp">
+
       <div className="w-full h-full flex flex-col relative font-sans select-none">
-        
+
         {/* HEADER */}
         <div className="absolute top-0 left-0 w-full p-4 pt-4 flex justify-between items-center z-30 pointer-events-none">
           <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg pointer-events-auto">
@@ -117,11 +197,11 @@ const MatchHub = () => {
 
         {/* MATCH LIST CONTAINER */}
         <div className="flex-1 overflow-y-auto space-y-2 pt-24 pb-20 px-0 no-scrollbar">
-          
+
           <div className="px-1 mb-2 text-center">
-             <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
-                {currentRound || "Upcoming Fixtures"}
-             </span>
+            <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
+              {currentRound || "Upcoming Fixtures"}
+            </span>
           </div>
 
           {dataLoading && (
@@ -132,10 +212,18 @@ const MatchHub = () => {
           )}
 
           {!dataLoading && error && (
-             <div className="text-center p-6 bg-red-900/50 mx-4 rounded-xl border border-red-500/30">
-               <p className="text-red-200 text-sm mb-2 font-bold">Signal Lost</p>
-               <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-800 rounded text-xs text-white font-bold uppercase">Retry</button>
-             </div>
+            <div className="text-center p-6 bg-red-900/50 mx-4 rounded-xl border border-red-500/30">
+              <p className="text-red-200 text-sm mb-2 font-bold">Signal Lost</p>
+              <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-800 rounded text-xs text-white font-bold uppercase">Retry</button>
+            </div>
+          )}
+
+          {!dataLoading && !error && matches.length === 0 && (
+            <div className="text-center p-8 mx-4 rounded-xl border border-yellow-500/30 bg-yellow-900/20">
+              <Calendar className="w-12 h-12 text-yellow-500 mx-auto mb-3 opacity-50" />
+              <p className="text-yellow-200 text-sm font-bold mb-1">No Matches Scheduled</p>
+              <p className="text-gray-400 text-xs">Check back soon for upcoming fixtures</p>
+            </div>
           )}
 
           {!dataLoading && !error && matches.map((matchData) => {
@@ -173,7 +261,7 @@ const MatchHub = () => {
 
                   {/* AWAY */}
                   <div className="flex flex-col items-center gap-1 w-1/3">
-                     <img src={teams.away.logo} alt={teams.away.name} className="w-8 h-8 object-contain drop-shadow-md" />
+                    <img src={teams.away.logo} alt={teams.away.name} className="w-8 h-8 object-contain drop-shadow-md" />
                     <span className="text-white font-bold text-[10px] uppercase tracking-tight leading-none text-center truncate w-full">{teams.away.name}</span>
                   </div>
                 </div>
