@@ -42,7 +42,7 @@ const ViewLedger = () => {
     const netProfit = totalWon - totalLost;
 
     return (
-        <div className="h-full overflow-y-auto p-6">
+        <div className="h-full overflow-y-auto scrollbar-hide p-6 pb-32 pt-6">
             {/* Ledger Header */}
             <div className="mb-6 text-center">
                 <h2 className="text-3xl font-black text-amber-900 uppercase tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>

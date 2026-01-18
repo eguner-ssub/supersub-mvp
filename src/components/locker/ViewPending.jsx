@@ -41,60 +41,72 @@ const ViewPending = () => {
     }
 
     return (
-        <div className="h-full overflow-y-auto p-6">
+        <div className="h-full overflow-y-auto scrollbar-hide p-6 pb-32 pt-6">
             {/* Whiteboard Header */}
             <div className="mb-6 text-center">
-                <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight" style={{ fontFamily: 'Permanent Marker, cursive' }}>
+                <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">
                     The Whiteboard
                 </h2>
                 <p className="text-gray-600 text-sm mt-1">Upcoming Predictions</p>
             </div>
 
-            {/* Sticky Notes Grid */}
+            {/* Tactic Cards Grid */}
             <div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
-                {pendingBets.map((bet, index) => (
-                    <div
-                        key={bet.id}
-                        className={`bg-yellow-200 border-2 border-yellow-400 rounded-lg p-6 shadow-lg transform ${index % 2 === 0 ? 'rotate-1' : '-rotate-1'
-                            } hover:rotate-0 transition-transform cursor-pointer`}
-                        style={{ fontFamily: 'Permanent Marker, cursive' }}
-                    >
-                        {/* Match */}
-                        <h3 className="text-xl font-black text-gray-900 mb-3">
-                            {bet.team_name}
-                        </h3>
+                {pendingBets.map((bet, index) => {
+                    // Random rotation between -1deg and 1deg
+                    const rotation = Math.random() * 2 - 1;
 
-                        {/* Prediction */}
-                        <div className="mb-3">
-                            <p className="text-sm text-gray-700 uppercase tracking-wide">Prediction:</p>
-                            <p className="text-lg font-bold text-gray-900">{formatBetSelection(bet)}</p>
-                        </div>
+                    return (
+                        <div
+                            key={bet.id}
+                            className="bg-gray-100 border-2 border-gray-300 rounded-lg p-6 shadow-lg hover:rotate-0 transition-transform cursor-pointer relative"
+                            style={{ transform: `rotate(${rotation}deg)` }}
+                        >
+                            {/* Visual Magnet */}
+                            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-6 h-6 rounded-full bg-red-600 border-2 border-gray-800 shadow-md"></div>
 
-                        {/* Stake & Potential Win */}
-                        <div className="flex justify-between items-center mb-3">
-                            <div>
-                                <p className="text-xs text-gray-700">Stake</p>
-                                <div className="flex items-center gap-1">
-                                    <Coins className="w-4 h-4 text-yellow-700" />
-                                    <p className="text-lg font-bold text-gray-900">{bet.stake}</p>
+                            {/* Card Image - Top Right Corner */}
+                            <div className="absolute top-4 right-4">
+                                <img
+                                    src="/cards/card_match_result.webp"
+                                    alt="Card"
+                                    className="w-12 h-12 object-contain opacity-80"
+                                />
+                            </div>
+
+                            {/* Match - Bold System Font */}
+                            <h3 className="text-xl font-black text-gray-900 mb-3 uppercase tracking-tight pr-16">
+                                {bet.team_name}
+                            </h3>
+
+                            {/* Prediction - Handwritten Font */}
+                            <div className="mb-4">
+                                <p className="text-xs text-gray-600 uppercase tracking-wide font-bold mb-1">Prediction:</p>
+                                <p
+                                    className="text-2xl font-bold text-blue-700"
+                                    style={{ fontFamily: "'Permanent Marker', cursive" }}
+                                >
+                                    {formatBetSelection(bet)}
+                                </p>
+                            </div>
+
+                            {/* Projected Payout */}
+                            <div className="border-t-2 border-gray-300 pt-3">
+                                <p className="text-xs text-gray-600 uppercase tracking-wide font-bold mb-1">PROJECTED PAYOUT</p>
+                                <div className="flex items-center gap-2">
+                                    <Coins className="w-5 h-5 text-green-700" />
+                                    <p className="text-2xl font-black text-green-700">{bet.potential_reward}</p>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-xs text-gray-700">Potential Win</p>
-                                <div className="flex items-center gap-1 justify-end">
-                                    <Coins className="w-4 h-4 text-green-700" />
-                                    <p className="text-lg font-bold text-green-700">{bet.potential_reward}</p>
-                                </div>
+
+                            {/* Created Time */}
+                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-3">
+                                <Calendar className="w-3 h-3" />
+                                <span>{new Date(bet.created_at).toLocaleString()}</span>
                             </div>
                         </div>
-
-                        {/* Created Time */}
-                        <div className="flex items-center gap-2 text-sm text-gray-700 border-t border-yellow-400 pt-3">
-                            <Calendar className="w-4 h-4" />
-                            <span>{new Date(bet.created_at).toLocaleString()}</span>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

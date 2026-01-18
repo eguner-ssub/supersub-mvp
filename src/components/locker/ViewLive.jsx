@@ -38,7 +38,7 @@ const ViewLive = () => {
     }
 
     return (
-        <div className="h-full overflow-y-auto p-6">
+        <div className="h-full overflow-y-auto scrollbar-hide p-6 pb-32 pt-6">
             {/* Tablet Header */}
             <div className="mb-6 text-center">
                 <h2 className="text-3xl font-black text-white uppercase tracking-tight flex items-center justify-center gap-3">

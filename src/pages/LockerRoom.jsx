@@ -40,9 +40,9 @@ const LockerRoom = () => {
 
     return (
         <MobileLayout bgImage="/bg-locker-room.webp">
-            <div className="w-full max-w-md h-full flex flex-col relative">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 bg-black/60 backdrop-blur-md border-b border-white/10 z-10">
+            <div className="h-screen w-full flex flex-col bg-gray-900 overflow-hidden">
+                {/* Header - Fixed */}
+                <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-black/60 backdrop-blur-md border-b border-white/10">
                     <button
                         onClick={() => navigate('/dashboard')}
                         className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
@@ -54,13 +54,13 @@ const LockerRoom = () => {
                     <div className="w-16" /> {/* Spacer */}
                 </div>
 
-                {/* Active View */}
-                <div className={`flex-1 overflow-hidden ${activeTabData.bgColor} transition-colors duration-300`}>
+                {/* Active View - Scrollable Content */}
+                <div className={`flex-1 overflow-y-auto scrollbar-hide pb-32 pt-20 ${activeTabData.bgColor} transition-colors duration-300`}>
                     <ActiveComponent />
                 </div>
 
-                {/* Hotspot Navigation */}
-                <div className="bg-black/80 backdrop-blur-md border-t border-white/10 p-4">
+                {/* Hotspot Navigation - Fixed */}
+                <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-t border-white/10 p-4">
                     <div className="flex justify-around items-center max-w-md mx-auto">
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
@@ -71,13 +71,13 @@ const LockerRoom = () => {
                                     key={tab.id}
                                     onClick={() => handleTabChange(tab.id)}
                                     className={`flex flex-col items-center gap-1 transition-all ${isActive
-                                            ? 'scale-110'
-                                            : 'opacity-60 hover:opacity-100 hover:scale-105'
+                                        ? 'scale-110'
+                                        : 'opacity-60 hover:opacity-100 hover:scale-105'
                                         }`}
                                 >
                                     <div className={`p-3 rounded-xl transition-all ${isActive
-                                            ? 'bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                                            : 'bg-gray-700 hover:bg-gray-600'
+                                        ? 'bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                                        : 'bg-gray-700 hover:bg-gray-600'
                                         }`}>
                                         <Icon className={`w-6 h-6 ${isActive ? 'text-white' : 'text-gray-300'}`} />
                                     </div>

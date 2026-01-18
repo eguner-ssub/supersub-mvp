@@ -259,7 +259,7 @@ const MatchDetail = () => {
   return (
     <div className="w-full h-screen relative font-sans select-none overflow-hidden bg-gray-900">
 
-      {/* 1. BACKGROUND IMAGE */}
+      {/* 1. HERO BACKGROUND - The Tunnel */}
       <div className="absolute inset-0 z-0">
         <img
           src="/bg-tunnel.webp"
@@ -267,7 +267,7 @@ const MatchDetail = () => {
           className="w-full h-full object-cover opacity-90"
           onError={(e) => { e.target.onerror = null; e.target.src = "/bg-dugout.webp"; }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-transparent to-black/90"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/50"></div>
       </div>
 
       {/* 2. TOP NAVIGATION */}
@@ -302,88 +302,100 @@ const MatchDetail = () => {
 
       {!loading && match && odds && (
         <>
-          {/* 3. SCOREBOARD (Enlarged) */}
+          {/* 3. COMPACT METALLIC HUD - Versus Header */}
           <div className="absolute top-24 left-0 w-full z-40 px-4">
-            <div className="relative h-24 w-full bg-gradient-to-b from-gray-100 via-white to-gray-300 shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex items-start justify-between px-4 pt-4 pb-2 border-b-4 border-[#C0A062] rounded-xl">
-              {/* Home */}
-              <div className="flex items-center gap-2 w-1/3 mt-2">
-                <img src={match.teams.home.logo} className="w-11 h-11 object-contain drop-shadow-md" alt="Home" />
-                <span className="text-gray-900 font-black text-sm uppercase tracking-tight leading-none truncate">{match.teams.home.name}</span>
+            <div className="relative h-16 w-full bg-gradient-to-b from-gray-300 via-gray-200 to-gray-100 shadow-[0_8px_20px_rgba(0,0,0,0.6)] flex items-center justify-between px-4 border border-gray-400/50 rounded-lg">
+              {/* Home Team */}
+              <div className="flex items-center gap-2 w-1/3">
+                <img src={match.teams.home.logo} className="w-8 h-8 object-contain drop-shadow-lg" alt="Home" />
+                <span className="text-white font-black text-xs uppercase tracking-tight leading-none truncate drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{match.teams.home.name}</span>
               </div>
-              {/* Time */}
-              <div className="absolute left-1/2 -translate-x-1/2 -top-1 h-28 w-1/3 pointer-events-none filter drop-shadow-lg">
-                <div className="w-full h-full bg-[#1a1a1a] clip-path-trapezoid flex flex-col items-center justify-center pt-6 border-t-2 border-[#C0A062] shadow-inner">
-                  <div className="text-[10px] text-[#F5C546] font-bold uppercase tracking-[0.2em] mb-0.5">KICKOFF</div>
-                  <div className="text-white font-black text-lg leading-none uppercase">{formatDate(match.fixture.date)}</div>
-                  <div className="text-xl text-white font-mono leading-none tracking-widest mt-1">{formatTime(match.fixture.date)}</div>
+              {/* Match Timer - Trapezoid */}
+              <div className="absolute left-1/2 -translate-x-1/2 -top-2 h-20 w-1/3 pointer-events-none filter drop-shadow-xl">
+                <div className="w-full h-full bg-gradient-to-b from-yellow-600 via-yellow-500 to-yellow-600 clip-path-trapezoid flex flex-col items-center justify-center pt-4 border-t-2 border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.5)]">
+                  <div className="text-[9px] text-black font-bold uppercase tracking-[0.2em] mb-0.5">KICKOFF</div>
+                  <div className="text-black font-black text-sm leading-none uppercase">{formatDate(match.fixture.date)}</div>
+                  <div className="text-base text-black font-mono leading-none tracking-widest mt-0.5">{formatTime(match.fixture.date)}</div>
                 </div>
               </div>
-              {/* Away */}
-              <div className="flex items-center justify-end gap-2 w-1/3 mt-2">
-                <span className="text-gray-900 font-black text-sm uppercase tracking-tight leading-none text-right truncate">{match.teams.away.name}</span>
-                <img src={match.teams.away.logo} className="w-11 h-11 object-contain drop-shadow-md" alt="Away" />
+              {/* Away Team */}
+              <div className="flex items-center justify-end gap-2 w-1/3">
+                <span className="text-white font-black text-xs uppercase tracking-tight leading-none text-right truncate drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{match.teams.away.name}</span>
+                <img src={match.teams.away.logo} className="w-8 h-8 object-contain drop-shadow-lg" alt="Away" />
               </div>
             </div>
           </div>
 
-          {/* 4. PREDICTION STAGE */}
-          <div className="absolute top-56 left-0 w-full z-30 px-4">
-            {/* Container with relative positioning for locked overlay */}
-            <div className="relative">
-              {/* Prediction Buttons */}
-              <div className="flex flex-col gap-3">
-                {/* HOME WIN */}
-                <PredictionButton
-                  type="HOME_WIN"
-                  label={`${match.teams.home.name} Win`}
-                  logo={match.teams.home.logo}
-                  odds={odds.home}
-                  isSelected={draftPrediction?.type === 'HOME_WIN'}
-                  isLocked={isLocked}
-                  onClick={() => handlePredictionSelect('HOME_WIN')}
-                />
-
-                {/* DRAW */}
-                <PredictionButton
-                  type="DRAW"
-                  label="Draw"
-                  logo={null}
-                  odds={odds.draw}
-                  isSelected={draftPrediction?.type === 'DRAW'}
-                  isLocked={isLocked}
-                  onClick={() => handlePredictionSelect('DRAW')}
-                />
-
-                {/* AWAY WIN */}
-                <PredictionButton
-                  type="AWAY_WIN"
-                  label={`${match.teams.away.name} Win`}
-                  logo={match.teams.away.logo}
-                  odds={odds.away}
-                  isSelected={draftPrediction?.type === 'AWAY_WIN'}
-                  isLocked={isLocked}
-                  onClick={() => handlePredictionSelect('AWAY_WIN')}
-                />
-              </div>
-
-              {/* LOCKED OVERLAY - Positioned relative to parent container */}
-              {isLocked && (
-                <div className="absolute inset-0 backdrop-blur-sm bg-black/40 rounded-xl flex flex-col items-center justify-center z-50">
-                  <div className="flex flex-col items-center justify-center">
-                    <Lock className="w-12 h-12 text-yellow-500 mb-3" />
-                    <p className="text-white font-bold text-lg mb-2">Locked</p>
-                    <p className="text-gray-300 text-sm mb-4">You need a Match Result card</p>
-                    <button
-                      onClick={() => navigate('/training')}
-                      className="px-6 py-2 bg-yellow-500 text-black font-black uppercase rounded-lg hover:bg-yellow-400 transition-all"
-                    >
-                      Get Cards
-                    </button>
-                  </div>
+          {/* 4. HIDDEN ACTION LAYER - Holographic Prediction Overlay */}
+          {selectedCard && !isLocked && (
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 px-4 w-full max-w-md animate-in fade-in duration-300">
+              <div className="bg-gradient-to-b from-blue-900/40 via-purple-900/30 to-blue-900/40 backdrop-blur-md border-2 border-cyan-400/50 shadow-[0_0_50px_rgba(34,211,238,0.4)] rounded-xl p-6">
+                {/* Holographic Title */}
+                <div className="text-center mb-4">
+                  <h3 className="text-cyan-300 font-black text-lg uppercase tracking-wider drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]">Tactical Projection</h3>
+                  <div className="h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent mt-2"></div>
                 </div>
-              )}
+
+                {/* Prediction Buttons */}
+                <div className="flex flex-col gap-3">
+                  {/* HOME WIN */}
+                  <PredictionButton
+                    type="HOME_WIN"
+                    label={`${match.teams.home.name} Win`}
+                    logo={match.teams.home.logo}
+                    odds={odds.home}
+                    isSelected={draftPrediction?.type === 'HOME_WIN'}
+                    isLocked={false}
+                    onClick={() => handlePredictionSelect('HOME_WIN')}
+                  />
+
+                  {/* DRAW */}
+                  <PredictionButton
+                    type="DRAW"
+                    label="Draw"
+                    logo={null}
+                    odds={odds.draw}
+                    isSelected={draftPrediction?.type === 'DRAW'}
+                    isLocked={false}
+                    onClick={() => handlePredictionSelect('DRAW')}
+                  />
+
+                  {/* AWAY WIN */}
+                  <PredictionButton
+                    type="AWAY_WIN"
+                    label={`${match.teams.away.name} Win`}
+                    logo={match.teams.away.logo}
+                    odds={odds.away}
+                    isSelected={draftPrediction?.type === 'AWAY_WIN'}
+                    isLocked={false}
+                    onClick={() => handlePredictionSelect('AWAY_WIN')}
+                  />
+                </div>
+
+                {/* Scan Line Effect */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-400/10 to-transparent animate-pulse"></div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* LOCKED OVERLAY - Full Screen */}
+          {isLocked && (
+            <div className="fixed inset-0 backdrop-blur-sm bg-black/60 flex flex-col items-center justify-center z-50">
+              <div className="flex flex-col items-center justify-center bg-gray-900/80 p-8 rounded-xl border-2 border-yellow-500/50">
+                <Lock className="w-16 h-16 text-yellow-500 mb-4" />
+                <p className="text-white font-bold text-xl mb-2">Locked</p>
+                <p className="text-gray-300 text-sm mb-6 text-center">You need a Match Result card to make predictions</p>
+                <button
+                  onClick={() => navigate('/training')}
+                  className="px-8 py-3 bg-yellow-500 text-black font-black uppercase rounded-lg hover:bg-yellow-400 transition-all shadow-lg"
+                >
+                  Get Cards
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 5. BACKDROP FOR CANCELLATION - z-50 to sit above deck but below queue */}
           {draftPrediction && (
@@ -420,39 +432,40 @@ const MatchDetail = () => {
             </div>
           )}
 
-          {/* 7. SHELF & INVENTORY */}
-          <div className="absolute bottom-0 w-full z-30">
-            <div className={`w-full flex justify-center items-end gap-3 pb-6 px-6 z-40 relative translate-y-2 transition-opacity duration-300 ${!isDeckOpen ? 'opacity-50' : 'opacity-100'}`}>
-              {cardTypes.map((card) => {
-                const count = getCardCount(card.id);
-                const isActive = count > 0;
-                const isSelected = selectedCard === card.id;
-                return (
-                  <button
-                    key={card.id}
-                    onClick={() => handleCardSelect(card.id)}
-                    disabled={!isActive}
-                    className={`group relative flex flex-col items-center gap-1 transition-all duration-300 ${isActive ? 'opacity-100 hover:-translate-y-4 cursor-pointer' : 'opacity-40 grayscale cursor-not-allowed'
-                      } ${isSelected ? 'ring-4 ring-yellow-400 rounded-lg shadow-[0_0_20px_rgba(251,191,36,0.6)]' : ''}`}
-                  >
-                    <div className={`relative w-[4.5rem] h-24 rounded-lg transition-all transform origin-bottom ${isActive ? 'shadow-[0_10px_20px_rgba(0,0,0,0.5)]' : ''}`}>
-                      <img src={card.img} alt={card.label} className="w-full h-full object-contain drop-shadow-2xl" onError={handleImageError} />
-                      {isActive && (
-                        <div className="absolute -top-2 -right-2 bg-[#F5C546] text-black text-[9px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-black shadow-lg z-10">{count}</div>
-                      )}
-                    </div>
-                    <span className={`text-[8px] font-bold uppercase tracking-wider text-center max-w-[4rem] leading-tight ${isActive ? 'text-white' : 'text-gray-500'} drop-shadow-md`}>{card.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="w-full h-12 bg-[#1a1a1a] relative z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.8)]">
-              <div className="absolute top-0 w-full h-2 bg-gradient-to-b from-[#555] to-[#222] border-t border-white/20"></div>
-              <div className="w-full h-full bg-gradient-to-b from-[#222] to-black opacity-90"></div>
-              <div className="absolute top-4 w-full text-center">
-                <span className="text-[#666] text-[9px] font-bold uppercase tracking-[0.3em] text-shadow-sm">
-                  {selectedCard ? '✓ Card Selected' : 'Select a Card'}
-                </span>
+          {/* 7. CARD DECK PANEL - Bottom Bar */}
+          <div className="fixed bottom-0 w-full z-30">
+            <div className="bg-black/80 backdrop-blur-md border-t-2 border-yellow-600 py-4 px-4">
+              {/* Deck Title */}
+              <div className="text-center mb-3">
+                <h3 className="text-yellow-500 font-black text-xs uppercase tracking-[0.2em]">Your Card Deck</h3>
+              </div>
+
+              {/* Cards */}
+              <div className="flex justify-center items-end gap-4 overflow-x-auto scrollbar-hide pb-2">
+                {cardTypes.map((card) => {
+                  const count = getCardCount(card.id);
+                  const isActive = count > 0;
+                  const isSelected = selectedCard === card.id;
+                  return (
+                    <button
+                      key={card.id}
+                      onClick={() => handleCardSelect(card.id)}
+                      disabled={!isActive}
+                      className={`group relative flex flex-col items-center gap-1 transition-all duration-300 flex-shrink-0 ${isActive ? 'opacity-100 hover:-translate-y-2 cursor-pointer' : 'opacity-40 grayscale cursor-not-allowed'
+                        } ${isSelected ? 'ring-4 ring-yellow-400 rounded-lg shadow-[0_0_20px_rgba(251,191,36,0.6)]' : ''} ${isActive && !isSelected ? 'shadow-[0_0_20px_rgba(234,179,8,0.6)]' : ''
+                        }`}
+                    >
+                      <div className="relative w-20 h-28 rounded-lg transition-all transform origin-bottom">
+                        <img src={card.img} alt={card.label} className="w-full h-full object-contain drop-shadow-2xl" onError={handleImageError} />
+                        {isActive && (
+                          <div className="absolute -top-2 -right-2 bg-yellow-500 text-black text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-black shadow-lg z-10">{count}</div>
+                        )}
+                      </div>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider text-center max-w-[5rem] leading-tight ${isActive ? 'text-white' : 'text-gray-500'
+                        } drop-shadow-md`}>{card.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
