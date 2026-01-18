@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Zap, Coins, Loader2 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import MobileLayout from '../components/MobileLayout';
+import { toast, Toaster } from 'sonner';
 
 const MatchHub = () => {
   const navigate = useNavigate();
@@ -96,6 +97,35 @@ const MatchHub = () => {
 
         const data = await response.json();
 
+        // TRANSPARENT ERROR HANDLING: Detect API errors
+        if (data.error) {
+          console.error('API Error detected:', data.error, data.message);
+
+          // DEV ALERT: Show toast on localhost only
+          if (import.meta.env.DEV) {
+            if (data.error === 'API_LIMIT_REACHED') {
+              toast.error('⚠️ DEV ALERT: API Quota Exceeded', {
+                description: data.message,
+                duration: 5000,
+              });
+            } else if (data.error === 'API_UNAVAILABLE') {
+              toast.warning('⚠️ DEV ALERT: API Unavailable', {
+                description: data.message,
+                duration: 5000,
+              });
+            }
+          }
+
+          // USER VIEW: Set empty matches (will show friendly empty state)
+          setMatches([]);
+          setError(null); // Don't show error UI, show empty state instead
+
+          // Still schedule next poll
+          const delay = calculateNextDelay([]);
+          pollingTimeoutRef.current = setTimeout(fetchMatches, delay);
+          return;
+        }
+
         if (data.errors && Object.keys(data.errors).length > 0) {
           throw new Error("API refused connection");
         }
@@ -165,6 +195,8 @@ const MatchHub = () => {
 
   return (
     <MobileLayout bgImage="/bg-stadium.webp">
+      {/* Toast Notifications (Dev only) */}
+      <Toaster position="top-center" richColors closeButton />
 
       <div className="w-full h-full flex flex-col relative font-sans select-none">
 
@@ -219,10 +251,15 @@ const MatchHub = () => {
           )}
 
           {!dataLoading && !error && matches.length === 0 && (
-            <div className="text-center p-8 mx-4 rounded-xl border border-yellow-500/30 bg-yellow-900/20">
-              <Calendar className="w-12 h-12 text-yellow-500 mx-auto mb-3 opacity-50" />
-              <p className="text-yellow-200 text-sm font-bold mb-1">No Matches Scheduled</p>
-              <p className="text-gray-400 text-xs">Check back soon for upcoming fixtures</p>
+            <div className="text-center p-8 mx-4 rounded-xl border border-yellow-500/30 bg-gradient-to-b from-yellow-900/20 to-gray-900/40 backdrop-blur-sm">
+              <div className="mb-4 relative">
+                <div className="w-20 h-20 mx-auto bg-yellow-500/10 rounded-full flex items-center justify-center">
+                  <Calendar className="w-10 h-10 text-yellow-500 opacity-60" />
+                </div>
+              </div>
+              <p className="text-yellow-200 text-base font-black mb-2 uppercase tracking-wide">Locker Room Quiet</p>
+              <p className="text-gray-400 text-sm mb-1">No matches scheduled at the moment</p>
+              <p className="text-gray-500 text-xs">Check back soon for upcoming fixtures</p>
             </div>
           )}
 

@@ -36,10 +36,26 @@ export default async function handler(req, res) {
       try {
         const response = await fetch(`${baseUrl}/fixtures?id=${id}`, { headers });
 
+        // Detect rate limit errors
+        if (response.status === 429 || response.status === 403) {
+          console.error(`🚫 [Matches API] Rate limit hit: ${response.status}`);
+          return res.status(200).json({
+            error: 'API_LIMIT_REACHED',
+            response: [],
+            message: 'API rate limit exceeded. Please try again later.',
+            statusCode: response.status
+          });
+        }
+
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`❌ [Matches API] Match fetch failed: ${response.status} - ${errorText}`);
-          throw new Error(`API Error ${response.status}: ${errorText}`);
+          return res.status(200).json({
+            error: 'API_UNAVAILABLE',
+            response: [],
+            message: 'Match data temporarily unavailable',
+            statusCode: response.status
+          });
         }
 
         const data = await response.json();
@@ -47,7 +63,12 @@ export default async function handler(req, res) {
         // Check for API-level errors
         if (data.errors && Object.keys(data.errors).length > 0) {
           console.error(`❌ [Matches API] API returned errors:`, data.errors);
-          // Still return the data, but log the error
+          return res.status(200).json({
+            error: 'API_ERROR',
+            response: [],
+            message: 'API returned an error',
+            details: data.errors
+          });
         }
 
         return res.status(200).json(data);
@@ -55,8 +76,9 @@ export default async function handler(req, res) {
         console.error(`❌ [Matches API] Exception fetching match ${id}:`, error.message);
         // Return safe empty state instead of crashing
         return res.status(200).json({
+          error: 'API_UNAVAILABLE',
           response: [],
-          error: "Match not found",
+          message: 'Match not found',
           details: error.message
         });
       }
@@ -78,6 +100,17 @@ export default async function handler(req, res) {
           { headers }
         );
 
+        // Check for rate limit on round fetch
+        if (roundRes.status === 429 || roundRes.status === 403) {
+          console.error(`🚫 [Matches API] Rate limit hit on round fetch: ${roundRes.status}`);
+          return res.status(200).json({
+            error: 'API_LIMIT_REACHED',
+            response: [],
+            message: 'API rate limit exceeded. Please try again later.',
+            statusCode: roundRes.status
+          });
+        }
+
         if (roundRes.ok) {
           const roundData = await roundRes.json();
 
@@ -90,6 +123,17 @@ export default async function handler(req, res) {
               `${baseUrl}/fixtures?league=${league}&season=${season}&round=${currentRound}`,
               { headers }
             );
+
+            // Check for rate limit on fixtures fetch
+            if (fixturesRes.status === 429 || fixturesRes.status === 403) {
+              console.error(`🚫 [Matches API] Rate limit hit on fixtures fetch: ${fixturesRes.status}`);
+              return res.status(200).json({
+                error: 'API_LIMIT_REACHED',
+                response: [],
+                message: 'API rate limit exceeded. Please try again later.',
+                statusCode: fixturesRes.status
+              });
+            }
 
             if (fixturesRes.ok) {
               const fixturesData = await fixturesRes.json();
@@ -187,6 +231,7 @@ export default async function handler(req, res) {
     if (!matchesData || !matchesData.response || matchesData.response.length === 0) {
       console.warn(`⚠️ [Matches API] All strategies exhausted. Returning safe empty state.`);
       return res.status(200).json({
+        error: 'NO_DATA',
         response: [],
         message: "No matches available at this time",
         seasons_tried: seasonsToTry,
@@ -214,8 +259,9 @@ export default async function handler(req, res) {
 
     // Never return 500 - always return 200 with empty data
     return res.status(200).json({
+      error: 'API_UNAVAILABLE',
       response: [],
-      error: "Service temporarily unavailable",
+      message: "Service temporarily unavailable",
       details: error.message,
       fallback: true
     });
