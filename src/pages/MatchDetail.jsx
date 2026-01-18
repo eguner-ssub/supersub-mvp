@@ -386,7 +386,7 @@ const MatchDetail = () => {
               <div className="flex flex-col items-center justify-center bg-gray-900/80 p-8 rounded-xl border-2 border-yellow-500/50">
                 <Lock className="w-16 h-16 text-yellow-500 mb-4" />
                 <p className="text-white font-bold text-xl mb-2">Locked</p>
-                <p className="text-gray-300 text-sm mb-6 text-center">You need a Match Result card to make predictions</p>
+                <p className="text-gray-300 text-sm mb-6 text-center">You need a Match Result card</p>
                 <button
                   onClick={() => navigate('/training')}
                   className="px-8 py-3 bg-yellow-500 text-black font-black uppercase rounded-lg hover:bg-yellow-400 transition-all shadow-lg"
@@ -438,6 +438,14 @@ const MatchDetail = () => {
               {/* Deck Title */}
               <div className="text-center mb-3">
                 <h3 className="text-yellow-500 font-black text-xs uppercase tracking-[0.2em]">Your Card Deck</h3>
+                {!selectedCard && (
+                  <p className="text-gray-400 text-xs mt-1">Select a Card</p>
+                )}
+                {selectedCard && (
+                  <p className="text-green-400 text-xs mt-1 flex items-center justify-center gap-1">
+                    <span>✓ Card Selected</span>
+                  </p>
+                )}
               </div>
 
               {/* Cards */}

@@ -340,6 +340,15 @@ describe('MatchDetail - Prediction Flow with Toggles', () => {
             expect(screen.getByText('Arsenal')).toBeInTheDocument();
         });
 
+        // Select a card to reveal prediction buttons with coin values
+        const matchResultCards = screen.getAllByAltText('Match Result');
+        fireEvent.click(matchResultCards[0]);
+
+        // Wait for prediction buttons to appear
+        await waitFor(() => {
+            expect(screen.getByText(/Arsenal Win/i)).toBeInTheDocument();
+        });
+
         // Just verify that coin values are displayed
         const coinLabels = screen.getAllByText('Coins');
         expect(coinLabels.length).toBeGreaterThan(0);
