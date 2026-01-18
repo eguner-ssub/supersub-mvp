@@ -4,6 +4,8 @@ import { useGame } from '../context/GameContext';
 import { Zap, Coins, Cone, Trophy, Backpack, ShoppingBag, Loader2 } from 'lucide-react';
 import gameDataRaw from '../data/gameData.json';
 import { mockCards } from '../data/mockInventory';
+import { getCardConfig } from '../utils/cardConfig';
+import CardBase from '../components/CardBase';
 import WinModal from '../components/WinModal';
 
 export default function Dashboard() {
@@ -119,10 +121,10 @@ export default function Dashboard() {
   }, [userProfile?.id, supabase]);
 
   const cardTypes = [
-    { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.webp' },
-    { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.webp' },
-    { id: 'c_player_score', label: 'Player Score', img: '/cards/card_player_score.webp' },
-    { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.webp' },
+    { id: 'c_match_result', label: 'Match Result' },
+    { id: 'c_total_goals', label: 'Total Goals' },
+    { id: 'c_player_score', label: 'Player Score' },
+    { id: 'c_supersub', label: 'Super Sub' },
   ];
 
   if (loading) {
@@ -306,11 +308,11 @@ export default function Dashboard() {
               return (
                 <div key={card.id} className={`flex-1 flex flex-col items-center gap-2 transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-30 grayscale'}`}>
                   <div className={`relative w-full h-full rounded-lg border border-white/5 bg-white/5 overflow-hidden flex items-center justify-center ${isActive ? 'shadow-[0_0_15px_rgba(234,179,8,0.15)] border-yellow-500/30' : ''}`}>
-                    <img
-                      src={card.img}
-                      alt={card.label}
-                      className="w-full h-full object-contain p-1"
-                      onError={(e) => e.target.style.display = 'none'}
+                    <CardBase
+                      rarity={getCardConfig(card.id).rarity}
+                      role={getCardConfig(card.id).role}
+                      label={card.label}
+                      className="w-full h-full"
                     />
                   </div>
                   <span className={`text-[9px] font-black uppercase tracking-wider ${isActive ? 'text-white' : 'text-gray-600'}`}>x{count}</span>
@@ -350,7 +352,12 @@ export default function Dashboard() {
                 {newCards.map((card, idx) => (
                   <div key={idx} className="flex flex-col items-center animate-in slide-in-from-bottom fade-in duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
                     <div className="w-14 h-20 bg-gray-800/80 rounded border border-yellow-500/30 overflow-hidden relative shadow-[0_0_15px_rgba(234,179,8,0.1)]">
-                      <img src={card.img} className="w-full h-full object-contain p-1" alt={card.label} />
+                      <CardBase
+                        rarity={getCardConfig(card.id).rarity}
+                        role={getCardConfig(card.id).role}
+                        label={card.label}
+                        className="w-full h-full"
+                      />
                     </div>
                   </div>
                 ))}

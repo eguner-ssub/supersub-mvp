@@ -8,21 +8,24 @@ export const mockCards = [
         type: 'c_match_result',
         status: 'AVAILABLE',
         label: 'Match Result',
-        img: '/cards/card_match_result.webp'
+        rarity: 'rare',
+        role: 'match_result'
     },
     {
         id: 2,
         type: 'c_total_goals',
         status: 'AVAILABLE',
         label: 'Total Goals',
-        img: '/cards/card_total_goals.webp'
+        rarity: 'common',
+        role: 'total_goals'
     },
     {
         id: 3,
         type: 'c_player_score',
         status: 'AVAILABLE',
         label: 'Player Score',
-        img: '/cards/card_player_score.webp'
+        rarity: 'legendary',
+        role: 'player_score'
     },
 
     // PENDING - Bets placed on future matches (The Whiteboard)

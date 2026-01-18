@@ -1,16 +1,18 @@
 import React from 'react';
 import { useGame } from '../../context/GameContext';
 import { getCardsByStatus } from '../../data/mockInventory';
+import { getCardConfig } from '../../utils/cardConfig';
+import CardBase from '../CardBase';
 
 const ViewDeck = () => {
     const { userProfile } = useGame();
     const availableCards = getCardsByStatus('AVAILABLE');
 
     const cardTypes = [
-        { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.webp' },
-        { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.webp' },
-        { id: 'c_player_score', label: 'Player Score', img: '/cards/card_player_score.webp' },
-        { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.webp' },
+        { id: 'c_match_result', label: 'Match Result' },
+        { id: 'c_total_goals', label: 'Total Goals' },
+        { id: 'c_player_score', label: 'Player Score' },
+        { id: 'c_supersub', label: 'Super Sub' },
     ];
 
     const getCardCount = (cardId) => {
@@ -38,16 +40,16 @@ const ViewDeck = () => {
                         <div
                             key={card.id}
                             className={`bg-black/40 backdrop-blur-md border rounded-xl p-4 transition-all ${isActive
-                                    ? 'border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.15)]'
-                                    : 'border-white/10 opacity-40 grayscale'
+                                ? 'border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.15)]'
+                                : 'border-white/10 opacity-40 grayscale'
                                 }`}
                         >
                             <div className="aspect-[3/4] bg-white/5 rounded-lg overflow-hidden mb-3 flex items-center justify-center">
-                                <img
-                                    src={card.img}
-                                    alt={card.label}
-                                    className="w-full h-full object-contain p-2"
-                                    onError={(e) => e.target.style.display = 'none'}
+                                <CardBase
+                                    rarity={getCardConfig(card.id).rarity}
+                                    role={getCardConfig(card.id).role}
+                                    label={card.label}
+                                    className="w-full h-full"
                                 />
                             </div>
                             <div className="text-center">

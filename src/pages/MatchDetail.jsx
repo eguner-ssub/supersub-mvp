@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Zap, Loader2, Lock, TrendingUp, CheckCircle } from 'lucide-react';
 import { useGame } from '../context/GameContext';
+import { getCardConfig } from '../utils/cardConfig';
+import CardBase from '../components/CardBase';
 
 const MatchDetail = () => {
   const { id } = useParams();
@@ -21,10 +23,10 @@ const MatchDetail = () => {
 
   // CARD TYPES DEFINITION
   const cardTypes = [
-    { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.webp' },
-    { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.webp' },
-    { id: 'c_player_score', label: 'Player Score', img: '/cards/card_player_score.webp' },
-    { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.webp' },
+    { id: 'c_match_result', label: 'Match Result' },
+    { id: 'c_total_goals', label: 'Total Goals' },
+    { id: 'c_player_score', label: 'Player Score' },
+    { id: 'c_supersub', label: 'Super Sub' },
   ];
 
   // REAL INVENTORY CHECK
@@ -532,7 +534,12 @@ const MatchDetail = () => {
                         }`}
                     >
                       <div className="relative w-20 h-28 rounded-lg transition-all transform origin-bottom">
-                        <img src={card.img} alt={card.label} className="w-full h-full object-contain drop-shadow-2xl" onError={handleImageError} />
+                        <CardBase
+                          rarity={getCardConfig(card.id).rarity}
+                          role={getCardConfig(card.id).role}
+                          label={card.label}
+                          className="w-full h-full drop-shadow-2xl"
+                        />
                         {isActive && (
                           <div className="absolute -top-2 -right-2 bg-yellow-500 text-black text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-black shadow-lg z-10">{count}</div>
                         )}

@@ -16,6 +16,7 @@ import LockerRoom from './pages/LockerRoom';
 import CardsInPlay from './pages/CardsInPlay';
 import Settings from './pages/Settings';
 import Account from './pages/Account'; // <--- 1. IMPORT ADDED HERE
+import CardShowcase from './pages/CardShowcase'; // Card System Demo
 
 // --- THE BOUNCER (Security Guard) ---
 const ProtectedRoute = ({ children, requireOnboarding = true }) => {
@@ -76,6 +77,9 @@ export const AppRoutes = () => {
       <Route path="/inventory" element={<ProtectedRoute><LockerRoom /></ProtectedRoute>} />
       <Route path="/inventory/active" element={<ProtectedRoute><CardsInPlay /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
+      {/* DEMO ROUTE - Card System Showcase */}
+      <Route path="/card-showcase" element={<CardShowcase />} />
 
       {/* Fallback logic */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
