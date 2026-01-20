@@ -17,6 +17,7 @@ import CardsInPlay from './pages/CardsInPlay';
 import Settings from './pages/Settings';
 import Account from './pages/Account'; // <--- 1. IMPORT ADDED HERE
 import CardShowcase from './pages/CardShowcase'; // Card System Demo
+import CardBaseDemo from './pages/CardBaseDemo'; // State-Driven Card Demo
 
 // --- THE BOUNCER (Security Guard) ---
 const ProtectedRoute = ({ children, requireOnboarding = true }) => {
@@ -80,6 +81,7 @@ export const AppRoutes = () => {
 
       {/* DEMO ROUTE - Card System Showcase */}
       <Route path="/card-showcase" element={<CardShowcase />} />
+      <Route path="/card-base-demo" element={<CardBaseDemo />} />
 
       {/* Fallback logic */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
