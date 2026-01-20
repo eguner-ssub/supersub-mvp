@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import { calculateBetResult } from '../utils/settlementEngine';
 
 const GameContext = createContext();
 
@@ -54,23 +55,6 @@ export const GameProvider = ({ children }) => {
 
   // --- LAZY SETTLEMENT ENGINE ---
 
-  // Helper: Determine bet outcome based on real match result
-  const determineOutcome = (bet, matchData) => {
-    const homeGoals = matchData.goals?.home || 0;
-    const awayGoals = matchData.goals?.away || 0;
-
-    if (bet.selection === 'HOME_WIN') {
-      return homeGoals > awayGoals ? 'WON' : 'LOST';
-    } else if (bet.selection === 'AWAY_WIN') {
-      return awayGoals > homeGoals ? 'WON' : 'LOST';
-    } else if (bet.selection === 'DRAW') {
-      return homeGoals === awayGoals ? 'WON' : 'LOST';
-    }
-
-    // Default to LOST if selection is unknown
-    return 'LOST';
-  };
-
   // Settlement Logic: Real API-based transitions
   const checkActiveBets = async () => {
     if (!userProfile?.id) return;
@@ -121,7 +105,16 @@ export const GameProvider = ({ children }) => {
           else if (bet.status === 'LIVE') {
             // If status is FT (Full Time), AET (After Extra Time), or PEN (Penalties)
             if (matchStatus === 'FT' || matchStatus === 'AET' || matchStatus === 'PEN') {
-              const outcome = determineOutcome(bet, matchData);
+              // Use DRY settlement engine
+              const result = calculateBetResult(
+                'MATCH_RESULT',
+                bet.selection,
+                matchData.goals?.home || 0,
+                matchData.goals?.away || 0,
+                matchStatus
+              );
+
+              const outcome = result.status; // 'WON' | 'LOST' | 'VOID'
 
               // Call settlement RPC
               const { data: settlementData, error: rpcError } = await supabase.rpc('settle_prediction', {
