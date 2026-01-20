@@ -1,44 +1,50 @@
 {
-    "rewrites": [
-      {
-        "source": "/api/(.*)",
-        "destination": "/api/$1"
-      },
-      {
-        "source": "/login",
-        "destination": "/index.html"
-      },
-      {
-        "source": "/signup",
-        "destination": "/index.html"
-      },
-      {
-        "source": "/dashboard",
-        "destination": "/index.html"
-      },
-      {
-        "source": "/onboarding",
-        "destination": "/index.html"
-      },
-      {
-        "source": "/match-hub",
-        "destination": "/index.html"
-      },
-      {
-        "source": "/match/:id",
-        "destination": "/index.html"
-      },
-      {
-        "source": "/training",
-        "destination": "/index.html"
-      },
-      {
-        "source": "/inventory",
-        "destination": "/index.html"
-      },
-      {
-        "source": "/settings",
-        "destination": "/index.html"
-      }
-    ]
-  }
+  "crons": [
+    {
+      "path": "/api/cron/resolve-zombies",
+      "schedule": "0 */6 * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/login",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/signup",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/onboarding",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/match-hub",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/match/:id",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/training",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/inventory",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/settings",
+      "destination": "/index.html"
+    }
+  ]
+}
