@@ -55,6 +55,9 @@ export const GameProvider = ({ children }) => {
 
   // --- LAZY SETTLEMENT ENGINE ---
 
+  // Static cache to prevent redundant API calls
+  const matchCacheRef = useRef({});
+
   // Settlement Logic: Real API-based transitions
   const checkActiveBets = async () => {
     if (!userProfile?.id) return;
@@ -71,7 +74,64 @@ export const GameProvider = ({ children }) => {
 
       for (const bet of bets) {
         try {
-          // Fetch real match data from API
+          const now = Date.now();
+          const cacheKey = `match_${bet.match_id}`;
+          const cached = matchCacheRef.current[cacheKey];
+
+          // Check if we have fresh cached data (< 60 seconds old)
+          if (cached && (now - cached.timestamp) < 60000) {
+            console.log(`📦 [Cache Hit] Using cached data for match ${bet.match_id}`);
+            // Use cached data instead of making API call
+            const matchData = cached.data;
+
+            // Process bet status transitions with cached data
+            const matchStatus = matchData.fixture?.status?.short;
+
+            // PENDING -> LIVE
+            if (bet.status === 'PENDING') {
+              if (matchStatus && matchStatus !== 'NS' && matchStatus !== 'FT' && matchStatus !== 'AET' && matchStatus !== 'PEN') {
+                await supabase
+                  .from('predictions')
+                  .update({ status: 'LIVE', updated_at: new Date().toISOString() })
+                  .eq('id', bet.id);
+
+                console.log(`✅ Bet ${bet.id} moved to LIVE (Match Status: ${matchStatus})`);
+              }
+            }
+            // LIVE -> SETTLED
+            else if (bet.status === 'LIVE') {
+              if (matchStatus === 'FT' || matchStatus === 'AET' || matchStatus === 'PEN') {
+                const result = calculateBetResult(
+                  'MATCH_RESULT',
+                  bet.selection,
+                  matchData.goals?.home || 0,
+                  matchData.goals?.away || 0,
+                  matchStatus
+                );
+
+                const outcome = result.status;
+
+                const { data: settlementData, error: rpcError } = await supabase.rpc('settle_prediction', {
+                  p_prediction_id: bet.id,
+                  p_new_status: outcome
+                });
+
+                if (!rpcError && settlementData && settlementData.length > 0) {
+                  console.log(`🎉 Bet ${bet.id} ${outcome}! New coins: ${settlementData[0].new_coins}`);
+
+                  const session = await supabase.auth.getSession();
+                  if (session.data.session) {
+                    loadProfile(session.data.session);
+                  }
+                }
+              }
+            }
+
+            continue; // Skip API call, we used cached data
+          }
+
+          // Cache miss or stale data - fetch from API
+          console.log(`🌐 [API Call] Fetching fresh data for match ${bet.match_id}`);
           const response = await fetch(`/api/matches?id=${bet.match_id}`);
 
           if (!response.ok) {
@@ -86,6 +146,12 @@ export const GameProvider = ({ children }) => {
             console.warn(`No match data for ${bet.match_id}`);
             continue;
           }
+
+          // Update cache
+          matchCacheRef.current[cacheKey] = {
+            data: matchData,
+            timestamp: now
+          };
 
           const matchStatus = matchData.fixture?.status?.short;
 
@@ -190,7 +256,7 @@ export const GameProvider = ({ children }) => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [userProfile]); // Re-run if profile changes
+  }, [userProfile?.id]); // ✅ FIX: Use stable primitive instead of object reference
 
   // --- GAME ACTIONS ---
   const createProfile = async (managerName) => {

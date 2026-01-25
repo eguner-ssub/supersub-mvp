@@ -22,6 +22,7 @@ vi.mock('react-router-dom', async () => {
 describe('Dashboard', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mockNavigate.mockClear();
   });
 
   afterEach(() => {
@@ -29,19 +30,19 @@ describe('Dashboard', () => {
   });
 
   // --- DEFINE DATA HERE SO ALL TESTS CAN USE IT ---
-  const mockProfile = { 
-    id: '123', 
-    club_name: 'Test FC', 
+  const mockProfile = {
+    id: '123',
+    club_name: 'Test FC',
     name: 'Test Manager',
-    coins: 1000, 
-    energy: 5, 
-    max_energy: 5, 
-    inventory: [] 
+    coins: 1000,
+    energy: 5,
+    max_energy: 5,
+    inventory: []
   };
 
   it('triggers bag opening and updates inventory', async () => {
     const mockUpdateInventory = vi.fn();
-    
+
     useGame.mockReturnValue({
       userProfile: mockProfile,
       loading: false,
@@ -62,17 +63,17 @@ describe('Dashboard', () => {
     // 2. Find the Bag Button specifically inside the Overlay
     const overlayContainer = overlayTitle.parentElement;
     const bagButton = within(overlayContainer).getByRole('button');
-    
+
     fireEvent.click(bagButton);
 
     // 3. Fast-forward animation (1500ms)
     act(() => {
-        vi.advanceTimersByTime(1600);
+      vi.advanceTimersByTime(1600);
     });
 
     // 4. Verify Next Stage (Rewards)
     expect(screen.getByText(/Squad Ready/i)).toBeInTheDocument();
-    
+
     // 5. Verify Inventory Update was called
     expect(mockUpdateInventory).toHaveBeenCalled();
 
@@ -82,9 +83,8 @@ describe('Dashboard', () => {
 
     // 7. Overlay should be gone
     expect(screen.queryByText(/Kit Delivery/i)).not.toBeInTheDocument();
-  }); // <--- OLD TEST CLOSES HERE
+  });
 
-  // --- NEW TEST LIVES HERE (OUTSIDE THE OTHER ONE) ---
   it('navigates to account when club name is clicked', async () => {
     useGame.mockReturnValue({
       userProfile: mockProfile,
@@ -104,6 +104,152 @@ describe('Dashboard', () => {
 
     // Verify navigation
     expect(mockNavigate).toHaveBeenCalledWith('/account');
+  });
+
+  // --- NEW TESTS FOR GOLDEN MASTER HITBOX NAVIGATION ---
+  it('navigates to inventory when kitbag hotspot is tapped', () => {
+    useGame.mockReturnValue({
+      userProfile: mockProfile,
+      loading: false,
+      updateInventory: vi.fn()
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    const hotspot = screen.getByTestId('hotspot-inventory');
+    fireEvent.click(hotspot);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/inventory');
+  });
+
+  it('navigates to training when cones hotspot is tapped', () => {
+    useGame.mockReturnValue({
+      userProfile: mockProfile,
+      loading: false,
+      updateInventory: vi.fn()
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    const hotspot = screen.getByTestId('hotspot-training');
+    fireEvent.click(hotspot);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/training');
+  });
+
+  it('navigates to shop when drinks hotspot is tapped', () => {
+    useGame.mockReturnValue({
+      userProfile: mockProfile,
+      loading: false,
+      updateInventory: vi.fn()
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    const hotspot = screen.getByTestId('hotspot-shop');
+    fireEvent.click(hotspot);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/shop');
+  });
+
+  it('navigates to missions when tablet hotspot is tapped', () => {
+    useGame.mockReturnValue({
+      userProfile: mockProfile,
+      loading: false,
+      updateInventory: vi.fn()
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    const hotspot = screen.getByTestId('hotspot-missions');
+    fireEvent.click(hotspot);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/missions');
+  });
+
+  it('navigates to manager office when chevron is clicked', () => {
+    useGame.mockReturnValue({
+      userProfile: mockProfile,
+      loading: false,
+      updateInventory: vi.fn()
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    const chevronNav = screen.getByTestId('nav-office');
+    fireEvent.click(chevronNav);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/manager-office');
+  });
+
+  it('shows LIVE indicator on whiteboard when live bets exist', () => {
+    // Mock Supabase with proper channel subscription
+    const mockChannel = {
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn().mockReturnValue({ unsubscribe: vi.fn() })
+    };
+
+    const mockSupabase = {
+      channel: vi.fn().mockReturnValue(mockChannel),
+      removeChannel: vi.fn()
+    };
+
+    useGame.mockReturnValue({
+      userProfile: mockProfile,
+      loading: false,
+      updateInventory: vi.fn(),
+      supabase: mockSupabase,
+      checkActiveBets: vi.fn(),
+      loadProfile: vi.fn()
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    // Initially no LIVE indicator
+    expect(screen.queryByText(/LIVE NOW/i)).not.toBeInTheDocument();
+  });
+
+  it('navigates to pending bets when whiteboard is clicked', () => {
+    useGame.mockReturnValue({
+      userProfile: mockProfile,
+      loading: false,
+      updateInventory: vi.fn()
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    const whiteboard = screen.getByTestId('hotspot-whiteboard');
+    fireEvent.click(whiteboard);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/inventory?tab=pending');
   });
 
 });
