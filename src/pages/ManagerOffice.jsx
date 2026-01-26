@@ -10,9 +10,6 @@ export default function ManagerOffice() {
     // PERFORMANCE: Progressive Loading State
     const [imageLoaded, setImageLoaded] = useState(false);
 
-    // NAVIGATION: Back to Dressing Room
-    const goBack = () => navigate('/dashboard');
-
     return (
         <div className="relative w-full h-[100dvh] bg-black overflow-hidden md:max-w-[480px] md:mx-auto md:h-screen md:border-x md:border-gray-800 select-none font-sans">
 
@@ -86,15 +83,6 @@ export default function ManagerOffice() {
                    transition-all duration-100 ease-out"
                 data-testid="hotspot-bookcase"
             />
-
-            {/* F. NAVIGATION: Back to Dressing Room (Left Edge) */}
-            <div
-                onClick={goBack}
-                className="absolute top-1/2 left-2 -translate-y-1/2 z-40 p-4 cursor-pointer opacity-50 hover:opacity-100 active:scale-90 transition-all"
-                data-testid="nav-dressing-room"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-lg"><path d="m15 18-6-6 6-6" /></svg>
-            </div>
 
             {/* ============================================================================ */}
             {/* LAYER 2: HUD (Consistent with Dashboard)                                  */}

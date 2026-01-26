@@ -1,24 +1,31 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GameProvider, useGame } from './context/GameContext';
 import { Loader2 } from 'lucide-react';
 
-// Pages
+// Components
+import NavigationShell from './components/NavigationShell';
+import LoadingScreen from './components/LoadingScreen';
+import { useAssetPreloader } from './hooks/useAssetPreloader';
+
+// Pages - Eager Loading (Small or frequently accessed)
 import Landing from './pages/Landing';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
-import Dashboard from './pages/Dashboard';
 import MatchHub from './pages/MatchHub';
 import MatchDetail from './pages/MatchDetail';
 import Training from './pages/Training';
 import LockerRoom from './pages/LockerRoom';
 import CardsInPlay from './pages/CardsInPlay';
 import Settings from './pages/Settings';
-import Account from './pages/Account'; // <--- 1. IMPORT ADDED HERE
-import CardShowcase from './pages/CardShowcase'; // Card System Demo
-import CardBaseDemo from './pages/CardBaseDemo'; // State-Driven Card Demo
-import ManagerOffice from './pages/ManagerOffice'; // Manager Office Room
+import Account from './pages/Account';
+import CardShowcase from './pages/CardShowcase';
+import CardBaseDemo from './pages/CardBaseDemo';
+
+// Pages - Lazy Loading (Large pages with heavy assets)
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ManagerOffice = lazy(() => import('./pages/ManagerOffice'));
 
 
 
@@ -69,8 +76,17 @@ export const AppRoutes = () => {
         }
       />
 
-      {/* DASHBOARD & GAME */}
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      {/* DASHBOARD & GAME - WRAPPED IN NAVIGATION SHELL */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <NavigationShell>
+              <Dashboard />
+            </NavigationShell>
+          </ProtectedRoute>
+        }
+      />
 
       {/* --- 2. ACCOUNT ROUTE ADDED HERE --- */}
       <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
@@ -81,23 +97,39 @@ export const AppRoutes = () => {
       <Route path="/inventory" element={<ProtectedRoute><LockerRoom /></ProtectedRoute>} />
       <Route path="/inventory/active" element={<ProtectedRoute><CardsInPlay /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-      <Route path="/manager-office" element={<ProtectedRoute><ManagerOffice /></ProtectedRoute>} />
+
+      {/* MANAGER OFFICE - WRAPPED IN NAVIGATION SHELL */}
+      <Route
+        path="/manager-office"
+        element={
+          <ProtectedRoute>
+            <NavigationShell>
+              <ManagerOffice />
+            </NavigationShell>
+          </ProtectedRoute>
+        }
+      />
 
       {/* DEMO ROUTE - Card System Showcase */}
       <Route path="/card-showcase" element={<CardShowcase />} />
       <Route path="/card-base-demo" element={<CardBaseDemo />} />
 
-      {/* Fallback logic */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Fallback logic - Default to Manager Office */}
+      <Route path="*" element={<Navigate to="/manager-office" replace />} />
     </Routes>
   );
 };
 
 function App() {
+  // Trigger aggressive asset preloading
+  useAssetPreloader();
+
   return (
     <BrowserRouter>
       <GameProvider>
-        <AppRoutes />
+        <Suspense fallback={<LoadingScreen />}>
+          <AppRoutes />
+        </Suspense>
       </GameProvider>
     </BrowserRouter>
   );

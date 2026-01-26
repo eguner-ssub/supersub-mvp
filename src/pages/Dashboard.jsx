@@ -285,16 +285,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* F. MANAGER OFFICE NAVIGATION (Right Edge) */}
-      <div
-        onClick={() => navigate('/manager-office')}
-        className="absolute top-1/2 right-2 -translate-y-1/2 z-40 p-2 cursor-pointer opacity-50 hover:opacity-100 transition-opacity"
-        data-testid="nav-office"
-      >
-        {/* Use a simple Chevron icon here */}
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-      </div>
-
       {/* LAYER 2: HUD (Energy/Coins) */}
       <div className="absolute top-0 left-0 w-full p-4 pt-6 flex justify-between items-center z-50">
         {/* Energy */}
