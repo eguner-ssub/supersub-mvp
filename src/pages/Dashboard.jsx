@@ -25,6 +25,12 @@ export default function Dashboard() {
   const [liveBets, setLiveBets] = useState([]);
   const [pendingBets, setPendingBets] = useState([]);
 
+  // PERFORMANCE ENGINE: Progressive Image Loading
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // USER GUIDANCE: Highlight kitbag after claiming starter kit
+  const [highlightBag, setHighlightBag] = useState(false);
+
   const gameData = gameDataRaw || { cardTypes: [] };
 
   useEffect(() => {
@@ -181,38 +187,56 @@ export default function Dashboard() {
     }, 1500);
   };
 
+  // HELPER: Close bag overlay & trigger user guidance
+  const closeBagOverlay = () => {
+    setShowBagOverlay(false);
+    // Pulse the bag in the room to show them where the items went
+    setHighlightBag(true);
+    // Stop pulsing after 5 seconds automatically (User protection)
+    setTimeout(() => setHighlightBag(false), 5000);
+  };
+
   return (
     <div className="relative w-full h-[100dvh] bg-black overflow-hidden md:max-w-[480px] md:mx-auto md:h-screen md:border-x md:border-gray-800">
 
-      {/* LAYER 0: IMMERSIVE BACKGROUND */}
-      {/* Key Changes: 
-          1. h-full instead of aspect ratio. 
-          2. bg-cover ensures no black bars.
-          3. bg-[center_bottom] protects the floor items from being cropped.
-      */}
-      <div
-        className="absolute inset-0 w-full h-full z-0 bg-cover bg-[center_bottom] transition-transform duration-500"
-        style={{ backgroundImage: "url('/assets/bg-dressing-room.webp')" }}
-        role="img"
-        aria-label="Dressing Room"
-      >
-        {/* Optional: Dark Gradient Overlay for text readability at the top */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/20 pointer-events-none" />
-      </div>
+      {/* ============================================================================ */}
+      {/* LAYER 0: PROGRESSIVE BACKGROUND (BLUR-UP STRATEGY)                        */}
+      {/* ============================================================================ */}
 
-      {/* LAYER 1: THE TACTILE HITBOX MAP */}
-      {/* NOTE: Since the image might zoom slightly on tall screens, 
-          we keep the % coordinates but ensure they are anchored to the BOTTOM 
-          to match the bg-position. 
-      */}
+      {/* A. The Placeholder (Instant Load) */}
+      {/* Uses a dark gradient approximating the room colors to hide the white flash */}
+      <div
+        className={`absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-800 to-black transition-opacity duration-1000 ${imageLoaded ? 'opacity-0' : 'opacity-100'}`}
+      />
+
+      {/* B. The Master Asset (Lazy Fade-In) */}
+      <img
+        src="/assets/bg-dressing-room.webp"
+        alt="Dressing Room"
+        onLoad={() => setImageLoaded(true)}
+        className={`absolute inset-0 w-full h-full object-cover object-bottom transition-opacity duration-700 ease-in-out ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+      />
+
+      {/* Optional: Dark Gradient Overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/20 pointer-events-none" />
+
+      {/* ============================================================================ */}
+      {/* LAYER 1: TACTILE HITBOXES (THE "SQUISH" SYSTEM)                           */}
+      {/* ============================================================================ */}
 
       {/* A. KITBAG (Inventory) - Bottom Center/Right */}
       <div
-        onClick={() => navigate('/inventory')}
-        className="absolute bottom-[2%] left-[35%] w-[55%] h-[25%] 
-                   rounded-[40px] bg-transparent
-                   active:scale-95 active:backdrop-brightness-125 active:backdrop-contrast-110
-                   transition-all duration-75 cursor-pointer z-20"
+        onClick={() => {
+          setHighlightBag(false); // Stop pulsing
+          navigate('/inventory');
+          // Optional SFX: new Audio('/assets/sfx/zip.mp3').play().catch(() => {});
+        }}
+        className={`
+          absolute bottom-[2%] left-[35%] w-[55%] h-[25%] z-20 cursor-pointer rounded-[40px]
+          active:scale-95 active:backdrop-brightness-125 active:backdrop-contrast-110
+          transition-all duration-100 ease-out
+          ${highlightBag ? 'animate-pulse ring-4 ring-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.3)]' : ''}
+        `}
         data-testid="hotspot-inventory"
       />
 
@@ -220,9 +244,9 @@ export default function Dashboard() {
       <div
         onClick={() => navigate('/training')}
         className="absolute bottom-[5%] left-[-2%] w-[30%] h-[30%] 
-                   rounded-tr-[50px] bg-transparent
-                   active:scale-95 active:backdrop-brightness-125
-                   transition-all duration-75 cursor-pointer z-30"
+                   rounded-tr-[50px] cursor-pointer z-30
+                   active:scale-95 active:backdrop-brightness-125 active:backdrop-contrast-110
+                   transition-all duration-100 ease-out"
         data-testid="hotspot-training"
       />
 
@@ -230,9 +254,9 @@ export default function Dashboard() {
       <div
         onClick={() => navigate('/shop')}
         className="absolute bottom-[35%] right-[2%] w-[25%] h-[15%] 
-                   rounded-xl bg-transparent
-                   active:scale-95 active:backdrop-brightness-125
-                   transition-all duration-75 cursor-pointer z-10"
+                   rounded-xl cursor-pointer z-10
+                   active:scale-95 active:backdrop-brightness-125 active:backdrop-contrast-110
+                   transition-all duration-100 ease-out"
         data-testid="hotspot-shop"
       />
 
@@ -240,9 +264,9 @@ export default function Dashboard() {
       <div
         onClick={() => navigate('/missions')}
         className="absolute bottom-[35%] left-[10%] w-[25%] h-[18%] 
-                   rounded-xl bg-transparent
-                   active:scale-95 active:backdrop-brightness-125
-                   transition-all duration-75 cursor-pointer z-10"
+                   rounded-xl cursor-pointer z-10
+                   active:scale-95 active:backdrop-brightness-125 active:backdrop-contrast-110
+                   transition-all duration-100 ease-out"
         data-testid="hotspot-missions"
       />
 
@@ -298,64 +322,64 @@ export default function Dashboard() {
 
 
       {showBagOverlay && (
-      <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
-        {bagStage === 'closed' && (
-          <div className="text-center animate-in zoom-in duration-300">
-            <h2 className="text-3xl font-black text-white mb-8 uppercase tracking-widest italic">Kit Delivery</h2>
-            <button
-              onClick={handleOpenBag}
-              className="w-48 h-48 bg-gray-900 rounded-3xl flex items-center justify-center border-2 border-yellow-500/50 cursor-pointer hover:scale-105 transition-transform shadow-[0_0_50px_rgba(234,179,8,0.2)] mx-auto mb-8 group"
-            >
-              <ShoppingBag className="w-20 h-20 text-yellow-500 group-hover:text-yellow-400 transition-colors drop-shadow-[0_0_15px_rgba(234,179,8,0.6)]" />
-            </button>
-            <p className="text-white/50 text-xs uppercase tracking-[0.2em] animate-pulse">Tap to Equip</p>
-          </div>
-        )}
-        {bagStage === 'opening' && (
-          <div className="flex flex-col items-center gap-6">
-            <Loader2 className="w-16 h-16 text-yellow-500 animate-spin" />
-            <p className="text-white font-mono uppercase text-sm tracking-widest">Unpacking Gear...</p>
-          </div>
-        )}
-        {bagStage === 'rewards' && (
-          <div className="w-full max-w-lg text-center animate-in zoom-in slide-in-from-bottom duration-500">
-            <h2 className="text-4xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 mb-2 uppercase tracking-tighter">Squad Ready</h2>
-            <p className="text-gray-500 text-[10px] mb-10 uppercase tracking-[0.3em] font-bold">New Assets Added to Inventory</p>
-            <div className="flex justify-center flex-wrap gap-3 mb-12">
-              {newCards.map((card, idx) => (
-                <div key={idx} className="flex flex-col items-center animate-in slide-in-from-bottom fade-in duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
-                  <div className="w-14 h-20 bg-gray-800/80 rounded border border-yellow-500/30 overflow-hidden relative shadow-[0_0_15px_rgba(234,179,8,0.1)]">
-                    <CardBase
-                      rarity={getCardConfig(card.id).rarity}
-                      role={getCardConfig(card.id).role}
-                      label={card.label}
-                      className="w-full h-full"
-                    />
-                  </div>
-                </div>
-              ))}
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
+          {bagStage === 'closed' && (
+            <div className="text-center animate-in zoom-in duration-300">
+              <h2 className="text-3xl font-black text-white mb-8 uppercase tracking-widest italic">Kit Delivery</h2>
+              <button
+                onClick={handleOpenBag}
+                className="w-48 h-48 bg-gray-900 rounded-3xl flex items-center justify-center border-2 border-yellow-500/50 cursor-pointer hover:scale-105 transition-transform shadow-[0_0_50px_rgba(234,179,8,0.2)] mx-auto mb-8 group"
+              >
+                <ShoppingBag className="w-20 h-20 text-yellow-500 group-hover:text-yellow-400 transition-colors drop-shadow-[0_0_15px_rgba(234,179,8,0.6)]" />
+              </button>
+              <p className="text-white/50 text-xs uppercase tracking-[0.2em] animate-pulse">Tap to Equip</p>
             </div>
-            <button
-              onClick={() => setShowBagOverlay(false)}
-              className="w-full py-4 bg-white hover:bg-gray-200 text-black font-black uppercase tracking-widest rounded-xl transition-transform active:scale-95 shadow-xl"
-            >
-              Enter Dressing Room
-            </button>
-          </div>
-        )}
-      </div>
-    )
-  }
+          )}
+          {bagStage === 'opening' && (
+            <div className="flex flex-col items-center gap-6">
+              <Loader2 className="w-16 h-16 text-yellow-500 animate-spin" />
+              <p className="text-white font-mono uppercase text-sm tracking-widest">Unpacking Gear...</p>
+            </div>
+          )}
+          {bagStage === 'rewards' && (
+            <div className="w-full max-w-lg text-center animate-in zoom-in slide-in-from-bottom duration-500">
+              <h2 className="text-4xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 mb-2 uppercase tracking-tighter">Squad Ready</h2>
+              <p className="text-gray-500 text-[10px] mb-10 uppercase tracking-[0.3em] font-bold">New Assets Added to Inventory</p>
+              <div className="flex justify-center flex-wrap gap-3 mb-12">
+                {newCards.map((card, idx) => (
+                  <div key={idx} className="flex flex-col items-center animate-in slide-in-from-bottom fade-in duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
+                    <div className="w-14 h-20 bg-gray-800/80 rounded border border-yellow-500/30 overflow-hidden relative shadow-[0_0_15px_rgba(234,179,8,0.1)]">
+                      <CardBase
+                        rarity={getCardConfig(card.id).rarity}
+                        role={getCardConfig(card.id).role}
+                        label={card.label}
+                        className="w-full h-full"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={closeBagOverlay}
+                className="w-full py-4 bg-white hover:bg-gray-200 text-black font-black uppercase tracking-widest rounded-xl transition-transform active:scale-95 shadow-xl"
+              >
+                Enter Dressing Room
+              </button>
+            </div>
+          )}
+        </div>
+      )
+      }
 
-  {/* Win Celebration Modal */ }
-  {
-    showWinModal && (
-      <WinModal
-        amount={winAmount}
-        onClose={() => setShowWinModal(false)}
-      />
-    )
-  }
+      {/* Win Celebration Modal */}
+      {
+        showWinModal && (
+          <WinModal
+            amount={winAmount}
+            onClose={() => setShowWinModal(false)}
+          />
+        )
+      }
     </div >
   );
 }

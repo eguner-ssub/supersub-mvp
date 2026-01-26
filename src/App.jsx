@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import Account from './pages/Account'; // <--- 1. IMPORT ADDED HERE
 import CardShowcase from './pages/CardShowcase'; // Card System Demo
 import CardBaseDemo from './pages/CardBaseDemo'; // State-Driven Card Demo
+import ManagerOffice from './pages/ManagerOffice'; // Manager Office Room
 
 
 
@@ -80,6 +81,7 @@ export const AppRoutes = () => {
       <Route path="/inventory" element={<ProtectedRoute><LockerRoom /></ProtectedRoute>} />
       <Route path="/inventory/active" element={<ProtectedRoute><CardsInPlay /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/manager-office" element={<ProtectedRoute><ManagerOffice /></ProtectedRoute>} />
 
       {/* DEMO ROUTE - Card System Showcase */}
       <Route path="/card-showcase" element={<CardShowcase />} />
