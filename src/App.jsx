@@ -19,8 +19,7 @@ import Account from './pages/Account'; // <--- 1. IMPORT ADDED HERE
 import CardShowcase from './pages/CardShowcase'; // Card System Demo
 import CardBaseDemo from './pages/CardBaseDemo'; // State-Driven Card Demo
 
-// Developer Tools
-import GodModePanel from './components/GodModePanel'; // Dev-only admin panel
+
 
 // --- THE BOUNCER (Security Guard) ---
 const ProtectedRoute = ({ children, requireOnboarding = true }) => {
@@ -97,8 +96,6 @@ function App() {
     <BrowserRouter>
       <GameProvider>
         <AppRoutes />
-        {/* Developer Tools - Only visible in development */}
-        <GodModePanel />
       </GameProvider>
     </BrowserRouter>
   );
