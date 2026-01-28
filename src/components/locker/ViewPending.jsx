@@ -1,27 +1,13 @@
 import React from 'react';
 import { usePredictions } from '../../hooks/usePredictions';
-import { Coins, Calendar } from 'lucide-react';
+import CardBase from '../CardBase';
+import { groupBetsByMatch, formatBetSelection } from '../../utils/betUtils';
 
 const ViewPending = () => {
     const { predictions: pendingBets, loading } = usePredictions('PENDING');
 
-    // Helper: Format bet selection for display
-    const formatBetSelection = (bet) => {
-        if (bet.selection === 'DRAW') {
-            return 'Draw';
-        } else if (bet.selection === 'HOME_WIN' || bet.selection === 'AWAY_WIN') {
-            // Extract just the team name from team_name field
-            // team_name format: "Arsenal vs Chelsea"
-            const teams = bet.team_name?.split(' vs ');
-            if (bet.selection === 'HOME_WIN' && teams?.[0]) {
-                return `${teams[0]} to Win`;
-            } else if (bet.selection === 'AWAY_WIN' && teams?.[1]) {
-                return `${teams[1]} to Win`;
-            }
-        }
-        // Fallback: capitalize the selection
-        return bet.selection?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
-    };
+    // Group bets by match
+    const matchGroups = groupBetsByMatch(pendingBets);
 
     if (loading) {
         return (
@@ -42,67 +28,63 @@ const ViewPending = () => {
 
     return (
         <div className="h-full overflow-y-auto scrollbar-hide p-6 pb-32 pt-6">
-            {/* Whiteboard Header */}
-            <div className="mb-6 text-center">
-                <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">
-                    The Whiteboard
-                </h2>
-                <p className="text-gray-600 text-sm mt-1">Upcoming Predictions</p>
-            </div>
-
-            {/* Tactic Cards Grid */}
-            <div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
-                {pendingBets.map((bet, index) => {
-                    // Random rotation between -1deg and 1deg
-                    const rotation = Math.random() * 2 - 1;
+            {/* Main Container */}
+            <div className="max-w-md mx-auto space-y-8">
+                {matchGroups.map((matchGroup, groupIndex) => {
+                    // Random rotation between -1 and 1 degree for each whiteboard
+                    const boardRotation = (Math.random() * 2 - 1);
 
                     return (
                         <div
-                            key={bet.id}
-                            className="bg-gray-100 border-2 border-gray-300 rounded-lg p-6 shadow-lg hover:rotate-0 transition-transform cursor-pointer relative"
-                            style={{ transform: `rotate(${rotation}deg)` }}
+                            key={matchGroup.matchId || groupIndex}
+                            style={{ transform: `rotate(${boardRotation}deg)` }}
                         >
-                            {/* Visual Magnet */}
-                            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-6 h-6 rounded-full bg-red-600 border-2 border-gray-800 shadow-md"></div>
-
-                            {/* Card Image - Top Right Corner */}
-                            <div className="absolute top-4 right-4">
-                                <img
-                                    src="/cards/card_match_result.webp"
-                                    alt="Card"
-                                    className="w-12 h-12 object-contain opacity-80"
-                                />
-                            </div>
-
-                            {/* Match - Bold System Font */}
-                            <h3 className="text-xl font-black text-gray-900 mb-3 uppercase tracking-tight pr-16">
-                                {bet.team_name}
-                            </h3>
-
-                            {/* Prediction - Handwritten Font */}
-                            <div className="mb-4">
-                                <p className="text-xs text-gray-600 uppercase tracking-wide font-bold mb-1">Prediction:</p>
-                                <p
-                                    className="text-2xl font-bold text-blue-700"
-                                    style={{ fontFamily: "'Permanent Marker', cursive" }}
-                                >
-                                    {formatBetSelection(bet)}
-                                </p>
-                            </div>
-
-                            {/* Projected Payout */}
-                            <div className="border-t-2 border-gray-300 pt-3">
-                                <p className="text-xs text-gray-600 uppercase tracking-wide font-bold mb-1">PROJECTED PAYOUT</p>
-                                <div className="flex items-center gap-2">
-                                    <Coins className="w-5 h-5 text-green-700" />
-                                    <p className="text-2xl font-black text-green-700">{bet.potential_reward}</p>
+                            {/* THE VERTICAL WHITEBOARD */}
+                            <div
+                                className="relative w-full aspect-[3/4] p-6 pb-12 mb-8 bg-[url('/assets/bg-whiteboard-vertical.webp')] bg-cover bg-center rounded-xl shadow-2xl overflow-hidden"
+                            >
+                                {/* HEADER: Match Name (Marker Text) */}
+                                <div className="relative">
+                                    <h2 className="font-permanent-marker text-black/85 text-2xl uppercase tracking-tighter text-center mb-6 drop-shadow-md">
+                                        {matchGroup.matchName}
+                                    </h2>
                                 </div>
-                            </div>
 
-                            {/* Created Time */}
-                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-3">
-                                <Calendar className="w-3 h-3" />
-                                <span>{new Date(bet.created_at).toLocaleString()}</span>
+                                {/* CARD GRID (Vertical Stack) */}
+                                <div className="flex flex-wrap justify-center gap-4">
+                                    {matchGroup.bets.map((bet) => {
+                                        // Random slight rotation for each card
+                                        const cardRotation = (Math.random() * 4 - 2);
+
+                                        return (
+                                            <div
+                                                key={bet.id}
+                                                className="relative w-[90px]"
+                                                style={{ transform: `rotate(${cardRotation}deg)` }}
+                                            >
+                                                {/* THE CSS MAGNET (Glossy Plastic) */}
+                                                <div
+                                                    className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 w-4 h-4 rounded-full bg-gradient-to-br from-red-600 to-red-800 shadow-md border border-black/20 after:content-[''] after:absolute after:top-0 after:left-0 after:w-2 after:h-2 after:rounded-full after:bg-white/40 after:blur-[1px]"
+                                                />
+
+                                                {/* THE CARD */}
+                                                <CardBase
+                                                    type={bet.card_type || 'c_match_result'}
+                                                    label={bet.card_type?.replace('c_', '').replace('_', ' ').toUpperCase() || 'MATCH RESULT'}
+                                                    selection={formatBetSelection(bet)}
+                                                    status="active"
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* FOOTER: Payout (Centered Bottom Line) */}
+                                <div className="absolute bottom-6 w-full text-center">
+                                    <p className="font-permanent-marker text-red-700 text-3xl font-bold -rotate-2 inline-block">
+                                        Pot: {matchGroup.totalPotentialPayout.toLocaleString()}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     );
