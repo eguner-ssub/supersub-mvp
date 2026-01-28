@@ -39,6 +39,20 @@ export const TYPE_ICONS = {
 };
 
 // ============================================================================
+// CARD_ASSETS - Maps card types to photorealistic asset paths
+// ============================================================================
+export const CARD_ASSETS = {
+  FRAME: '/assets/cards/frame-standard.png',
+  ICONS: {
+    c_match_result: '/assets/cards/icon-whistle.png',
+    c_total_goals: '/assets/cards/icon-net.png',
+    c_player_score: '/assets/cards/icon-celebration.png',
+    c_supersub: '/assets/cards/icon-supersub.png',
+  }
+};
+
+
+// ============================================================================
 // VISUAL_CONFIG - Maps states to Tailwind CSS classes
 // ============================================================================
 export const VISUAL_CONFIG = {

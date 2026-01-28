@@ -22,6 +22,8 @@ import Settings from './pages/Settings';
 import Account from './pages/Account';
 import CardShowcase from './pages/CardShowcase';
 import CardBaseDemo from './pages/CardBaseDemo';
+import CardTest from './pages/CardTest';
+
 
 // Pages - Lazy Loading (Large pages with heavy assets)
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -113,6 +115,8 @@ export const AppRoutes = () => {
       {/* DEMO ROUTE - Card System Showcase */}
       <Route path="/card-showcase" element={<CardShowcase />} />
       <Route path="/card-base-demo" element={<CardBaseDemo />} />
+      <Route path="/card-test" element={<CardTest />} />
+
 
       {/* Fallback logic - Default to Manager Office */}
       <Route path="*" element={<Navigate to="/manager-office" replace />} />
