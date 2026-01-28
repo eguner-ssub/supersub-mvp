@@ -9,3 +9,26 @@
     @apply bg-gray-900 text-white min-h-screen;
   }
 }
+
+@layer utilities {
+
+  /* Subtle Levitate Animation - Slow floating micro-HUD */
+  @keyframes levitate {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-4px);
+    }
+
+    /* Subtle float */
+  }
+
+  .animate-float {
+    animation: levitate 3s ease-in-out infinite;
+    /* Slow 3s cycle */
+  }
+}

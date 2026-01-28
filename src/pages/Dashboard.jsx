@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { Zap, Coins, Loader2, ShoppingBag, X } from 'lucide-react';
+import { Zap, Coins, Loader2, ShoppingBag, X, ClipboardList, TrendingUp, Cone } from 'lucide-react';
 import gameDataRaw from '../data/gameData.json';
 import { getCardConfig } from '../utils/cardConfig';
 import CardBase from '../components/CardBase';
@@ -166,64 +166,87 @@ export default function Dashboard() {
 
 
       {/* ============================================================================ */}
-      {/* LAYER 1: INTERACTIVE OBJECTS (Hitboxes & States)                          */}
+      {/* LAYER 1: INTERACTIVE OBJECTS (Subtle Floating Micro-HUDs)                */}
       {/* ============================================================================ */}
 
       {/* A. WHITEBOARD (Bets) */}
       <div
         onClick={handleWhiteboardClick}
-        className="absolute top-[20%] right-[10%] w-[35%] h-[20%] z-10 cursor-pointer bg-transparent active:scale-95 transition-transform"
+        className="absolute top-[18%] right-[12%] w-[32%] h-[22%] z-10 cursor-pointer bg-transparent active:scale-95 transition-transform"
         data-testid="hotspot-whiteboard"
       >
-        {/* STATE: Active Bet Count */}
+        {/* MICRO-HUD: Floating Icon (Top-Right Badge) */}
+        <div className="absolute -top-3 -right-3 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+          <TrendingUp className="w-3.5 h-3.5 text-white" />
+        </div>
+
+        {/* STATE: Active Bet Count - Pinned to the top right of the board */}
         {(liveBets.length + pendingBets.length) > 0 && (
-          <div className="absolute top-2 right-10 rotate-3 bg-yellow-400 text-black font-black text-xs px-2 py-1 shadow-lg border border-black/10">
-            {liveBets.length + pendingBets.length} ACTIVE
+          <div className="absolute -top-2 -right-2 rotate-3 bg-yellow-400 text-black font-black text-[10px] px-2 py-0.5 shadow-lg border border-black/10 rounded-sm">
+            {liveBets.length + pendingBets.length} LIVE
           </div>
         )}
       </div>
 
       {/* B. TABLET (Training/Brief) */}
+      {/* GROUNDED: Lowered to bottom-[26%] to sit ON the bench */}
       <div
         onClick={handleTabletClick}
-        className="absolute bottom-[35%] left-[10%] w-[25%] h-[18%] z-10 cursor-pointer rounded-xl active:scale-95 transition-transform"
+        className="absolute bottom-[26%] left-[12%] w-[22%] h-[18%] z-10 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-tablet"
       >
-        {/* STATE: Training Brief Overlay (If not completed) */}
-        {!trainingCompletedToday && (
-          <div className="absolute inset-0 bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl animate-pulse shadow-[0_0_15px_rgba(234,179,8,0.2)]" />
-        )}
+        {/* MICRO-HUD: Floating Icon (Top-Center) */}
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+          <ClipboardList className={`w-3.5 h-3.5 ${!trainingCompletedToday ? 'text-yellow-400' : 'text-gray-400'}`} />
+        </div>
       </div>
 
       {/* C. ENERGY DRINKS (Shop) */}
+      {/* GROUNDED: Lowered to bottom-[26%] to match Tablet. Reduced height to prevent air-tapping. */}
       <div
         onClick={handleDrinkClick}
-        className="absolute bottom-[35%] right-[2%] w-[25%] h-[15%] z-10 cursor-pointer rounded-xl active:scale-95 transition-transform"
+        className="absolute bottom-[26%] right-[5%] w-[20%] h-[12%] z-10 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-drinks"
       >
-        {/* Optional: Glow if low energy */}
+        {/* MICRO-HUD: Floating Icon (Top-Center) */}
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+          <Zap className={`w-3.5 h-3.5 ${userData.energy === 0 ? 'text-red-500' : 'text-blue-400'}`} />
+        </div>
+
+        {/* Low Energy Warning: Subtle red vignette only on the drinks */}
         {userData.energy === 0 && (
-          <div className="absolute inset-0 bg-red-500/20 rounded-xl animate-pulse" />
+          <div className="absolute inset-0 bg-red-500/20 blur-md rounded-full animate-pulse" />
         )}
       </div>
 
       {/* D. KITBAG (Inventory/Rewards) */}
+      {/* GROUNDED: Tucked slightly lower to fit under the bench properly */}
       <div
         onClick={handleBagClick}
         className={`
-          absolute bottom-[2%] left-[35%] w-[55%] h-[25%] z-20 cursor-pointer rounded-[40px]
+          absolute bottom-[2%] left-[35%] w-[55%] h-[20%] z-20 cursor-pointer rounded-2xl
           active:scale-95 transition-transform duration-100
           ${(highlightBag || dailyRewardAvailable) ? 'animate-pulse ring-4 ring-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.3)]' : ''}
         `}
         data-testid="hotspot-inventory"
-      />
+      >
+        {/* MICRO-HUD: Floating Icon (Top-Center) */}
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+          <ShoppingBag className={`w-3.5 h-3.5 ${dailyRewardAvailable ? 'text-yellow-400' : 'text-white'}`} />
+        </div>
+      </div>
 
       {/* E. CONES (Training Mode) */}
       <div
         onClick={() => navigate('/training')}
-        className="absolute bottom-[5%] left-[-2%] w-[30%] h-[30%] z-30 cursor-pointer rounded-tr-[50px] active:scale-95 transition-transform"
+        className="absolute bottom-[2%] left-[-2%] w-[28%] h-[25%] z-30 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-training"
-      />
+      >
+        {/* MICRO-HUD: Floating Icon (Top-Right to avoid edge) */}
+        <div className="absolute top-0 right-4 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+          <Cone className="w-3.5 h-3.5 text-orange-400" />
+        </div>
+      </div>
 
 
       {/* ============================================================================ */}

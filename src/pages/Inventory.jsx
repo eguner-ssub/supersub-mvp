@@ -4,6 +4,8 @@ import { useGame } from '../context/GameContext';
 import { ArrowLeft, Zap, X } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
 import { mockConsumables } from '../data/mockInventory';
+// 1. IMPORT THE COMPONENT
+import CardBase from '../components/CardBase';
 
 const Inventory = () => {
   const navigate = useNavigate();
@@ -11,11 +13,12 @@ const Inventory = () => {
   const [showDrinkPopup, setShowDrinkPopup] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
+  // 2. SIMPLIFIED DATA (We don't need 'img' paths anymore, CardBase handles it)
   const cardTypes = [
-    { id: 'c_match_result', label: 'Match Result', img: '/cards/card_match_result.webp' },
-    { id: 'c_total_goals', label: 'Total Goals', img: '/cards/card_total_goals.webp' },
-    { id: 'c_player_score', label: 'Player Score', img: '/cards/card_player_score.webp' },
-    { id: 'c_supersub', label: 'Super Sub', img: '/cards/card_supersub.webp' },
+    { id: 'c_match_result', label: 'Match Result' },
+    { id: 'c_total_goals', label: 'Total Goals' },
+    { id: 'c_player_score', label: 'Player Score' },
+    { id: 'c_supersub', label: 'Super Sub' },
   ];
 
   const getCardCount = (cardId) => {
@@ -24,7 +27,6 @@ const Inventory = () => {
   };
 
   const handleDrink = () => {
-    // Mock function - in production this would call an API
     console.log('✅ Energy Drink consumed!');
     setShowDrinkPopup(false);
     setShowToast(true);
@@ -33,8 +35,9 @@ const Inventory = () => {
 
   return (
     <>
-      <MobileLayout bgImage="/bg-dashboard.webp">
+      <MobileLayout bgImage="/assets/bg-dashboard.webp">
         <div className="w-full max-w-md h-full flex flex-col p-6 relative">
+
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <button
@@ -44,63 +47,72 @@ const Inventory = () => {
               <ArrowLeft className="w-5 h-5" />
               <span className="font-bold">Back</span>
             </button>
-            <h1 className="text-2xl font-black text-white uppercase tracking-wide">Inventory</h1>
-            <div className="w-16" /> {/* Spacer for centering */}
+            <h1 className="text-2xl font-black text-white uppercase tracking-wide italic">Inventory</h1>
+            <div className="w-16" />
           </div>
 
           {/* Consumables Section */}
           <div className="mb-8">
-            <h2 className="text-white/70 font-bold text-sm uppercase tracking-wider mb-4">Consumables</h2>
+            <h2 className="text-white/50 font-mono text-[10px] uppercase tracking-[0.2em] mb-4 pl-1">Consumables</h2>
             <div className="grid grid-cols-2 gap-4">
-              {/* Energy Drink Card */}
               <button
                 onClick={() => setShowDrinkPopup(true)}
-                className="bg-gradient-to-br from-blue-900/40 to-yellow-900/40 backdrop-blur-md border border-blue-500/30 rounded-xl p-4 hover:scale-105 transition-all active:scale-95"
+                className="relative bg-gray-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4 hover:border-blue-500/50 transition-all active:scale-95 group"
               >
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center border-2 border-blue-400/50">
-                    <Zap className="w-8 h-8 text-yellow-400 fill-yellow-400" />
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full flex items-center justify-center border border-blue-500/20 group-hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-shadow">
+                    <Zap className="w-6 h-6 text-blue-400 fill-blue-400 group-hover:text-yellow-400 group-hover:fill-yellow-400 transition-colors" />
                   </div>
                   <div className="text-center">
-                    <p className="text-white font-bold text-sm">Energy Drink</p>
-                    <p className="text-blue-300 text-xs font-mono">x{mockConsumables.energy_drinks}</p>
+                    <p className="text-gray-300 font-bold text-xs uppercase tracking-wide group-hover:text-white">Energy Drink</p>
+                    <p className="text-blue-400 text-[10px] font-mono mt-1">x{mockConsumables.energy_drinks}</p>
                   </div>
                 </div>
               </button>
             </div>
           </div>
 
-          {/* My Deck Section */}
-          <div className="flex-1 overflow-y-auto">
-            <h2 className="text-white/70 font-bold text-sm uppercase tracking-wider mb-4">My Deck</h2>
-            <div className="grid grid-cols-2 gap-4">
+          {/* My Deck Section - THE OVERHAUL */}
+          <div className="flex-1 overflow-y-auto pb-20">
+            <h2 className="text-white/50 font-mono text-[10px] uppercase tracking-[0.2em] mb-4 pl-1">Tactical Deck</h2>
+
+            <div className="grid grid-cols-2 gap-x-4 gap-y-8">
               {cardTypes.map((card) => {
                 const count = getCardCount(card.id);
-                const isActive = count > 0;
+                const hasCards = count > 0;
+
                 return (
-                  <div
-                    key={card.id}
-                    className={`bg-black/40 backdrop-blur-md border rounded-xl p-4 transition-all ${isActive
-                        ? 'border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.15)]'
-                        : 'border-white/10 opacity-40 grayscale'
-                      }`}
-                  >
-                    <div className="aspect-[3/4] bg-white/5 rounded-lg overflow-hidden mb-3 flex items-center justify-center">
-                      <img
-                        src={card.img}
-                        alt={card.label}
-                        className="w-full h-full object-contain p-2"
-                        onError={(e) => e.target.style.display = 'none'}
+                  <div key={card.id} className="relative group">
+
+                    {/* 3. THE STANDARD COMPONENT */}
+                    {/* Opacity logic: Dim it if they have 0 cards */}
+                    <div className={hasCards ? 'opacity-100' : 'opacity-40 grayscale contrast-125'}>
+                      <CardBase
+                        type={card.id}
+                        label={card.label}
+                        status="generic" // Forces the Silver look
                       />
                     </div>
-                    <div className="text-center">
-                      <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isActive ? 'text-white' : 'text-gray-600'}`}>
-                        {card.label}
-                      </p>
-                      <p className={`text-sm font-black ${isActive ? 'text-yellow-400' : 'text-gray-700'}`}>
-                        x{count}
-                      </p>
-                    </div>
+
+                    {/* 4. QUANTITY BADGE (Overlay) */}
+                    {/* We float this ON TOP of the CardBase */}
+                    {hasCards && (
+                      <div className="absolute -top-2 -right-2 z-30">
+                        <div className="bg-yellow-500 text-black font-black font-mono text-xs w-6 h-6 flex items-center justify-center rounded-full border-2 border-black shadow-lg">
+                          {count}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty State Badge */}
+                    {!hasCards && (
+                      <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+                        <div className="bg-black/80 px-3 py-1 rounded text-[10px] font-bold text-white/50 uppercase border border-white/10">
+                          Empty
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 );
               })}
@@ -109,44 +121,40 @@ const Inventory = () => {
         </div>
       </MobileLayout>
 
-      {/* Energy Drink Popup */}
+      {/* DRINK POPUP (Keep existing logic, just refined styles) */}
       {showDrinkPopup && (
-        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
-          <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-blue-500/50 rounded-2xl p-8 max-w-sm w-full relative animate-in zoom-in slide-in-from-bottom duration-300">
-            {/* Close button */}
+        <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="bg-neutral-900 border border-white/10 rounded-2xl p-8 max-w-sm w-full relative animate-in zoom-in slide-in-from-bottom duration-300 shadow-2xl">
             <button
               onClick={() => setShowDrinkPopup(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
 
-            {/* Energy Drink Icon */}
             <div className="flex justify-center mb-6">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-500/20 to-yellow-500/20 rounded-full flex items-center justify-center border-4 border-blue-400/50 shadow-[0_0_30px_rgba(59,130,246,0.3)]">
-                <Zap className="w-12 h-12 text-yellow-400 fill-yellow-400 animate-pulse" />
+              {/* Placeholder for a future 3D Can Asset */}
+              <div className="w-24 h-24 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full flex items-center justify-center border border-blue-500/30">
+                <Zap className="w-10 h-10 text-yellow-400 fill-yellow-400" />
               </div>
             </div>
 
-            {/* Text */}
-            <h3 className="text-2xl font-black text-white text-center mb-2 uppercase">Energy Drink</h3>
-            <p className="text-blue-300 text-center mb-6">Restore 3 Energy?</p>
+            <h3 className="text-xl font-black text-white text-center mb-2 uppercase italic tracking-wider">Hydration</h3>
+            <p className="text-gray-400 text-center text-xs mb-8">Restore 3 Energy Points?</p>
 
-            {/* Drink Button */}
             <button
               onClick={handleDrink}
-              className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 shadow-lg"
+              className="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase tracking-widest rounded-xl transition-all active:scale-95"
             >
-              DRINK
+              Confirm
             </button>
           </div>
         </div>
       )}
 
-      {/* Toast Notification */}
       {showToast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-lg shadow-lg z-[100] animate-in slide-in-from-bottom fade-in duration-300">
-          ⚡ Energy Restored!
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-[0_0_20px_rgba(22,163,74,0.4)] z-[100] animate-in slide-in-from-top fade-in duration-300 font-bold text-sm tracking-wide">
+          ⚡ ENERGY RESTORED
         </div>
       )}
     </>

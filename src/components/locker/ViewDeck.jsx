@@ -1,7 +1,6 @@
 import React from 'react';
 import { useGame } from '../../context/GameContext';
 import { getCardsByStatus } from '../../data/mockInventory';
-import { getCardConfig } from '../../utils/cardConfig';
 import CardBase from '../CardBase';
 
 const ViewDeck = () => {
@@ -30,36 +29,42 @@ const ViewDeck = () => {
                 <p className="text-gray-400 text-sm mt-1">Your Available Cards</p>
             </div>
 
-            {/* Cards Grid */}
-            <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* Cards Grid - STRIPPED DOWN TO MATCH CARDLAB */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-8 max-w-2xl mx-auto">
                 {cardTypes.map((card) => {
                     const count = getCardCount(card.id);
-                    const isActive = count > 0;
+                    const hasCards = count > 0;
 
                     return (
-                        <div
-                            key={card.id}
-                            className={`bg-black/40 backdrop-blur-md border rounded-xl p-4 transition-all ${isActive
-                                ? 'border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.15)]'
-                                : 'border-white/10 opacity-40 grayscale'
-                                }`}
-                        >
-                            <div className="aspect-[3/4] bg-white/5 rounded-lg overflow-hidden mb-3 flex items-center justify-center">
+                        <div key={card.id} className="relative group">
+
+                            {/* THE NAKED COMPONENT - No wrappers, no borders, no aspect ratio conflicts */}
+                            <div className={hasCards ? 'opacity-100' : 'opacity-40 grayscale contrast-125'}>
                                 <CardBase
-                                    rarity={getCardConfig(card.id).rarity}
-                                    role={getCardConfig(card.id).role}
+                                    type={card.id}
                                     label={card.label}
-                                    className="w-full h-full"
+                                    status="generic"
                                 />
                             </div>
-                            <div className="text-center">
-                                <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isActive ? 'text-white' : 'text-gray-600'}`}>
-                                    {card.label}
-                                </p>
-                                <p className={`text-sm font-black ${isActive ? 'text-yellow-400' : 'text-gray-700'}`}>
-                                    x{count}
-                                </p>
-                            </div>
+
+                            {/* QUANTITY BADGE (Overlay) - Floats on top */}
+                            {hasCards && (
+                                <div className="absolute -top-2 -right-2 z-30">
+                                    <div className="bg-yellow-500 text-black font-black font-mono text-xs w-6 h-6 flex items-center justify-center rounded-full border-2 border-black shadow-lg">
+                                        {count}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Empty State Badge */}
+                            {!hasCards && (
+                                <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+                                    <div className="bg-black/80 px-3 py-1 rounded text-[10px] font-bold text-white/50 uppercase border border-white/10">
+                                        Empty
+                                    </div>
+                                </div>
+                            )}
+
                         </div>
                     );
                 })}
