@@ -1,11 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { Zap, Coins } from 'lucide-react';
+import { Zap, Coins, Monitor, Tablet, Smartphone, BookOpen } from 'lucide-react';
 
 export default function ManagerOffice() {
     const navigate = useNavigate();
     const { userProfile } = useGame();
+
+    // ============================================================================
+    // DYNAMIC STATE: Live Match Detection
+    // ============================================================================
+    // TODO: Replace with real hook like useLiveMatches() when available
+    const liveMatches = []; // Populate this array to test "Packed" state
+    const hasLiveMatches = liveMatches.length > 0;
+
+    // ASSET SELECTION: Switch between Empty (Quiet) and Packed (Live Energy)
+    const bgImage = hasLiveMatches
+        ? '/assets/manager-room-packed.webp'
+        : '/assets/manager-room-empty.webp';
 
     // PERFORMANCE: Progressive Loading State
     const [imageLoaded, setImageLoaded] = useState(false);
@@ -14,75 +26,87 @@ export default function ManagerOffice() {
         <div className="relative w-full h-[100dvh] bg-black overflow-hidden md:max-w-[480px] md:mx-auto md:h-screen md:border-x md:border-gray-800 select-none font-sans">
 
             {/* ============================================================================ */}
-            {/* LAYER 0: PROGRESSIVE BACKGROUND (BLUR-UP STRATEGY)                        */}
+            {/* LAYER 0: DYNAMIC BACKGROUND (EMPTY vs PACKED)                             */}
             {/* ============================================================================ */}
 
             {/* A. Placeholder (Instant Dark Load) */}
             <div className={`absolute inset-0 bg-gray-900 transition-opacity duration-1000 ${imageLoaded ? 'opacity-0' : 'opacity-100'}`} />
 
-            {/* B. Master Asset (.webp) */}
+            {/* B. Dynamic Asset - GEOMETRY LOCK: object-[65%_bottom] preserved */}
             <img
-                src="/assets/manager-room.webp"
+                key={bgImage} // Forces clean re-render when state changes
+                src={bgImage}
                 alt="Manager Office"
                 onLoad={() => setImageLoaded(true)}
-                className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute inset-0 w-full h-full object-cover object-[65%_bottom] z-0 transition-opacity duration-700 ease-in-out ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
             />
 
             {/* ============================================================================ */}
-            {/* LAYER 1: TACTILE HITBOXES (THE COMMAND CENTER)                            */}
+            {/* LAYER 1: DIEGETIC MICRO-HUD (Dashboard Style)                             */}
             {/* ============================================================================ */}
 
-            {/* A. WINDOW (Match List / Play) - The "Hero" Action */}
+            {/* A. LAPTOP (Workstation) */}
             <div
-                onClick={() => navigate('/match-hub')}
-                className="absolute top-[10%] left-[20%] w-[60%] h-[35%] z-20 cursor-pointer 
-                   bg-transparent rounded-lg
-                   active:scale-95 active:backdrop-brightness-125
-                   transition-all duration-100 ease-out"
-                data-testid="hotspot-window"
+                onClick={() => navigate('/dashboard')}
+                className="absolute bottom-[15%] left-[50%] -translate-x-1/2 w-[40%] h-[25%] z-10 cursor-pointer active:scale-95 transition-transform"
+                data-testid="hotspot-laptop"
             >
-                {/* Optional: 'Next Match' Pulse Indicator can go here */}
+                {/* Badge: Blue to signify Work/Dashboard */}
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+                    <Monitor className="w-3.5 h-3.5 text-blue-400" />
+                </div>
             </div>
 
-            {/* B. LAPTOP (Scouting / Insights) - Center Desk */}
+            {/* B. TABLET (Live Ops) */}
             <div
-                onClick={() => navigate('/scouting')}
-                className="absolute bottom-[20%] left-[28%] w-[44%] h-[25%] z-20 cursor-pointer 
-                   bg-transparent rounded-xl rotate-1
-                   active:scale-95 active:backdrop-brightness-125
-                   transition-all duration-100 ease-out"
-                data-testid="hotspot-laptop"
-            />
+                onClick={() => navigate('/view-pending')}
+                className="absolute bottom-[20%] right-[5%] w-[25%] h-[20%] z-10 cursor-pointer active:scale-95 transition-transform"
+                data-testid="hotspot-tablet"
+            >
+                {/* Badge: Staggered Float Delay */}
+                <div
+                    className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float"
+                    style={{ animationDelay: '0.7s' }}
+                >
+                    <Tablet className={`w-3.5 h-3.5 ${hasLiveMatches ? 'text-green-400' : 'text-white'}`} />
+                </div>
 
-            {/* C. TABLET (Leaderboard) - Right Desk */}
-            <div
-                onClick={() => navigate('/leaderboard')}
-                className="absolute bottom-[28%] right-[5%] w-[20%] h-[18%] z-20 cursor-pointer 
-                   bg-transparent rounded-lg -rotate-2
-                   active:scale-95 active:backdrop-brightness-125
-                   transition-all duration-100 ease-out"
-                data-testid="hotspot-tablet-office"
-            />
+                {/* Status Indicator: "Live" Pulse (Like Dashboard's Live Bet Count) */}
+                {hasLiveMatches && (
+                    <div className="absolute -top-5 -right-2 rotate-6 bg-green-500 text-black font-black text-[9px] px-1.5 py-0.5 shadow-lg border border-black/10 rounded-sm animate-pulse">
+                        LIVE
+                    </div>
+                )}
+            </div>
 
-            {/* D. PHONE (Inbox/Social) - Left Desk */}
+            {/* C. PHONE (Intel/Messages) */}
             <div
-                onClick={() => navigate('/inbox')}
-                className="absolute bottom-[18%] left-[8%] w-[12%] h-[12%] z-20 cursor-pointer 
-                   bg-transparent rounded-lg rotate-12
-                   active:scale-95 active:backdrop-brightness-125
-                   transition-all duration-100 ease-out"
+                onClick={() => navigate('/messages')}
+                className="absolute bottom-[10%] left-[5%] w-[25%] h-[15%] z-10 cursor-pointer active:scale-95 transition-transform"
                 data-testid="hotspot-phone"
-            />
+            >
+                <div
+                    className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float"
+                    style={{ animationDelay: '0.3s' }}
+                >
+                    <Smartphone className="w-3.5 h-3.5 text-yellow-400" />
+                </div>
+            </div>
 
-            {/* E. BOOKCASE (Bet History/Ledger) - Left Wall */}
+            {/* D. BOOKCASE (Archives) */}
             <div
                 onClick={() => navigate('/history')}
-                className="absolute top-[10%] left-0 w-[18%] h-[50%] z-20 cursor-pointer 
-                   bg-transparent 
-                   active:brightness-110
-                   transition-all duration-100 ease-out"
+                className="absolute top-[30%] left-0 w-[20%] h-[30%] z-10 cursor-pointer active:scale-95 transition-transform"
                 data-testid="hotspot-bookcase"
-            />
+            >
+                {/* Anchored to Right Edge of Hitbox for visibility */}
+                <div
+                    className="absolute top-1/2 right-2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float"
+                    style={{ animationDelay: '1.2s' }}
+                >
+                    <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+                </div>
+            </div>
 
             {/* ============================================================================ */}
             {/* LAYER 2: HUD (Consistent with Dashboard)                                  */}
