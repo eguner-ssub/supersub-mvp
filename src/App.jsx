@@ -24,6 +24,7 @@ import CardShowcase from './pages/CardShowcase';
 import CardBaseDemo from './pages/CardBaseDemo';
 import CardTest from './pages/CardTest';
 import CardLab from './pages/CardLab';
+import ComingSoon from './pages/ComingSoon';
 
 
 // Pages - Lazy Loading (Large pages with heavy assets)
@@ -111,6 +112,26 @@ export const AppRoutes = () => {
             </NavigationShell>
           </ProtectedRoute>
         }
+      />
+
+      {/* --- NEW ROUTES FOR MANAGER OFFICE --- */}
+
+      {/* 1. STATS (Laptop) */}
+      <Route
+        path="/stats"
+        element={<ProtectedRoute><ComingSoon title="Season Stats" message="Advanced player analytics coming in v1.1" /></ProtectedRoute>}
+      />
+
+      {/* 2. INBOX (Phone) */}
+      <Route
+        path="/inbox"
+        element={<ProtectedRoute><ComingSoon title="Manager Inbox" message="Social features are currently locked." /></ProtectedRoute>}
+      />
+
+      {/* 3. LEADERBOARD (Tablet) */}
+      <Route
+        path="/leaderboard"
+        element={<ProtectedRoute><ComingSoon title="Global Rankings" message="Competition season hasn't started yet." /></ProtectedRoute>}
       />
 
       {/* DEMO ROUTE - Card System Showcase */}

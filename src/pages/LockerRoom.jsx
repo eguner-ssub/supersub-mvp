@@ -55,8 +55,10 @@ const LockerRoom = () => {
                 </div>
 
                 {/* Active View - Scrollable Content */}
-                <div className={`flex-1 overflow-y-auto scrollbar-hide pb-32 pt-20 ${activeTabData.bgColor} transition-colors duration-300`}>
-                    <ActiveComponent />
+                <div className={`flex-1 overflow-y-auto scrollbar-hide pb-32 pt-20 ${activeTabData.bgColor} transition-colors duration-300 ${activeTab === 'deck' ? 'relative before:content-[\'\'] before:absolute before:inset-0 before:bg-white/10 before:backdrop-blur-sm before:z-0' : ''}`}>
+                    <div className="relative z-10">
+                        <ActiveComponent />
+                    </div>
                 </div>
 
                 {/* Hotspot Navigation - Fixed */}

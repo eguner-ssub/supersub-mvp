@@ -169,10 +169,10 @@ export default function Dashboard() {
       {/* LAYER 1: INTERACTIVE OBJECTS (Subtle Floating Micro-HUDs)                */}
       {/* ============================================================================ */}
 
-      {/* A. WHITEBOARD (Bets) */}
+      {/* A. WHITEBOARD (Bets) - UPDATED COORDINATES */}
       <div
         onClick={handleWhiteboardClick}
-        className="absolute top-[18%] right-[12%] w-[32%] h-[22%] z-10 cursor-pointer bg-transparent active:scale-95 transition-transform"
+        className="absolute top-[28%] right-[8%] w-[42%] h-[28%] z-10 cursor-pointer bg-transparent active:scale-95 transition-transform"
         data-testid="hotspot-whiteboard"
       >
         {/* MICRO-HUD: Floating Icon (Top-Right Badge) */}
@@ -188,11 +188,11 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* B. TABLET (Training/Brief) */}
-      {/* GROUNDED: Lowered to bottom-[26%] to sit ON the bench */}
+      {/* B. TABLET (Training/Brief) - UPDATED COORDINATES */}
+      {/* CENTERED: Positioned on device screen in foreground bench */}
       <div
         onClick={handleTabletClick}
-        className="absolute bottom-[26%] left-[12%] w-[22%] h-[18%] z-10 cursor-pointer active:scale-95 transition-transform"
+        className="absolute bottom-[32%] left-[22%] w-[40%] h-[25%] z-10 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-tablet"
       >
         {/* MICRO-HUD: Floating Icon (Top-Center) */}
