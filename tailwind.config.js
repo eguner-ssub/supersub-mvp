@@ -18,7 +18,25 @@ export default {
       animation: {
         levitate: 'levitate 4s ease-in-out infinite',
       },
+      backgroundImage: {
+        'radial-gradient': 'radial-gradient(var(--tw-gradient-stops))',
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    function ({ addUtilities }) {
+      addUtilities({
+        '.no-scrollbar': {
+          '-ms-overflow-style': 'none',
+          'scrollbar-width': 'none',
+          '&::-webkit-scrollbar': {
+            display: 'none',
+          },
+        },
+        '.perspective-1000': {
+          perspective: '1000px',
+        },
+      });
+    },
+  ],
 }

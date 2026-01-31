@@ -1,8 +1,8 @@
 /**
- * Settlement Engine - Pure Utility for Bet Result Calculation
+ * Settlement Engine - Arcade Edition
  * 
- * This module provides a DRY (Don't Repeat Yourself) implementation of bet settlement logic.
- * It's used by both the frontend (GameContext) and backend (cron jobs) to ensure consistency.
+ * This module handles bet settlement with an arcade-style points system.
+ * Points are calculated as: Odds × 100 (standard cards) or Fixed Jackpot (SuperSub).
  * 
  * @module settlementEngine
  */
@@ -10,171 +10,140 @@
 /**
  * Calculate the result of a bet based on match data
  * 
- * @param {string} betType - Type of bet ('MATCH_RESULT', 'TOTAL_GOALS', 'PLAYER_SCORE', etc.)
- * @param {string} betSelection - User's selection ('HOME_WIN', 'AWAY_WIN', 'DRAW', 'OVER_2.5', etc.)
- * @param {number} matchScoreHome - Home team's final score
- * @param {number} matchScoreAway - Away team's final score
- * @param {string} matchStatus - Match status code ('FT', 'AET', 'PEN', 'PST', 'CANC', 'ABD', etc.)
- * 
- * @returns {{status: 'WON'|'LOST'|'VOID', payoutMultiplier: number}} Settlement result
- * 
- * @example
- * // Home team wins 2-1
- * calculateBetResult('MATCH_RESULT', 'HOME_WIN', 2, 1, 'FT')
- * // Returns: { status: 'WON', payoutMultiplier: 2.0 }
- * 
- * @example
- * // Match postponed
- * calculateBetResult('MATCH_RESULT', 'HOME_WIN', 0, 0, 'PST')
- * // Returns: { status: 'VOID', payoutMultiplier: 1.0 }
+ * @param {string} cardType - The inventory ID (e.g., 'c_match_winner', 'c_supersub')
+ * @param {string|number} selection - The user's pick (e.g., 'HOME', playerID)
+ * @param {object} matchData - Full API response including goals, events, lineups
+ * @returns {{status: string, market_odds?: number, fixed_points?: number, message?: string}}
  */
-export function calculateBetResult(betType, betSelection, matchScoreHome, matchScoreAway, matchStatus) {
-    // Normalize inputs
-    const homeGoals = Number(matchScoreHome) || 0;
-    const awayGoals = Number(matchScoreAway) || 0;
-    const status = String(matchStatus || '').toUpperCase();
-    const selection = String(betSelection || '').toUpperCase();
-    const type = String(betType || '').toUpperCase();
+export const calculateBetResult = (cardType, selection, matchData) => {
 
-    // ============================================================================
-    // VOID CASES - Match didn't complete normally
-    // ============================================================================
-    const VOID_STATUSES = ['PST', 'CANC', 'ABD', 'SUSP', 'INT', 'AWD', 'WO'];
-
-    if (VOID_STATUSES.includes(status)) {
-        return {
-            status: 'VOID',
-            payoutMultiplier: 1.0, // Full refund
-            reason: `Match ${status} - Bet voided`
-        };
+    // 1. SAFETY: Ensure match is finished
+    const status = matchData.fixture?.status?.short;
+    if (!['FT', 'AET', 'PEN'].includes(status)) {
+        return { status: 'PENDING' };
     }
 
-    // ============================================================================
-    // MATCH RESULT BETS
-    // ============================================================================
-    if (type === 'MATCH_RESULT' || !type) {
-        let isWin = false;
+    const homeGoals = matchData.goals?.home || 0;
+    const awayGoals = matchData.goals?.away || 0;
+    const events = matchData.events || [];
+    const lineups = matchData.lineups || [];
 
-        switch (selection) {
-            case 'HOME_WIN':
-                isWin = homeGoals > awayGoals;
-                break;
+    // 2. LOGIC SWITCH
+    switch (cardType) {
 
-            case 'AWAY_WIN':
-                isWin = awayGoals > homeGoals;
-                break;
+        // --- A. MATCH RESULT (1x2) ---
+        case 'c_match_winner':
+        case 'c_match_result': {
+            let result;
+            if (homeGoals > awayGoals) result = 'HOME';
+            else if (awayGoals > homeGoals) result = 'AWAY';
+            else result = 'DRAW';
 
-            case 'DRAW':
-                isWin = homeGoals === awayGoals;
-                break;
+            // Normalize selection for comparison
+            const normalizedSelection = String(selection).toUpperCase();
 
-            default:
-                console.warn(`Unknown selection: ${selection}. Defaulting to LOST.`);
-                return {
-                    status: 'LOST',
-                    payoutMultiplier: 0,
-                    reason: `Unknown selection: ${selection}`
-                };
-        }
+            // Get Closing Odds for Points Calculation (Fallback to 1.0)
+            // Note: In a real app, you should prefer the odds locked at bet creation time.
+            const closingOdds = matchData.odds?.match_winner?.[normalizedSelection] || 1.0;
 
-        return {
-            status: isWin ? 'WON' : 'LOST',
-            payoutMultiplier: isWin ? 2.0 : 0,
-            reason: `${homeGoals}-${awayGoals} (${selection})`
-        };
-    }
-
-    // ============================================================================
-    // TOTAL GOALS BETS (Over/Under)
-    // ============================================================================
-    if (type === 'TOTAL_GOALS') {
-        const totalGoals = homeGoals + awayGoals;
-        let isWin = false;
-
-        // Parse threshold from selection (e.g., "OVER_2.5" -> 2.5)
-        const overMatch = selection.match(/OVER[_\s]?([\d.]+)/i);
-        const underMatch = selection.match(/UNDER[_\s]?([\d.]+)/i);
-
-        if (overMatch) {
-            const threshold = parseFloat(overMatch[1]);
-            isWin = totalGoals > threshold;
-        } else if (underMatch) {
-            const threshold = parseFloat(underMatch[1]);
-            isWin = totalGoals < threshold;
-        } else {
-            console.warn(`Unknown total goals selection: ${selection}`);
             return {
-                status: 'LOST',
-                payoutMultiplier: 0,
-                reason: `Invalid total goals selection: ${selection}`
+                status: result === normalizedSelection ? 'WON' : 'LOST',
+                market_odds: closingOdds
             };
         }
 
-        return {
-            status: isWin ? 'WON' : 'LOST',
-            payoutMultiplier: isWin ? 1.8 : 0,
-            reason: `Total goals: ${totalGoals} (${selection})`
-        };
-    }
+        // --- B. TOTAL GOALS (Over/Under 2.5) ---
+        case 'c_total_goals': {
+            const total = homeGoals + awayGoals;
+            const isOver = total > 2.5;
 
-    // ============================================================================
-    // PLAYER SCORE BETS (Future Implementation)
-    // ============================================================================
-    if (type === 'PLAYER_SCORE') {
-        // TODO: Implement player-specific scoring logic
-        // Requires additional match data (goalscorers, assists, etc.)
-        console.warn('PLAYER_SCORE bets not yet implemented');
-        return {
-            status: 'VOID',
-            payoutMultiplier: 1.0,
-            reason: 'Player score bets not yet supported'
-        };
-    }
+            // Assumes selection is strictly 'Over 2.5' or 'Under 2.5'
+            const wonGoals = (selection === 'Over 2.5' && isOver) ||
+                (selection === 'Under 2.5' && !isOver);
 
-    // ============================================================================
-    // SUPERSUB BETS (Future Implementation)
-    // ============================================================================
-    if (type === 'SUPERSUB') {
-        // TODO: Implement supersub-specific logic
-        console.warn('SUPERSUB bets not yet implemented');
-        return {
-            status: 'VOID',
-            payoutMultiplier: 1.0,
-            reason: 'Supersub bets not yet supported'
-        };
-    }
+            return {
+                status: wonGoals ? 'WON' : 'LOST',
+                market_odds: 1.85 // Dynamic API odds recommended here
+            };
+        }
 
-    // ============================================================================
-    // DEFAULT - Unknown bet type
-    // ============================================================================
-    console.warn(`Unknown bet type: ${type}. Defaulting to LOST.`);
-    return {
-        status: 'LOST',
-        payoutMultiplier: 0,
-        reason: `Unknown bet type: ${type}`
-    };
-}
+        // --- C. PLAYER TO SCORE (Anytime) ---
+        case 'c_player_score': {
+            // Selection is the Player ID (convert to number for comparison)
+            const playerId = Number(selection);
+
+            const playerScored = events.some(e =>
+                e.type === 'Goal' &&
+                e.detail !== 'Missed Penalty' &&
+                Number(e.player?.id) === playerId
+            );
+
+            return {
+                status: playerScored ? 'WON' : 'LOST',
+                market_odds: 2.50 // Dynamic API odds recommended here
+            };
+        }
+
+        // --- D. SUPERSUB (The "Any Sub" Mechanic) ---
+        case 'c_supersub': {
+            // 1. Identify Bench Players from Lineups (Primary Source)
+            const benchIds = new Set();
+
+            if (lineups.length > 0) {
+                // Parse lineups to find substitutes
+                lineups.forEach(team => {
+                    const substitutes = team.substitutes || [];
+                    substitutes.forEach(sub => {
+                        if (sub.player?.id) {
+                            benchIds.add(Number(sub.player.id));
+                        }
+                    });
+                });
+            } else {
+                // Fallback: Use 'subst' events if lineups missing
+                events.forEach(e => {
+                    if (e.type === 'subst' && e.player?.id) {
+                        benchIds.add(Number(e.player.id));
+                    }
+                });
+            }
+
+            // 2. Check if any bench player scored
+            const subScored = events.some(e =>
+                e.type === 'Goal' &&
+                e.detail !== 'Missed Penalty' &&
+                e.player?.id &&
+                benchIds.has(Number(e.player.id))
+            );
+
+            return {
+                status: subScored ? 'WON' : 'LOST',
+                fixed_points: 5000 // JACKPOT REWARD
+            };
+        }
+
+        default:
+            return {
+                status: 'VOID',
+                message: `Unknown card type: ${cardType}`
+            };
+    }
+};
 
 /**
  * Batch calculate results for multiple bets
  * 
- * @param {Array} bets - Array of bet objects with { betType, betSelection, ... }
- * @param {Object} matchData - Match data with { goals: { home, away }, fixture: { status: { short } } }
+ * @param {Array} bets - Array of bet objects with { id, card_type, selection, ... }
+ * @param {Object} matchData - Match data with events, lineups, goals, etc.
  * @returns {Array} Array of results with bet IDs
  */
 export function calculateBatchResults(bets, matchData) {
-    const homeGoals = matchData.goals?.home || 0;
-    const awayGoals = matchData.goals?.away || 0;
-    const matchStatus = matchData.fixture?.status?.short || '';
-
     return bets.map(bet => ({
         betId: bet.id,
         ...calculateBetResult(
-            bet.bet_type || 'MATCH_RESULT',
+            bet.card_type || bet.market,
             bet.selection,
-            homeGoals,
-            awayGoals,
-            matchStatus
+            matchData
         )
     }));
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ClipboardList, Tablet, Backpack, BookOpen, Refrigerator } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
-import ViewPending from '../components/locker/ViewPending';
+import ViewPendingCarousel from '../components/locker/ViewPendingCarousel';
 import ViewLive from '../components/locker/ViewLive';
 import ViewDeck from '../components/locker/ViewDeck';
 import ViewLedger from '../components/locker/ViewLedger';
@@ -22,7 +22,7 @@ const LockerRoom = () => {
     }, [searchParams]);
 
     const tabs = [
-        { id: 'pending', label: 'Whiteboard', icon: ClipboardList, component: ViewPending, bgColor: 'bg-white' },
+        { id: 'pending', label: 'Whiteboard', icon: ClipboardList, component: ViewPendingCarousel, bgColor: 'bg-black' },
         { id: 'live', label: 'Tablet', icon: Tablet, component: ViewLive, bgColor: 'bg-gray-950' },
         { id: 'deck', label: 'Kit Bag', icon: Backpack, component: ViewDeck, bgColor: 'bg-gray-900' },
         { id: 'ledger', label: 'Ledger', icon: BookOpen, component: ViewLedger, bgColor: 'bg-amber-100' },

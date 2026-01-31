@@ -113,9 +113,9 @@ export const GameProvider = ({ children }) => {
                 let rewardPoints = 0;
 
                 if (result.status === 'WON') {
-                  if (result.fixed_points) {
-                    // Rule 1: Fixed Jackpot (Supersub)
-                    rewardPoints = result.fixed_points;
+                  if (bet.market === 'c_supersub' || bet.card_type === 'c_supersub') {
+                    // RULE 1: SUPERSUB JACKPOT
+                    rewardPoints = 5000;
                   } else {
                     // RULE 2: STANDARD MARKETS (Odds * 100)
                     // We prioritize the odds locked at bet time (bet.odds).
@@ -202,9 +202,9 @@ export const GameProvider = ({ children }) => {
               let rewardPoints = 0;
 
               if (result.status === 'WON') {
-                if (result.fixed_points) {
-                  // Rule 1: Fixed Jackpot (Supersub)
-                  rewardPoints = result.fixed_points;
+                if (bet.market === 'c_supersub' || bet.card_type === 'c_supersub') {
+                  // RULE 1: SUPERSUB JACKPOT
+                  rewardPoints = 5000;
                 } else {
                   // RULE 2: STANDARD MARKETS (Odds * 100)
                   // We prioritize the odds locked at bet time (bet.odds).
