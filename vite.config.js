@@ -9,6 +9,14 @@ export default defineConfig({
     globals: true,
     setupFiles: './vitest.setup.js',
   },
-  // NOTE: No proxy needed when using Vercel dev server
-  // Vercel dev handles /api routes and forwards them to serverless functions
+  // Proxy configuration to connect frontend (5173) to backend (3000)
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000', // Vercel dev server
+        changeOrigin: true,
+        secure: false,
+      }
+    }
+  }
 });
