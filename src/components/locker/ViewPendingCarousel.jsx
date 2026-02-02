@@ -7,6 +7,7 @@ import TacticalBoardCarousel from '../TacticalBoardCarousel';
  * This component is used in the LockerRoom's "Whiteboard" tab
  */
 const ViewPendingCarousel = () => {
+    // 1. Fetch the clean data (which now includes 'match_title', 'selection', etc.)
     const { predictions: pendingBets, loading } = usePredictions('PENDING');
 
     if (loading) {
@@ -26,18 +27,10 @@ const ViewPendingCarousel = () => {
         );
     }
 
-    // Transform the data to match TacticalBoardCarousel's expected format
-    const transformedBets = pendingBets.map(bet => ({
-        id: bet.id,
-        match_name: bet.match_name || `${bet.home_team} vs ${bet.away_team}`,
-        team_name: bet.selection || bet.team_name,
-        market: bet.market_type || bet.card_type?.replace('c_', '').replace('_', ' ').toUpperCase(),
-        potential_return: bet.potential_payout || bet.potential_return,
-        card_type: bet.card_type,
-        status: bet.status
-    }));
-
-    return <TacticalBoardCarousel bets={transformedBets} />;
+    // 2. PASS DATA DIRECTLY - DO NOT TRANSFORM
+    // TacticalBoardCarousel has its own internal normalization logic that expects
+    // the keys exactly as they come from Supabase (e.g., 'match_title').
+    return <TacticalBoardCarousel bets={pendingBets} />;
 };
 
 export default ViewPendingCarousel;

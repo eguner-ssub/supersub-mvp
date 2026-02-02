@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Zap, Loader2, Trophy, CheckCircle, Lock } from 'lucide-react';
+import { ArrowLeft, Zap, Loader2, Trophy, CheckCircle, Goal, User, ArrowUpCircle } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import CardBase from '../components/CardBase';
 
 const MatchDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  // Using simplified context access
-  const { userProfile, loading: gameLoading, supabase, loadProfile } = useGame();
+
+  const { userProfile, loading: gameLoading, placeBet, consumeCard, loadProfile, supabase } = useGame();
 
   const [match, setMatch] = useState(null);
   const [odds, setOdds] = useState(null);
@@ -26,7 +26,6 @@ const MatchDetail = () => {
     { id: 'c_supersub', label: 'Super Sub' }
   ];
 
-  // Helper to safely count cards
   const getCardCount = (cardId) => {
     if (!userProfile?.inventory || !Array.isArray(userProfile.inventory)) return 0;
     return userProfile.inventory.filter(item => item === cardId).length;
@@ -48,7 +47,40 @@ const MatchDetail = () => {
 
         if (matchData.response && matchData.response.length > 0) {
           setMatch(matchData.response[0]);
-          setOdds(oddsData.odds || { home: 2.0, draw: 3.0, away: 2.0 });
+
+          // --- ODDS MAPPING (API-FOOTBALL STANDARD) ---
+          const apiResponse = oddsData.response?.[0];
+          const bookmaker = apiResponse?.bookmakers?.[0]; // Usually "Bet365" or first available
+          const markets = bookmaker?.bets || [];
+
+          // Helper to find odds in the standard array structure
+          const findMarket = (name) => markets.find(m => m.name === name)?.values || [];
+          const matchWinner = findMarket("Match Winner");
+          const goalsOverUnder = findMarket("Goals Over/Under");
+
+          setOdds({
+            // 1. MATCH RESULT (Standard)
+            home: matchWinner.find(o => o.value === "Home")?.odd || 1.50,
+            draw: matchWinner.find(o => o.value === "Draw")?.odd || 3.50,
+            away: matchWinner.find(o => o.value === "Away")?.odd || 4.50,
+
+            // 2. TOTAL GOALS (Standard Over/Under 2.5)
+            goals_over: goalsOverUnder.find(o => o.value === "Over 2.5")?.odd || 1.85,
+            goals_under: goalsOverUnder.find(o => o.value === "Under 2.5")?.odd || 1.95,
+
+            // 3. SUPER SUB (FIXED REWARD - CUSTOM MARKET)
+            // Since this doesn't exist in real life, we set a static multiplier.
+            supersub_yes: 4.50,
+
+            // 4. PLAYER TO SCORE
+            // API-Football often puts this in a separate endpoint, so we default to mock
+            // unless you have the "players" endpoint integrated.
+            scorers: [
+              { id: 1, name: "Home Striker", odds: 2.2 },
+              { id: 2, name: "Away Striker", odds: 2.8 },
+              { id: 3, name: "Midfield Star", odds: 3.5 }
+            ]
+          });
         }
       } catch (err) {
         console.error("Fetch Error:", err);
@@ -72,65 +104,35 @@ const MatchDetail = () => {
       card: selectedCard,
       selection,
       odds: oddsVal,
-      reward: Math.floor(oddsVal * 100)
+      reward: Math.floor(oddsVal * 100) // Reward Calculation (Odds * 100)
     });
     setFlowState('staging');
   };
 
-  // --- THE FIXED TRANSACTION LOGIC ---
   const handlePlay = async () => {
     if (!userProfile || !stagedBet) return;
 
     try {
-      // 1. SAFE INVENTORY CHECK
-      const currentInv = userProfile.inventory ? [...userProfile.inventory] : [];
-      const cardIndex = currentInv.indexOf(stagedBet.card);
+      const result = await placeBet(
+        match,
+        stagedBet.selection,
+        stagedBet.reward,
+        stagedBet.card,
+        stagedBet.odds
+      );
 
-      if (cardIndex === -1) {
-        alert("Transaction Failed: Card not found in inventory.");
-        return;
-      }
+      if (!result.success) throw new Error(result.error || "Failed to place bet");
 
-      // 2. Remove Card (Optimistic)
-      currentInv.splice(cardIndex, 1);
+      const consumed = await consumeCard(stagedBet.card);
+      if (!consumed) console.warn("Bet placed, but failed to update inventory.");
 
-      // 3. Update Profile (Consume Card)
-      const { error: invError } = await supabase
-        .from('profiles')
-        .update({ inventory: currentInv })
-        .eq('id', userProfile.id);
-
-      if (invError) throw invError;
-
-      // 4. Create Prediction Record
-      // FIX APPLIED HERE: Changed 'market' to 'card_type'
-      const { error: betError } = await supabase
-        .from('predictions')
-        .insert({
-          user_id: userProfile.id,
-          match_id: match.fixture.id,
-          team_name: `${match.teams.home.name} vs ${match.teams.away.name}`,
-          card_type: stagedBet.card, // <--- CHANGED FROM 'market' TO 'card_type'
-          selection: stagedBet.selection,
-          odds: stagedBet.odds,
-          stake: 0,
-          potential_reward: stagedBet.reward,
-          status: 'PENDING'
-        });
-
-      if (betError) throw betError;
-
-      // 5. Force Refresh Profile (To sync UI with DB)
       const session = await supabase.auth.getSession();
-      if (session?.data?.session) {
-        loadProfile(session.data.session);
-      }
+      if (session?.data?.session) loadProfile(session.data.session);
 
       setFlowState('resolved');
 
     } catch (err) {
       console.error("Transaction Failed:", err);
-      // Alert the specific database error message so we can debug further if needed
       alert("System Error: " + (err.message || "Could not place bet"));
     }
   };
@@ -147,8 +149,6 @@ const MatchDetail = () => {
   if (gameLoading || !userProfile) {
     return <div className="bg-black h-[100dvh] flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500 w-8 h-8" /></div>;
   }
-
-  const isLocked = cardTypes.every(card => getCardCount(card.id) === 0);
 
   return (
     <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
@@ -170,15 +170,14 @@ const MatchDetail = () => {
         </div>
       </div>
 
-      {/* SCOREBOARD (BALANCED) */}
+      {/* SCOREBOARD */}
       {match && (
         <div className="absolute top-16 w-full z-40 px-2">
           <div className="relative w-full max-w-lg mx-auto h-14 flex items-center justify-center drop-shadow-2xl mt-3">
             {/* Left Wing */}
             <div className="flex-1 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-l-md border-b-4 border-[#2d241e] flex items-center justify-start pl-3 relative shadow-lg mr-[-8px]">
-              <img src={match.teams.home.logo} className="w-5 h-5 object-contain z-10 drop-shadow-md" />
+              <img src={match.teams.home.logo} className="w-5 h-5 object-contain z-10 drop-shadow-md" alt="Home" />
               <span className="ml-2 text-black/90 font-black text-[10px] md:text-xs uppercase tracking-tight truncate z-10 leading-none">{match.teams.home.name}</span>
-              <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/40 rounded-l-md pointer-events-none"></div>
             </div>
             {/* Center */}
             <div className="relative z-20 w-28 h-14 bg-zinc-950 border-x border-zinc-700 border-b-4 border-[#2d241e] rounded-b-lg shadow-2xl flex flex-col items-center justify-center pt-0.5 pb-1">
@@ -187,13 +186,11 @@ const MatchDetail = () => {
               <span className="text-lg md:text-xl text-white font-black tracking-widest leading-none font-mono drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
                 {match.fixture.status.short === 'NS' ? formatTime(match.fixture.date) : `${match.goals.home}-${match.goals.away}`}
               </span>
-              {match.fixture.status.short !== 'NS' && (<div className="absolute bottom-1 w-1 h-1 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,1)]"></div>)}
             </div>
             {/* Right Wing */}
             <div className="flex-1 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-r-md border-b-4 border-[#2d241e] flex items-center justify-end pr-3 relative shadow-lg ml-[-8px]">
               <span className="mr-2 text-black/90 font-black text-[10px] md:text-xs uppercase tracking-tight truncate text-right z-10 leading-none">{match.teams.away.name}</span>
-              <img src={match.teams.away.logo} className="w-5 h-5 object-contain z-10 drop-shadow-md" />
-              <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/40 rounded-r-md pointer-events-none"></div>
+              <img src={match.teams.away.logo} className="w-5 h-5 object-contain z-10 drop-shadow-md" alt="Away" />
             </div>
           </div>
         </div>
@@ -228,38 +225,95 @@ const MatchDetail = () => {
         </div>
       </div>
 
-      {/* SELECTION MODAL */}
-      {flowState === 'selection' && match && odds && selectedCard === 'c_match_result' && (
+      {/* SELECTION MODAL (DYNAMIC) */}
+      {flowState === 'selection' && match && odds && selectedCard && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="grid grid-cols-3 gap-3 w-full max-w-lg mt-20">
-            <button onClick={() => handleOutcomeClick('HOME', odds.home)} className="backdrop-blur-md border border-white/10 bg-gradient-to-b from-blue-500/20 to-blue-900/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform">
-              <img src={match.teams.home.logo} className="w-12 h-12 object-contain" />
-              <h3 className="font-black text-white text-xs uppercase text-center leading-tight">{match.teams.home.name}<br />WIN</h3>
-              <p className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.home * 100)}</p>
-            </button>
-            <button onClick={() => handleOutcomeClick('DRAW', odds.draw)} className="backdrop-blur-md border border-white/10 bg-gradient-to-b from-zinc-500/20 to-zinc-900/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform">
-              <Trophy className="w-10 h-10 text-zinc-400" />
-              <h3 className="font-black text-white text-sm uppercase">DRAW</h3>
-              <p className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.draw * 100)}</p>
-            </button>
-            <button onClick={() => handleOutcomeClick('AWAY', odds.away)} className="backdrop-blur-md border border-white/10 bg-gradient-to-b from-red-500/20 to-red-900/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform">
-              <img src={match.teams.away.logo} className="w-12 h-12 object-contain" />
-              <h3 className="font-black text-white text-xs uppercase text-center leading-tight">{match.teams.away.name}<br />WIN</h3>
-              <p className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.away * 100)}</p>
-            </button>
-          </div>
+
+          {/* CASE 1: MATCH RESULT */}
+          {selectedCard === 'c_match_result' && (
+            <div className="grid grid-cols-3 gap-3 w-full max-w-lg mt-20 animate-in slide-in-from-bottom-8">
+              <button onClick={() => handleOutcomeClick('HOME_WIN', odds.home)} className="backdrop-blur-md border border-white/10 bg-gradient-to-b from-blue-500/20 to-blue-900/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform">
+                <img src={match.teams.home.logo} className="w-12 h-12 object-contain" alt="Home" />
+                <h3 className="font-black text-white text-xs uppercase text-center leading-tight">WIN</h3>
+                <p className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.home * 100)}</p>
+              </button>
+              <button onClick={() => handleOutcomeClick('DRAW', odds.draw)} className="backdrop-blur-md border border-white/10 bg-gradient-to-b from-zinc-500/20 to-zinc-900/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform">
+                <Trophy className="w-10 h-10 text-zinc-400" />
+                <h3 className="font-black text-white text-sm uppercase">DRAW</h3>
+                <p className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.draw * 100)}</p>
+              </button>
+              <button onClick={() => handleOutcomeClick('AWAY_WIN', odds.away)} className="backdrop-blur-md border border-white/10 bg-gradient-to-b from-red-500/20 to-red-900/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform">
+                <img src={match.teams.away.logo} className="w-12 h-12 object-contain" alt="Away" />
+                <h3 className="font-black text-white text-xs uppercase text-center leading-tight">WIN</h3>
+                <p className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.away * 100)}</p>
+              </button>
+            </div>
+          )}
+
+          {/* CASE 2: TOTAL GOALS */}
+          {selectedCard === 'c_total_goals' && (
+            <div className="flex flex-col gap-4 w-full max-w-xs mt-20 animate-in slide-in-from-bottom-8">
+              <h3 className="text-white text-center font-black uppercase text-xl">Over / Under 2.5 Goals</h3>
+              <div className="flex gap-4">
+                <button onClick={() => handleOutcomeClick('OVER_2.5', odds.goals_over)} className="flex-1 backdrop-blur-md border border-white/10 bg-gradient-to-b from-emerald-500/20 to-emerald-900/40 rounded-xl p-6 flex flex-col items-center gap-2 hover:scale-105 transition-transform">
+                  <Goal className="w-8 h-8 text-emerald-400" />
+                  <span className="font-black text-white uppercase">OVER</span>
+                  <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.goals_over * 100)}</span>
+                </button>
+                <button onClick={() => handleOutcomeClick('UNDER_2.5', odds.goals_under)} className="flex-1 backdrop-blur-md border border-white/10 bg-gradient-to-b from-red-500/20 to-red-900/40 rounded-xl p-6 flex flex-col items-center gap-2 hover:scale-105 transition-transform">
+                  <Goal className="w-8 h-8 text-red-400" />
+                  <span className="font-black text-white uppercase">UNDER</span>
+                  <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.goals_under * 100)}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* CASE 3: SUPER SUB */}
+          {selectedCard === 'c_supersub' && (
+            <div className="w-full max-w-xs mt-20 animate-in slide-in-from-bottom-8">
+              <button onClick={() => handleOutcomeClick('SUPERSUB_GOAL', odds.supersub_yes)} className="w-full backdrop-blur-md border border-yellow-500/50 bg-gradient-to-b from-yellow-500/10 to-yellow-900/20 rounded-xl p-8 flex flex-col items-center gap-4 hover:scale-105 transition-transform">
+                <ArrowUpCircle className="w-12 h-12 text-yellow-400" />
+                <div className="text-center">
+                  <h3 className="font-black text-white text-xl uppercase">IMPACT SUB</h3>
+                  <p className="text-zinc-400 text-xs">Goal scored by a substitute</p>
+                </div>
+                <span className="text-yellow-400 font-black text-4xl">+{Math.floor(odds.supersub_yes * 100)}</span>
+              </button>
+            </div>
+          )}
+
+          {/* CASE 4: PLAYER SCORE */}
+          {selectedCard === 'c_player_score' && (
+            <div className="w-full max-w-sm mt-20 max-h-[60vh] overflow-y-auto animate-in slide-in-from-bottom-8">
+              <h3 className="text-white text-center font-black uppercase text-xl mb-4">To Score Anytime</h3>
+              <div className="flex flex-col gap-2">
+                {odds.scorers?.map((player) => (
+                  <button key={player.id || player.name} onClick={() => handleOutcomeClick(`GOAL: ${player.name}`, player.odds)} className="flex items-center justify-between backdrop-blur-md border border-white/10 bg-zinc-900/80 rounded-lg p-4 hover:bg-zinc-800 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <User className="w-8 h-8 text-zinc-500 bg-zinc-800 rounded-full p-1.5" />
+                      <span className="font-bold text-white uppercase text-sm">{player.name}</span>
+                    </div>
+                    <span className="text-yellow-400 font-black text-lg">+{Math.floor(player.odds * 100)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Click Outside to Close */}
           <div className="absolute inset-0 -z-10" onClick={handleReset}></div>
         </div>
       )}
 
-      {/* CONFIRMATION POPUP (CENTERED & FIXED) */}
+      {/* CONFIRMATION POPUP */}
       {flowState === 'staging' && stagedBet && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="w-full max-w-md bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-end mb-6">
               <div>
                 <p className="text-zinc-500 text-[10px] uppercase tracking-widest mb-1">SELECTED OUTCOME</p>
-                <p className="text-white font-black text-2xl uppercase italic">{stagedBet.selection}</p>
+                <p className="text-white font-black text-2xl uppercase italic">{stagedBet.selection.replace('_', ' ')}</p>
               </div>
               <div className="text-right">
                 <p className="text-zinc-500 text-[10px] uppercase tracking-widest mb-1">REWARD</p>
@@ -284,7 +338,7 @@ const MatchDetail = () => {
                 <CheckCircle className="w-10 h-10 text-green-500" />
               </div>
               <h2 className="font-black uppercase text-white text-3xl mb-2 tracking-tighter">Locked In!</h2>
-              <button onClick={() => window.location.reload()} className="w-full py-4 bg-white text-black font-black uppercase rounded-xl hover:scale-105 transition-transform shadow-xl">Continue</button>
+              <button onClick={() => navigate('/dashboard')} className="w-full py-4 bg-white text-black font-black uppercase rounded-xl hover:scale-105 transition-transform shadow-xl">Continue</button>
             </div>
           </div>
         </div>

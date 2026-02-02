@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { calculateBetResult } from '../utils/settlementEngine';
 
 const GameContext = createContext();
 
@@ -50,28 +49,98 @@ export const GameProvider = ({ children }) => {
     }
   };
 
-  // --- SETTLEMENT ENGINE (Cached) ---
-  const matchCacheRef = useRef({});
+  // --- GAME ACTIONS ---
 
-  const checkActiveBets = async () => {
-    if (!userProfile?.id) return;
+  // 1. PLACE BET (Updated to include Odds)
+  const placeBet = async (match, selection, potentialReward, cardType, odds) => { // <--- Added 'odds' param
+    if (!userProfile) return { success: false, error: 'No user' };
 
     try {
-      const { data: bets, error } = await supabase
+      // CONSTRUCT THE TITLE 
+      // We explicitly format "Home vs Away" here so it is saved permanently.
+      const homeTeam = match.teams.home.name;
+      const awayTeam = match.teams.away.name;
+      const matchTitle = `${homeTeam} vs ${awayTeam}`;
+
+      const { data, error } = await supabase
         .from('predictions')
-        .select('*')
-        .eq('user_id', userProfile.id)
-        .in('status', ['PENDING', 'LIVE']);
+        .insert([
+          {
+            user_id: userProfile.id,
+            match_id: match.fixture.id,
+            selection: selection,
+            potential_reward: potentialReward,
+            card_type: cardType, // e.g., 'c_match_result'
+            status: 'PENDING',
+            match_title: matchTitle,
+            odds: odds // <--- SAVING ODDS TO DB
+          }
+        ])
+        .select();
 
-      if (error || !bets) return;
+      if (error) throw error;
+      return { success: true, data };
 
-      for (const bet of bets) {
-        // ... (Your existing Settlement Logic matches here, hidden for brevity but assumed present) ...
-        // Note: Ensure the logic from your previous file is kept here if you want automatic settlement
-      }
-    } catch (error) {
-      console.error('Error checking active bets:', error);
+    } catch (err) {
+      console.error("Bet Placement Failed:", err.message);
+      return { success: false, error: err.message };
     }
+  };
+
+  // 2. CONSUME CARD
+  const consumeCard = async (cardId) => {
+    if (!userProfile) return false;
+
+    // A. Safe Inventory Copy
+    const currentInv = Array.isArray(userProfile.inventory) ? [...userProfile.inventory] : [];
+
+    // B. Find Index
+    const cardIndex = currentInv.indexOf(cardId);
+    if (cardIndex === -1) return false; // Card not found
+
+    // C. Optimistic Update
+    currentInv.splice(cardIndex, 1);
+    setUserProfile(prev => ({ ...prev, inventory: currentInv }));
+
+    // D. Database Sync
+    const { error } = await supabase
+      .from('profiles')
+      .update({ inventory: currentInv })
+      .eq('id', userProfile.id);
+
+    if (error) {
+      console.error("Card Consumption Failed:", error.message);
+      return false;
+    }
+    return true;
+  };
+
+  // 3. OTHER ACTIONS
+  const updateInventory = async (newCardIds) => {
+    if (!userProfile?.id) return;
+    const currentInv = Array.isArray(userProfile.inventory) ? userProfile.inventory : [];
+    const updatedInv = [...currentInv, ...newCardIds];
+
+    setUserProfile(prev => ({ ...prev, inventory: updatedInv }));
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ inventory: updatedInv })
+      .eq('id', userProfile.id);
+
+    if (error) console.error('Inventory Sync Failed:', error.message);
+  };
+
+  const spendEnergy = async (amount) => {
+    if (!userProfile) return;
+    const newEnergy = Math.max(0, userProfile.energy - amount);
+    setUserProfile(prev => ({ ...prev, energy: newEnergy }));
+    await supabase.from('profiles').update({ energy: newEnergy }).eq('id', userProfile.id);
+  };
+
+  const checkActiveBets = async () => {
+    // Placeholder for your settlement engine logic
+    console.log("Checking active bets...");
   };
 
   // --- INITIALIZATION ---
@@ -97,64 +166,12 @@ export const GameProvider = ({ children }) => {
     };
   }, []);
 
-  // --- GAME ACTIONS ---
-
-  // 1. CONSUME CARD (The Fix)
-  const consumeCard = async (cardId) => {
-    if (!userProfile) return false;
-
-    // 1. Safe Inventory Copy (Handle nulls)
-    const currentInv = Array.isArray(userProfile.inventory) ? [...userProfile.inventory] : [];
-
-    // 2. Find Index
-    const cardIndex = currentInv.indexOf(cardId);
-    if (cardIndex === -1) return false; // Card not found
-
-    // 3. Optimistic Update (Update UI instantly)
-    currentInv.splice(cardIndex, 1);
-    setUserProfile(prev => ({ ...prev, inventory: currentInv }));
-
-    // 4. Database Sync
-    const { error } = await supabase
-      .from('profiles')
-      .update({ inventory: currentInv })
-      .eq('id', userProfile.id);
-
-    if (error) {
-      console.error("Card Consumption Failed:", error.message);
-      // Revert optimistic update if DB fails (optional but recommended)
-      return false;
-    }
-    return true;
-  };
-
-  const updateInventory = async (newCardIds) => {
-    if (!userProfile?.id) return;
-    const currentInv = Array.isArray(userProfile.inventory) ? userProfile.inventory : [];
-    const updatedInv = [...currentInv, ...newCardIds];
-
-    setUserProfile(prev => ({ ...prev, inventory: updatedInv }));
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ inventory: updatedInv })
-      .eq('id', userProfile.id);
-
-    if (error) console.error('Inventory Sync Failed:', error.message);
-  };
-
-  const spendEnergy = async (amount) => {
-    if (!userProfile) return;
-    const newEnergy = Math.max(0, userProfile.energy - amount);
-    setUserProfile(prev => ({ ...prev, energy: newEnergy }));
-    await supabase.from('profiles').update({ energy: newEnergy }).eq('id', userProfile.id);
-  };
-
   const value = {
     userProfile,
     loading,
     supabase,
-    consumeCard, // Exporting the new function
+    placeBet,    // <--- EXPORTED NEW FUNCTION
+    consumeCard,
     spendEnergy,
     updateInventory,
     checkActiveBets,

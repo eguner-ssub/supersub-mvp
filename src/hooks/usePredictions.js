@@ -1,11 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 
-/**
- * Hook to fetch predictions from Supabase based on status filter
- * @param {string} statusFilter - 'PENDING', 'LIVE', 'SETTLED', or null for all
- * @returns {object} { predictions, loading, refetch }
- */
 export const usePredictions = (statusFilter = null) => {
     const [predictions, setPredictions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -20,9 +15,21 @@ export const usePredictions = (statusFilter = null) => {
         setLoading(true);
 
         try {
+            // EXPLICIT SCHEMA: Bypass Supabase cache by listing all columns
             let query = supabase
                 .from('predictions')
-                .select('*')
+                .select(`
+                    id,
+                    match_id,
+                    match_title,
+                    team_name,
+                    selection,
+                    odds,
+                    potential_reward,
+                    status,
+                    card_type,
+                    created_at
+                `)
                 .eq('user_id', userProfile.id)
                 .order('created_at', { ascending: false });
 
