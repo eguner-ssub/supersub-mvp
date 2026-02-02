@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  const { league = 39, season: requestedSeason, id } = req.query;
+  const { league = 39, season: requestedSeason, id, date } = req.query;
 
   // 1. ROBUST KEY RETRIEVAL
   const apiKey = process.env.VITE_API_FOOTBALL_KEY || process.env.FOOTBALL_API_KEY || "";
@@ -29,7 +29,109 @@ export default async function handler(req, res) {
   console.log(`🔍 [Matches API] Seasons to try: ${seasonsToTry.join(', ')}`);
 
   try {
-    // SCENARIO 1: Fetch Specific Match Detail (for MatchDetail page)
+    // SCENARIO 1: Date-Specific Query (Bypass round logic)
+    if (date) {
+      console.log(`📅 [Matches API] Fetching fixtures for date: ${date}`);
+
+      // Validate date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(date)) {
+        return res.status(400).json({
+          error: 'INVALID_DATE_FORMAT',
+          message: 'Date must be in YYYY-MM-DD format'
+        });
+      }
+
+      // Use the requested season or default
+      const season = requestedSeason ? parseInt(requestedSeason) : defaultSeason;
+
+      // Multi-League Support: EPL (39) + Championship (40)
+      const LEAGUES = [39, 40];
+      console.log(`🏆 [Matches API] Fetching from leagues: ${LEAGUES.join(', ')}`);
+
+      try {
+        // Parallel fetch for all leagues
+        const fetchPromises = LEAGUES.map(async (leagueId) => {
+          try {
+            const response = await fetch(
+              `${baseUrl}/fixtures?league=${leagueId}&season=${season}&date=${date}`,
+              { headers }
+            );
+
+            // Handle rate limits
+            if (response.status === 429 || response.status === 403) {
+              console.error(`🚫 [Matches API] Rate limit hit for league ${leagueId}: ${response.status}`);
+              return { leagueId, error: 'RATE_LIMIT', data: [] };
+            }
+
+            if (!response.ok) {
+              console.error(`❌ [Matches API] Date fetch failed for league ${leagueId}: ${response.status}`);
+              return { leagueId, error: 'FETCH_FAILED', data: [] };
+            }
+
+            const data = await response.json();
+
+            // Check for API errors
+            if (data.errors && Object.keys(data.errors).length > 0) {
+              console.error(`❌ [Matches API] API errors for league ${leagueId}:`, data.errors);
+              return { leagueId, error: 'API_ERROR', data: [] };
+            }
+
+            console.log(`✅ [Matches API] League ${leagueId}: ${data.response?.length || 0} matches`);
+            return { leagueId, error: null, data: data.response || [] };
+          } catch (error) {
+            console.error(`❌ [Matches API] Exception for league ${leagueId}:`, error.message);
+            return { leagueId, error: 'EXCEPTION', data: [] };
+          }
+        });
+
+        // Wait for all fetches to complete
+        const results = await Promise.all(fetchPromises);
+
+        // Check if any league hit rate limit
+        const rateLimitHit = results.some(r => r.error === 'RATE_LIMIT');
+        if (rateLimitHit) {
+          return res.status(200).json({
+            error: 'API_LIMIT_REACHED',
+            response: [],
+            message: 'API rate limit exceeded. Please try again later.',
+          });
+        }
+
+        // Merge all results
+        const allMatches = results.flatMap(r => r.data);
+
+        // Sort by fixture date (chronological order)
+        const sortedMatches = allMatches.sort((a, b) =>
+          new Date(a.fixture.date) - new Date(b.fixture.date)
+        );
+
+        console.log(`✅ [Matches API] Total merged matches: ${sortedMatches.length}`);
+
+        return res.status(200).json({
+          response: sortedMatches,
+          date_queried: date,
+          season_used: season,
+          leagues_queried: LEAGUES,
+          league_results: results.map(r => ({
+            league: r.leagueId,
+            count: r.data.length,
+            error: r.error
+          }))
+        });
+      } catch (error) {
+        console.error(`❌ [Matches API] Date query exception:`, error.message);
+        return res.status(200).json({
+          error: 'API_UNAVAILABLE',
+          response: [],
+          message: 'Service temporarily unavailable',
+          details: error.message
+        });
+      }
+    }
+
+
+    // SCENARIO 2: Fetch Specific Match Detail (for MatchDetail page)
     if (id) {
       console.log(`🎯 [Matches API] Fetching specific match: ${id}`);
 

@@ -89,7 +89,44 @@ const MatchDetail = () => {
 
     const matchWinner = getMarketValues("Match Winner");
     const goalsOverUnder = getMarketValues("Goals Over/Under");
-    const goalscorers = getMarketValues("Goalscorers") || getMarketValues("Anytime Goalscorer");
+
+    // === ROBUST GOALSCORER MARKET FINDER ===
+    // Search for any of these market names (case-insensitive)
+    const scorerMarketNames = ["Goalscorers", "Anytime Goalscorer", "Player to Score"];
+    let scorerMarket = null;
+
+    for (const name of scorerMarketNames) {
+      scorerMarket = getMarketValues(name);
+      if (scorerMarket && scorerMarket.length > 0) {
+        console.log(`✅ Found goalscorer market: "${name}" with ${scorerMarket.length} players`);
+        break;
+      }
+    }
+
+    // Map and sort real scorers by lowest odds (most likely) to highest
+    const realScorers = (scorerMarket || [])
+      .map((p, index) => ({
+        id: index,
+        name: p.value, // Player Name
+        odds: parseFloat(p.odd)
+      }))
+      .sort((a, b) => a.odds - b.odds) // Sort by lowest odds first
+      .slice(0, 20); // Top 20 players for performance
+
+    // Fallback only if no real data found
+    const finalScorers = realScorers.length > 0 ? realScorers : [
+      { id: 101, name: "Home Striker", odds: 2.2 },
+      { id: 102, name: "Away Striker", odds: 2.8 },
+      { id: 103, name: "Midfield Star", odds: 3.5 }
+    ];
+
+    console.log(`📊 Goalscorers: ${realScorers.length > 0 ? 'Real data' : 'Mock data'} (${finalScorers.length} players)`);
+
+    // === PROPRIETARY MARKET: SUPER SUB ===
+    // This is a custom game mechanic, not a real betting market.
+    // No API dependency - always active with fixed reward.
+    // Logic: If ANY substitute scores, user wins fixed reward.
+    const fixedSuperSubOdds = 5.00; // Equates to 500 Points (100 stake × 5.00)
 
     return {
       bookmaker: { id: bookmakerId, name: bookmakerName },
@@ -99,14 +136,8 @@ const MatchDetail = () => {
         away: matchWinner.find(o => o.value === "Away")?.odd || 2.90,
         goals_over: goalsOverUnder.find(o => o.value === "Over 2.5")?.odd || 1.85,
         goals_under: goalsOverUnder.find(o => o.value === "Under 2.5")?.odd || 1.95,
-        supersub_yes: 4.50,
-        scorers: goalscorers.length > 0
-          ? goalscorers.map((p, index) => ({ id: index, name: p.value, odds: p.odd })).slice(0, 20)
-          : [
-            { id: 1, name: "Home Striker", odds: 2.2 },
-            { id: 2, name: "Away Striker", odds: 2.8 },
-            { id: 3, name: "Midfield Star", odds: 3.5 }
-          ]
+        supersub_yes: fixedSuperSubOdds,
+        scorers: finalScorers
       }
     };
   };
@@ -120,7 +151,7 @@ const MatchDetail = () => {
       away: 3.10,
       goals_over: 1.85,
       goals_under: 1.95,
-      supersub_yes: 4.50,
+      supersub_yes: 5.00, // Proprietary market - fixed odds
       scorers: [
         { id: 1, name: "Haaland", odds: 1.80 },
         { id: 2, name: "Salah", odds: 2.30 },
@@ -175,21 +206,24 @@ const MatchDetail = () => {
             : `/api/odds?fixture=${id}&bookmaker=6&t=${timestamp}`;
 
           console.log(`📡 Fetching ${phase} odds from: ${endpoint}`);
-          
+
           const oddsRes = await fetch(endpoint);
           const oddsData = await oddsRes.json();
-          
+
           console.log("📊 Raw Odds Response:", oddsData);
 
-          // Check if response is in simplified format (from our live odds API)
-          if (oddsData.isLive !== undefined && oddsData.odds) {
-            // Simplified format: { fixtureId, isLive, source, odds: {home, draw, away} }
-            console.log(`✅ Odds loaded from: ${oddsData.source || 'LIVE'}`);
+          // === ADAPTER PATTERN: Handle both Clean and Raw data formats ===
+
+          // CHECK 1: Clean Data Format (New Backend)
+          // Format: { fixtureId, source, odds: { home, draw, away } }
+          if (oddsData.odds && typeof oddsData.odds === 'object') {
+            console.log(`✅ Clean data format detected from: ${oddsData.source || 'API'}`);
+
             setOdds({
               home: oddsData.odds.home,
               draw: oddsData.odds.draw,
               away: oddsData.odds.away,
-              goals_over: 1.85, // Default for live (not provided in simplified format)
+              goals_over: 1.85, // Default values for additional markets
               goals_under: 1.95,
               supersub_yes: 4.50,
               scorers: [
@@ -198,11 +232,15 @@ const MatchDetail = () => {
                 { id: 3, name: "Midfield Star", odds: 3.5 }
               ]
             });
-            setActiveBookie(oddsData.source || 'LIVE');
-          } else {
-            // Standard API-Football format
+            setActiveBookie(oddsData.source || 'Official Odds');
+
+            // CHECK 2: Legacy Raw Data Format (Fallback)
+            // Format: { response: [{ bookmakers: [...] }] }
+          } else if (oddsData.response && Array.isArray(oddsData.response)) {
+            console.log("📦 Legacy raw data format detected");
+
             const processed = processOdds(oddsData, phase === 'LIVE');
-            
+
             if (processed) {
               setOdds(processed.odds);
               setActiveBookie(processed.bookmaker.name);
@@ -214,6 +252,33 @@ const MatchDetail = () => {
               setOdds(simulation.odds);
               setActiveBookie(simulation.bookmaker.name);
             }
+
+            // CHECK 3: Simplified Live Format (isLive flag)
+            // Format: { fixtureId, isLive, source, odds: { home, draw, away } }
+          } else if (oddsData.isLive !== undefined && oddsData.odds) {
+            console.log(`✅ Simplified live format from: ${oddsData.source || 'LIVE'}`);
+
+            setOdds({
+              home: oddsData.odds.home,
+              draw: oddsData.odds.draw,
+              away: oddsData.odds.away,
+              goals_over: 1.85,
+              goals_under: 1.95,
+              supersub_yes: 4.50,
+              scorers: [
+                { id: 1, name: "Home Striker", odds: 2.2 },
+                { id: 2, name: "Away Striker", odds: 2.8 },
+                { id: 3, name: "Midfield Star", odds: 3.5 }
+              ]
+            });
+            setActiveBookie(oddsData.source || 'LIVE');
+
+          } else {
+            // Unknown format - fallback to simulation
+            console.warn("⚠️ Unknown odds format. Activating Simulation.");
+            const simulation = getSimulationOdds();
+            setOdds(simulation.odds);
+            setActiveBookie(simulation.bookmaker.name);
           }
         }
       } catch (err) {

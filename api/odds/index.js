@@ -11,6 +11,7 @@ export default async function handler(req, res) {
     // Default fallback odds
     const defaultOdds = {
         fixtureId: parseInt(fixture),
+        source: "Default",
         odds: {
             home: 2.0,
             draw: 3.0,
@@ -21,8 +22,6 @@ export default async function handler(req, res) {
     const apiKey = process.env.VITE_API_FOOTBALL_KEY || process.env.FOOTBALL_API_KEY || "";
 
     console.log('🔑 [ODDS API] API Key present:', apiKey ? 'Yes' : 'No');
-    console.log('🔑 [ODDS API] Checking VITE_API_FOOTBALL_KEY:', process.env.VITE_API_FOOTBALL_KEY ? 'Found' : 'Not found');
-    console.log('🔑 [ODDS API] Checking FOOTBALL_API_KEY:', process.env.FOOTBALL_API_KEY ? 'Found' : 'Not found');
 
     // If no API key, return defaults immediately
     if (!apiKey) {
@@ -36,10 +35,18 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
     };
 
+    // Priority bookmaker IDs (Bet365, 1xBet, Unibet)
+    const PRIORITY_BOOKMAKER_IDS = [6, 10, 16];
+    const BOOKMAKER_NAMES = {
+        6: "Bet365",
+        10: "1xBet",
+        16: "Unibet"
+    };
+
     try {
         console.log('📡 [ODDS API] Fetching from:', `${baseUrl}/odds?fixture=${fixture}`);
 
-        // Fetch odds from API-Football (any bookmaker)
+        // Fetch odds from API-Football (all bookmakers)
         const response = await fetch(
             `${baseUrl}/odds?fixture=${fixture}`,
             { headers }
@@ -54,7 +61,6 @@ export default async function handler(req, res) {
 
         const data = await response.json();
 
-        console.log('📦 [ODDS API] Raw response:', JSON.stringify(data, null, 2));
         console.log('📦 [ODDS API] Response array length:', data.response?.length || 0);
 
         // Check if we got valid odds data
@@ -64,27 +70,45 @@ export default async function handler(req, res) {
             return res.status(200).json(defaultOdds);
         }
 
-        // Extract the "Match Winner" market (1x2) from first available bookmaker
+        // Extract the odds data
         const oddsData = data.response[0];
         console.log('🎯 [ODDS API] Odds data bookmakers:', oddsData.bookmakers?.length || 0);
 
-        // Take the first available bookmaker
-        const bookmaker = oddsData.bookmakers?.[0];
-
-        if (!bookmaker) {
+        if (!oddsData.bookmakers || oddsData.bookmakers.length === 0) {
             console.warn("⚠️ [ODDS API] No bookmakers found, using defaults");
             return res.status(200).json(defaultOdds);
         }
 
-        console.log('📚 [ODDS API] Using bookmaker:', bookmaker.name);
+        // Smart bookmaker selection: prioritize high-quality bookmakers
+        let selectedBookmaker = null;
+        let bookmakerSource = "Unknown";
 
-        const matchWinnerMarket = bookmaker.bets?.find(
+        // Try to find a priority bookmaker
+        for (const priorityId of PRIORITY_BOOKMAKER_IDS) {
+            const found = oddsData.bookmakers.find(b => b.id === priorityId);
+            if (found) {
+                selectedBookmaker = found;
+                bookmakerSource = BOOKMAKER_NAMES[priorityId] || found.name;
+                console.log(`✅ [ODDS API] Found priority bookmaker: ${bookmakerSource} (ID: ${priorityId})`);
+                break;
+            }
+        }
+
+        // Fallback to first available bookmaker if no priority match
+        if (!selectedBookmaker) {
+            selectedBookmaker = oddsData.bookmakers[0];
+            bookmakerSource = selectedBookmaker.name;
+            console.log(`📚 [ODDS API] Using fallback bookmaker: ${bookmakerSource} (ID: ${selectedBookmaker.id})`);
+        }
+
+        // Find Match Winner market
+        const matchWinnerMarket = selectedBookmaker.bets?.find(
             bet => bet.name === "Match Winner"
         );
 
         if (!matchWinnerMarket || !matchWinnerMarket.values) {
             console.warn("⚠️ [ODDS API] Match Winner odds not found, using defaults");
-            console.log('🔍 [ODDS API] Available markets for selected bookmaker:', bookmaker.bets?.map(b => b.name));
+            console.log('🔍 [ODDS API] Available markets:', selectedBookmaker.bets?.map(b => b.name));
             return res.status(200).json(defaultOdds);
         }
 
@@ -95,6 +119,7 @@ export default async function handler(req, res) {
 
         const parsedOdds = {
             fixtureId: parseInt(fixture),
+            source: bookmakerSource,
             odds: {
                 home: parseFloat(homeOdds?.odd || 2.0),
                 draw: parseFloat(drawOdds?.odd || 3.0),
@@ -102,7 +127,8 @@ export default async function handler(req, res) {
             }
         };
 
-        console.log('✅ [ODDS API] Returning real odds:', parsedOdds);
+        console.log('✅ [ODDS API] Returning real odds from:', bookmakerSource);
+        console.log('📊 [ODDS API] Odds:', parsedOdds.odds);
         return res.status(200).json(parsedOdds);
 
     } catch (error) {

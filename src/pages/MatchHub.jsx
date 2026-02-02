@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Zap, Coins, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Zap, Coins, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import MobileLayout from '../components/MobileLayout';
 import { toast, Toaster } from 'sonner';
@@ -14,12 +14,89 @@ const MatchHub = () => {
   const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // DATE PICKER STATE
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [dateList, setDateList] = useState([]);
+  const [isDateMode, setIsDateMode] = useState(false); // Toggle between round mode and date mode
+
   // CONFIGURATION
   const LEAGUE_ID = 39;
   const SEASON = 2025;
 
   // Ref to track timeout ID for cleanup
   const pollingTimeoutRef = useRef(null);
+  const dateScrollRef = useRef(null);
+
+  // Generate ±7 day date list
+  useEffect(() => {
+    const generateDateList = () => {
+      const dates = [];
+      const today = new Date();
+
+      for (let i = -7; i <= 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        dates.push(date);
+      }
+
+      setDateList(dates);
+    };
+
+    generateDateList();
+  }, []);
+
+  // Auto-center selected date in date picker
+  useEffect(() => {
+    if (!dateScrollRef.current || dateList.length === 0) return;
+
+    // Find the index of the selected date
+    const selectedIndex = dateList.findIndex(date =>
+      date.toDateString() === selectedDate.toDateString()
+    );
+
+    if (selectedIndex === -1) return;
+
+    // Small delay to ensure DOM is ready
+    setTimeout(() => {
+      const container = dateScrollRef.current;
+      if (!container) return;
+
+      const buttons = container.querySelectorAll('button');
+      const activeButton = buttons[selectedIndex];
+
+      if (activeButton) {
+        // Calculate scroll position to center the button
+        const scrollLeft =
+          activeButton.offsetLeft -
+          (container.offsetWidth / 2) +
+          (activeButton.offsetWidth / 2);
+
+        container.scrollTo({
+          left: scrollLeft,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
+  }, [selectedDate, dateList]);
+
+  // Format date to YYYY-MM-DD
+  const formatDateForAPI = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Check if date is today
+  const isToday = (date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  // Check if date is selected
+  const isSelected = (date) => {
+    return date.toDateString() === selectedDate.toDateString();
+  };
 
   // Calculate next polling delay based on match states
   const calculateNextDelay = (matchesData) => {
@@ -87,11 +164,18 @@ const MatchHub = () => {
         setDataLoading(true);
         setError(null);
 
-        // We ask the backend for the league data.
-        // The backend handles the logic of finding the active round.
-        const response = await fetch(
-          `/api/matches?league=${LEAGUE_ID}&season=${SEASON}`
-        );
+        // Build URL based on mode
+        let url;
+        if (isDateMode) {
+          const dateStr = formatDateForAPI(selectedDate);
+          url = `/api/matches?league=${LEAGUE_ID}&season=${SEASON}&date=${dateStr}`;
+          console.log(`📅 Fetching matches for date: ${dateStr}`);
+        } else {
+          url = `/api/matches?league=${LEAGUE_ID}&season=${SEASON}`;
+          console.log(`🔄 Fetching current round matches`);
+        }
+
+        const response = await fetch(url);
 
         if (!response.ok) throw new Error(`Server Error: ${response.status}`);
 
@@ -120,9 +204,11 @@ const MatchHub = () => {
           setMatches([]);
           setError(null); // Don't show error UI, show empty state instead
 
-          // Still schedule next poll
-          const delay = calculateNextDelay([]);
-          pollingTimeoutRef.current = setTimeout(fetchMatches, delay);
+          // Still schedule next poll (only in round mode)
+          if (!isDateMode) {
+            const delay = calculateNextDelay([]);
+            pollingTimeoutRef.current = setTimeout(fetchMatches, delay);
+          }
           return;
         }
 
@@ -130,9 +216,11 @@ const MatchHub = () => {
           throw new Error("API refused connection");
         }
 
-        // The backend tells us the active round name
-        if (data.active_round) {
+        // The backend tells us the active round name (only in round mode)
+        if (!isDateMode && data.active_round) {
           setCurrentRound(data.active_round.replace("Regular Season - ", "Matchweek "));
+        } else if (isDateMode) {
+          setCurrentRound(''); // Clear round name in date mode
         }
 
         // The backend returns the matches in 'response'
@@ -145,17 +233,21 @@ const MatchHub = () => {
 
         setMatches(sortedMatches);
 
-        // Calculate next delay and schedule next poll
-        const delay = calculateNextDelay(sortedMatches);
-        pollingTimeoutRef.current = setTimeout(fetchMatches, delay);
+        // Calculate next delay and schedule next poll (only in round mode)
+        if (!isDateMode) {
+          const delay = calculateNextDelay(sortedMatches);
+          pollingTimeoutRef.current = setTimeout(fetchMatches, delay);
+        }
 
       } catch (err) {
         console.error("Fetch error:", err);
         setError("Could not load matches.");
 
-        // Retry after 5 minutes on error
-        console.log('❌ Error occurred - Retry in 5 minutes');
-        pollingTimeoutRef.current = setTimeout(fetchMatches, 5 * 60 * 1000);
+        // Retry after 5 minutes on error (only in round mode)
+        if (!isDateMode) {
+          console.log('❌ Error occurred - Retry in 5 minutes');
+          pollingTimeoutRef.current = setTimeout(fetchMatches, 5 * 60 * 1000);
+        }
       } finally {
         setDataLoading(false);
       }
@@ -171,7 +263,7 @@ const MatchHub = () => {
         console.log('🧹 Polling cleanup - timeout cleared');
       }
     };
-  }, []);
+  }, [isDateMode, selectedDate]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -180,6 +272,18 @@ const MatchHub = () => {
 
   const formatTime = (dateString) => {
     return new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  // Handle date selection
+  const handleDateSelect = (date) => {
+    setSelectedDate(date);
+    setIsDateMode(true);
+  };
+
+  // Handle back to current round
+  const handleBackToRound = () => {
+    setIsDateMode(false);
+    setSelectedDate(new Date());
   };
 
   // SAFETY SHIELD
@@ -227,14 +331,74 @@ const MatchHub = () => {
           </button>
         </div>
 
-        {/* MATCH LIST CONTAINER */}
-        <div className="flex-1 overflow-y-auto space-y-2 pt-24 pb-20 px-0 no-scrollbar">
+        {/* DATE PICKER STRIP */}
+        <div className="absolute top-24 left-0 w-full z-20 px-4">
+          <div className="flex items-center gap-2 mb-2">
+            {isDateMode && (
+              <button
+                onClick={handleBackToRound}
+                className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 rounded-full border border-yellow-500/30 text-yellow-500 text-[9px] font-bold uppercase tracking-wide hover:bg-yellow-500/30 transition-all active:scale-95"
+              >
+                <ChevronLeft className="w-3 h-3" />
+                Current
+              </button>
+            )}
+            <div ref={dateScrollRef} className="flex-1 overflow-x-auto no-scrollbar">
+              <div className="flex gap-2 pb-2">
+                {dateList.map((date, index) => {
+                  const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                  const dayNumber = date.getDate();
+                  const monthName = date.toLocaleDateString('en-US', { month: 'short' });
 
-          <div className="px-1 mb-2 text-center">
-            <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
-              {currentRound || "Upcoming Fixtures"}
-            </span>
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleDateSelect(date)}
+                      className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-lg border transition-all active:scale-95 ${isSelected(date)
+                        ? 'bg-yellow-500 border-yellow-400 shadow-lg shadow-yellow-500/30'
+                        : isToday(date)
+                          ? 'bg-white/10 border-white/20 hover:bg-white/15'
+                          : 'bg-black/40 border-white/10 hover:bg-black/50'
+                        }`}
+                    >
+                      <span className={`text-[9px] font-bold uppercase tracking-wide ${isSelected(date) ? 'text-black' : 'text-gray-400'
+                        }`}>
+                        {dayName}
+                      </span>
+                      <span className={`text-lg font-black ${isSelected(date) ? 'text-black' : 'text-white'
+                        }`}>
+                        {dayNumber}
+                      </span>
+                      <span className={`text-[8px] font-bold ${isSelected(date) ? 'text-black/70' : 'text-gray-500'
+                        }`}>
+                        {monthName}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* MATCH LIST CONTAINER */}
+        <div className="flex-1 overflow-y-auto space-y-2 pt-44 pb-20 px-0 no-scrollbar">
+
+          {!isDateMode && currentRound && (
+            <div className="px-1 mb-2 text-center">
+              <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
+                {currentRound}
+              </span>
+            </div>
+          )}
+
+          {isDateMode && (
+            <div className="px-1 mb-2 text-center">
+              <span className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5">
+                {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              </span>
+            </div>
+          )}
 
           {dataLoading && (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
@@ -257,9 +421,18 @@ const MatchHub = () => {
                   <Calendar className="w-10 h-10 text-yellow-500 opacity-60" />
                 </div>
               </div>
-              <p className="text-yellow-200 text-base font-black mb-2 uppercase tracking-wide">Locker Room Quiet</p>
-              <p className="text-gray-400 text-sm mb-1">No matches scheduled at the moment</p>
-              <p className="text-gray-500 text-xs">Check back soon for upcoming fixtures</p>
+              <p className="text-yellow-200 text-base font-black mb-2 uppercase tracking-wide">
+                {isDateMode ? 'No Matches Scheduled' : 'Locker Room Quiet'}
+              </p>
+              <p className="text-gray-400 text-sm mb-1">
+                {isDateMode
+                  ? `No fixtures on ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  : 'No matches scheduled at the moment'
+                }
+              </p>
+              <p className="text-gray-500 text-xs">
+                {isDateMode ? 'Try selecting a different date' : 'Check back soon for upcoming fixtures'}
+              </p>
             </div>
           )}
 
