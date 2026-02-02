@@ -175,25 +175,45 @@ const MatchDetail = () => {
             : `/api/odds?fixture=${id}&bookmaker=6&t=${timestamp}`;
 
           console.log(`📡 Fetching ${phase} odds from: ${endpoint}`);
-
+          
           const oddsRes = await fetch(endpoint);
           const oddsData = await oddsRes.json();
-
+          
           console.log("📊 Raw Odds Response:", oddsData);
 
-          // Process odds
-          const processed = processOdds(oddsData, phase === 'LIVE');
-
-          if (processed) {
-            setOdds(processed.odds);
-            setActiveBookie(processed.bookmaker.name);
-            console.log(`✅ Odds loaded from: ${processed.bookmaker.name}`);
+          // Check if response is in simplified format (from our live odds API)
+          if (oddsData.isLive !== undefined && oddsData.odds) {
+            // Simplified format: { fixtureId, isLive, source, odds: {home, draw, away} }
+            console.log(`✅ Odds loaded from: ${oddsData.source || 'LIVE'}`);
+            setOdds({
+              home: oddsData.odds.home,
+              draw: oddsData.odds.draw,
+              away: oddsData.odds.away,
+              goals_over: 1.85, // Default for live (not provided in simplified format)
+              goals_under: 1.95,
+              supersub_yes: 4.50,
+              scorers: [
+                { id: 1, name: "Home Striker", odds: 2.2 },
+                { id: 2, name: "Away Striker", odds: 2.8 },
+                { id: 3, name: "Midfield Star", odds: 3.5 }
+              ]
+            });
+            setActiveBookie(oddsData.source || 'LIVE');
           } else {
-            // Fallback to simulation
-            console.warn("⚠️ No odds available. Activating Simulation.");
-            const simulation = getSimulationOdds();
-            setOdds(simulation.odds);
-            setActiveBookie(simulation.bookmaker.name);
+            // Standard API-Football format
+            const processed = processOdds(oddsData, phase === 'LIVE');
+            
+            if (processed) {
+              setOdds(processed.odds);
+              setActiveBookie(processed.bookmaker.name);
+              console.log(`✅ Odds loaded from: ${processed.bookmaker.name}`);
+            } else {
+              // Fallback to simulation
+              console.warn("⚠️ No odds available. Activating Simulation.");
+              const simulation = getSimulationOdds();
+              setOdds(simulation.odds);
+              setActiveBookie(simulation.bookmaker.name);
+            }
           }
         }
       } catch (err) {
