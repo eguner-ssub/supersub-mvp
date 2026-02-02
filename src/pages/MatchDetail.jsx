@@ -1,107 +1,41 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Zap, Loader2, Lock, TrendingUp, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Zap, Loader2, Trophy, CheckCircle, Lock } from 'lucide-react';
 import { useGame } from '../context/GameContext';
-import { getCardConfig } from '../utils/cardConfig';
 import CardBase from '../components/CardBase';
 
 const MatchDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { userProfile, loading: gameLoading, supabase } = useGame();
+  // Using simplified context access
+  const { userProfile, loading: gameLoading, supabase, loadProfile } = useGame();
 
   const [match, setMatch] = useState(null);
   const [odds, setOdds] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // PREDICTION FLOW STATE
+  // STATE MACHINE: 'idle' | 'selection' | 'staging' | 'resolved'
+  const [flowState, setFlowState] = useState('idle');
   const [selectedCard, setSelectedCard] = useState(null);
-  const [draftPrediction, setDraftPrediction] = useState(null);
-  const [isDeckOpen, setIsDeckOpen] = useState(true);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [stagedBet, setStagedBet] = useState(null);
 
-  // CARD TYPES DEFINITION
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result' },
     { id: 'c_total_goals', label: 'Total Goals' },
     { id: 'c_player_score', label: 'Player Score' },
-    { id: 'c_supersub', label: 'Super Sub' },
+    { id: 'c_supersub', label: 'Super Sub' }
   ];
 
-  // REAL INVENTORY CHECK
+  // Helper to safely count cards
   const getCardCount = (cardId) => {
-    if (!userProfile?.inventory) return 0;
+    if (!userProfile?.inventory || !Array.isArray(userProfile.inventory)) return 0;
     return userProfile.inventory.filter(item => item === cardId).length;
   };
 
-  const hasMatchResultCard = () => {
-    return getCardCount('c_match_result') > 0;
-  };
-
-  const handleImageError = (e) => {
-    e.target.style.opacity = 0.5;
-  };
-
-  // Real odds will be fetched from API
-
-  // Ref to track timeout ID for cleanup
-  const pollingTimeoutRef = useRef(null);
-
-  // Calculate next polling delay based on match state
-  const calculateNextDelay = (matchData) => {
-    if (!matchData || !matchData.fixture) {
-      console.log('📅 [MatchDetail] No match data - Next poll in 60 minutes');
-      return 60 * 60 * 1000; // 60 minutes
-    }
-
-    const now = new Date();
-    const kickoffTime = new Date(matchData.fixture.date);
-    const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'PEN', 'LIVE', 'P'];
-
-    // Check if match is LIVE
-    const isLive = LIVE_STATUSES.includes(matchData.fixture.status.short);
-
-    if (isLive) {
-      console.log('🔴 [MatchDetail] Match is LIVE - Next poll in 30 seconds');
-      return 30 * 1000; // 30 seconds
-    }
-
-    // Calculate hours until kickoff
-    const hoursUntilKickoff = (kickoffTime - now) / (1000 * 60 * 60);
-
-    // Kickoff in < 3 hours
-    if (hoursUntilKickoff > 0 && hoursUntilKickoff < 3) {
-      console.log(`⏰ [MatchDetail] Kickoff in ${hoursUntilKickoff.toFixed(1)} hours - Next poll in 5 minutes`);
-      return 5 * 60 * 1000; // 5 minutes
-    }
-
-    // Check if kickoff is today (but > 3 hours away)
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
-
-    const isToday = kickoffTime >= todayStart && kickoffTime < todayEnd;
-
-    if (isToday && hoursUntilKickoff > 0) {
-      console.log('📆 [MatchDetail] Kickoff today (> 3 hours) - Next poll in 30 minutes');
-      return 30 * 60 * 1000; // 30 minutes
-    }
-
-    // Kickoff on a future date
-    console.log('📅 [MatchDetail] Future match - Next poll in 60 minutes');
-    return 60 * 60 * 1000; // 60 minutes
-  };
-
-  // FETCH MATCH DATA & ODDS
   useEffect(() => {
     const fetchMatchDetail = async () => {
       try {
         setLoading(true);
-
-        console.log('🎯 [MatchDetail] Fetching data for fixture:', id);
-
-        // Fetch match data and odds in parallel
         const [matchRes, oddsRes] = await Promise.all([
           fetch(`/api/matches?id=${id}`),
           fetch(`/api/odds?fixture=${id}`)
@@ -112,545 +46,251 @@ const MatchDetail = () => {
         const matchData = await matchRes.json();
         const oddsData = await oddsRes.json();
 
-        console.log('📊 [MatchDetail] Raw odds response:', oddsData);
-        console.log('📊 [MatchDetail] Odds object:', oddsData.odds);
-
         if (matchData.response && matchData.response.length > 0) {
-          const matchObj = matchData.response[0];
-          setMatch(matchObj);
-
-          // Safety check: ensure oddsData.odds exists, otherwise default to 2.0
-          const finalOdds = oddsData.odds || { home: 2.0, draw: 3.0, away: 2.0 };
-          console.log('✅ [MatchDetail] Setting odds:', finalOdds);
-          setOdds(finalOdds);
-
-          // Calculate next delay and schedule next poll
-          const delay = calculateNextDelay(matchObj);
-          pollingTimeoutRef.current = setTimeout(fetchMatchDetail, delay);
-        } else {
-          throw new Error("Match not found");
+          setMatch(matchData.response[0]);
+          setOdds(oddsData.odds || { home: 2.0, draw: 3.0, away: 2.0 });
         }
       } catch (err) {
-        console.error("❌ [MatchDetail] Error:", err);
-        setError("Could not retrieve match intelligence.");
-
-        // Retry after 5 minutes on error
-        console.log('❌ [MatchDetail] Error occurred - Retry in 5 minutes');
-        pollingTimeoutRef.current = setTimeout(fetchMatchDetail, 5 * 60 * 1000);
+        console.error("Fetch Error:", err);
       } finally {
         setLoading(false);
       }
     };
-
-    if (id) {
-      // Initial fetch (immediate)
-      fetchMatchDetail();
-    }
-
-    // Cleanup function
-    return () => {
-      if (pollingTimeoutRef.current) {
-        clearTimeout(pollingTimeoutRef.current);
-        console.log('🧹 [MatchDetail] Polling cleanup - timeout cleared');
-      }
-    };
+    if (id) fetchMatchDetail();
   }, [id]);
 
-  // CARD SELECTION HANDLER WITH TOGGLE
-  const handleCardSelect = (cardId) => {
-    if (getCardCount(cardId) === 0) return; // Can't select cards you don't have
-    if (cardId !== 'c_match_result') return; // Only Match Result cards work for now
-
-    // TOGGLE LOGIC: If clicking the same card, deselect it
-    if (selectedCard === cardId) {
-      setSelectedCard(null);
-      setDraftPrediction(null);
-    } else {
-      setSelectedCard(cardId);
-      setDraftPrediction(null); // Clear any existing draft
-    }
+  // --- HANDLERS ---
+  const handleCardClick = (cardId) => {
+    const count = getCardCount(cardId);
+    if (count === 0) return;
+    setSelectedCard(cardId);
+    setFlowState('selection');
   };
 
-  // PREDICTION SELECTION HANDLER WITH TOGGLE
-  const handlePredictionSelect = (type) => {
-    if (!selectedCard) return; // Must select a card first
-    if (!hasMatchResultCard()) return; // Must have the card
-
-    // TOGGLE LOGIC: If clicking the same prediction, cancel it
-    if (draftPrediction?.type === type) {
-      setDraftPrediction(null);
-      setIsDeckOpen(true);
-      return;
-    }
-
-    let oddsValue;
-    switch (type) {
-      case 'HOME_WIN':
-        oddsValue = parseFloat(odds.home);
-        break;
-      case 'DRAW':
-        oddsValue = parseFloat(odds.draw);
-        break;
-      case 'AWAY_WIN':
-        oddsValue = parseFloat(odds.away);
-        break;
-      default:
-        oddsValue = 2.0;
-    }
-
-    const potentialReward = Math.floor(oddsValue * 100);
-
-    setDraftPrediction({
-      type,
-      odds: oddsValue,
-      potentialReward
+  const handleOutcomeClick = (selection, oddsVal) => {
+    setStagedBet({
+      card: selectedCard,
+      selection,
+      odds: oddsVal,
+      reward: Math.floor(oddsVal * 100)
     });
-
-    setIsDeckOpen(false); // Dim the deck
+    setFlowState('staging');
   };
 
-  // BACKDROP CLICK HANDLER - Cancel prediction
-  const handleBackdropClick = () => {
-    setDraftPrediction(null);
-    setIsDeckOpen(true);
-  };
-
-  // GET DISPLAY NAME FOR PREDICTION
-  const getPredictionDisplayName = () => {
-    if (!draftPrediction || !match) return '';
-
-    switch (draftPrediction.type) {
-      case 'HOME_WIN':
-        return `${match.teams.home.name} Win`;
-      case 'AWAY_WIN':
-        return `${match.teams.away.name} Win`;
-      case 'DRAW':
-        return 'Draw';
-      default:
-        return draftPrediction.type;
-    }
-  };
-
-  // PLAY PREDICTION HANDLER - Complete Bet Placement
-  const handlePlayPrediction = async () => {
-    console.log('🎯 PLAYING PREDICTION:', draftPrediction);
+  // --- THE FIXED TRANSACTION LOGIC ---
+  const handlePlay = async () => {
+    if (!userProfile || !stagedBet) return;
 
     try {
-      // 1. Inventory Check: Verify user has a Match Result card
-      if (!hasMatchResultCard()) {
-        alert('❌ No Match Result card available!');
+      // 1. SAFE INVENTORY CHECK
+      const currentInv = userProfile.inventory ? [...userProfile.inventory] : [];
+      const cardIndex = currentInv.indexOf(stagedBet.card);
+
+      if (cardIndex === -1) {
+        alert("Transaction Failed: Card not found in inventory.");
         return;
       }
 
-      // 2. Determine team name based on selection
-      let teamName = '';
-      if (draftPrediction.type === 'HOME_WIN') {
-        teamName = `${match.teams.home.name} vs ${match.teams.away.name}`;
-      } else if (draftPrediction.type === 'AWAY_WIN') {
-        teamName = `${match.teams.home.name} vs ${match.teams.away.name}`;
-      } else if (draftPrediction.type === 'DRAW') {
-        teamName = `${match.teams.home.name} vs ${match.teams.away.name}`;
-      }
+      // 2. Remove Card (Optimistic)
+      currentInv.splice(cardIndex, 1);
 
-      // 3. Database Insert: Create prediction
-      const { data: insertData, error: insertError } = await supabase
+      // 3. Update Profile (Consume Card)
+      const { error: invError } = await supabase
+        .from('profiles')
+        .update({ inventory: currentInv })
+        .eq('id', userProfile.id);
+
+      if (invError) throw invError;
+
+      // 4. Create Prediction Record
+      // FIX APPLIED HERE: Changed 'market' to 'card_type'
+      const { error: betError } = await supabase
         .from('predictions')
         .insert({
           user_id: userProfile.id,
           match_id: match.fixture.id,
-          team_name: teamName,
-          selection: draftPrediction.type,
-          odds: parseFloat(draftPrediction.odds),
-          stake: draftPrediction.stake,
-          potential_reward: draftPrediction.potentialReward,
+          team_name: `${match.teams.home.name} vs ${match.teams.away.name}`,
+          card_type: stagedBet.card, // <--- CHANGED FROM 'market' TO 'card_type'
+          selection: stagedBet.selection,
+          odds: stagedBet.odds,
+          stake: 0,
+          potential_reward: stagedBet.reward,
           status: 'PENDING'
         });
 
-      if (insertError) {
-        console.error('Database insert error:', insertError);
-        alert('❌ Failed to place bet. Please try again.');
-        return;
+      if (betError) throw betError;
+
+      // 5. Force Refresh Profile (To sync UI with DB)
+      const session = await supabase.auth.getSession();
+      if (session?.data?.session) {
+        loadProfile(session.data.session);
       }
 
-      // 4. Card Consumption: Remove one c_match_result from inventory
-      const updatedInventory = [...userProfile.inventory];
-      const cardIndex = updatedInventory.indexOf('c_match_result');
-      if (cardIndex > -1) {
-        updatedInventory.splice(cardIndex, 1);
-      }
+      setFlowState('resolved');
 
-      // Update inventory in database
-      const { error: inventoryError } = await supabase
-        .from('inventory')
-        .delete()
-        .eq('user_id', userProfile.id)
-        .eq('card_id', 'c_match_result')
-        .limit(1);
-
-      if (inventoryError) {
-        console.error('Inventory update error:', inventoryError);
-        // Continue anyway - bet is placed
-      }
-
-      // 5. UI Feedback: Show success modal
-      console.log('✅ Bet placed successfully!');
-      setShowSuccessModal(true);
-
-    } catch (error) {
-      console.error('Error placing bet:', error);
-      alert('❌ An error occurred. Please try again.');
+    } catch (err) {
+      console.error("Transaction Failed:", err);
+      // Alert the specific database error message so we can debug further if needed
+      alert("System Error: " + (err.message || "Could not place bet"));
     }
   };
 
-  // CLOSE SUCCESS MODAL AND NAVIGATE
-  const handleContinue = () => {
-    setShowSuccessModal(false);
-    setDraftPrediction(null);
+  const handleReset = () => {
     setSelectedCard(null);
-    setIsDeckOpen(true);
-    navigate('/match-hub');
+    setStagedBet(null);
+    setFlowState('idle');
   };
 
-  const formatTime = (d) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-  const formatDate = (d) => new Date(d).toLocaleDateString([], { weekday: 'long' });
+  const formatTime = (d) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase();
 
-  // SAFETY SHIELD
   if (gameLoading || !userProfile) {
-    return (
-      <div className="h-screen w-full bg-black flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
-      </div>
-    );
+    return <div className="bg-black h-[100dvh] flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500 w-8 h-8" /></div>;
   }
 
-  const userData = userProfile;
-  const isLocked = !hasMatchResultCard();
+  const isLocked = cardTypes.every(card => getCardCount(card.id) === 0);
 
   return (
-    <div className="w-full h-screen relative font-sans select-none overflow-hidden bg-gray-900">
+    <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
 
-      {/* 1. HERO BACKGROUND - The Tunnel */}
+      {/* BACKGROUND */}
       <div className="absolute inset-0 z-0">
-        <img
-          src="/bg-tunnel.webp"
-          alt="Tunnel Background"
-          className="w-full h-full object-cover opacity-90"
-          onError={(e) => { e.target.onerror = null; e.target.src = "/bg-dugout.webp"; }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/50"></div>
+        <img src="/bg-tunnel.webp" className="absolute inset-0 w-full h-full object-cover" alt="Tunnel" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
       </div>
 
-      {/* 2. TOP NAVIGATION */}
-      <div className="absolute top-0 w-full px-4 pt-12 flex justify-between items-center z-[60] pointer-events-none">
-        <button
-          onClick={() => navigate('/match-hub')}
-          className="flex items-center justify-center w-10 h-10 bg-black/50 backdrop-blur-md border border-white/20 rounded-full text-white hover:bg-black/70 active:scale-95 transition-all shadow-lg pointer-events-auto"
-        >
+      {/* TOP NAV */}
+      <div className="absolute top-0 left-0 w-full px-4 pt-8 pb-4 flex justify-between items-center z-[60]">
+        <button onClick={() => navigate('/match-hub')} className="flex items-center justify-center w-10 h-10 bg-black/50 backdrop-blur-md border border-white/20 rounded-full text-white active:scale-95 transition-all">
           <ArrowLeft className="w-5 h-5" />
         </button>
-
-        <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-lg pointer-events-auto">
+        <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
           <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-          <span className="text-white font-bold text-sm">
-            {userData.energy}/{userData.max_energy}
-          </span>
+          <span className="text-white font-bold text-sm">{userProfile.energy}/{userProfile.max_energy}</span>
         </div>
       </div>
 
-      {loading && (
-        <div className="flex-1 flex items-center justify-center h-full z-50 relative">
-          <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="flex-1 flex flex-col items-center justify-center h-full z-50 relative px-6 text-center">
-          <p className="text-red-400 font-bold mb-4">{error}</p>
-          <button onClick={() => navigate('/match-hub')} className="px-6 py-3 bg-white text-black font-black uppercase rounded">Return to Hub</button>
-        </div>
-      )}
-
-      {!loading && match && odds && (
-        <>
-          {/* 3. COMPACT METALLIC HUD - Versus Header */}
-          <div className="absolute top-24 left-0 w-full z-40 px-4">
-            <div className="relative h-16 w-full bg-gradient-to-b from-gray-300 via-gray-200 to-gray-100 shadow-[0_8px_20px_rgba(0,0,0,0.6)] flex items-center justify-between px-4 border border-gray-400/50 rounded-lg">
-              {/* Home Team */}
-              <div className="flex items-center gap-2 w-1/3">
-                <img src={match.teams.home.logo} className="w-8 h-8 object-contain drop-shadow-lg" alt="Home" />
-                <span className="text-white font-black text-xs uppercase tracking-tight leading-none truncate drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{match.teams.home.name}</span>
-              </div>
-              {/* Match Timer - Trapezoid */}
-              <div className="absolute left-1/2 -translate-x-1/2 -top-2 h-20 w-1/3 pointer-events-none filter drop-shadow-xl">
-                <div className="w-full h-full bg-gradient-to-b from-yellow-600 via-yellow-500 to-yellow-600 clip-path-trapezoid flex flex-col items-center justify-center pt-4 border-t-2 border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.5)]">
-                  <div className="text-[9px] text-black font-bold uppercase tracking-[0.2em] mb-0.5">KICKOFF</div>
-                  <div className="text-black font-black text-sm leading-none uppercase">{formatDate(match.fixture.date)}</div>
-                  <div className="text-base text-black font-mono leading-none tracking-widest mt-0.5">{formatTime(match.fixture.date)}</div>
-                </div>
-              </div>
-              {/* Away Team */}
-              <div className="flex items-center justify-end gap-2 w-1/3">
-                <span className="text-white font-black text-xs uppercase tracking-tight leading-none text-right truncate drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{match.teams.away.name}</span>
-                <img src={match.teams.away.logo} className="w-8 h-8 object-contain drop-shadow-lg" alt="Away" />
-              </div>
+      {/* SCOREBOARD (BALANCED) */}
+      {match && (
+        <div className="absolute top-16 w-full z-40 px-2">
+          <div className="relative w-full max-w-lg mx-auto h-14 flex items-center justify-center drop-shadow-2xl mt-3">
+            {/* Left Wing */}
+            <div className="flex-1 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-l-md border-b-4 border-[#2d241e] flex items-center justify-start pl-3 relative shadow-lg mr-[-8px]">
+              <img src={match.teams.home.logo} className="w-5 h-5 object-contain z-10 drop-shadow-md" />
+              <span className="ml-2 text-black/90 font-black text-[10px] md:text-xs uppercase tracking-tight truncate z-10 leading-none">{match.teams.home.name}</span>
+              <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/40 rounded-l-md pointer-events-none"></div>
             </div>
-          </div>
-
-          {/* 4. HIDDEN ACTION LAYER - Holographic Prediction Overlay */}
-          {selectedCard && !isLocked && (
-            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 px-4 w-full max-w-md animate-in fade-in duration-300">
-              <div className="bg-gradient-to-b from-blue-900/40 via-purple-900/30 to-blue-900/40 backdrop-blur-md border-2 border-cyan-400/50 shadow-[0_0_50px_rgba(34,211,238,0.4)] rounded-xl p-6">
-                {/* Holographic Title */}
-                <div className="text-center mb-4">
-                  <h3 className="text-cyan-300 font-black text-lg uppercase tracking-wider drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]">Tactical Projection</h3>
-                  <div className="h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent mt-2"></div>
-                </div>
-
-                {/* Prediction Buttons */}
-                <div className="flex flex-col gap-3">
-                  {/* HOME WIN */}
-                  <PredictionButton
-                    type="HOME_WIN"
-                    label={`${match.teams.home.name} Win`}
-                    logo={match.teams.home.logo}
-                    odds={odds.home}
-                    isSelected={draftPrediction?.type === 'HOME_WIN'}
-                    isLocked={false}
-                    onClick={() => handlePredictionSelect('HOME_WIN')}
-                  />
-
-                  {/* DRAW */}
-                  <PredictionButton
-                    type="DRAW"
-                    label="Draw"
-                    logo={null}
-                    odds={odds.draw}
-                    isSelected={draftPrediction?.type === 'DRAW'}
-                    isLocked={false}
-                    onClick={() => handlePredictionSelect('DRAW')}
-                  />
-
-                  {/* AWAY WIN */}
-                  <PredictionButton
-                    type="AWAY_WIN"
-                    label={`${match.teams.away.name} Win`}
-                    logo={match.teams.away.logo}
-                    odds={odds.away}
-                    isSelected={draftPrediction?.type === 'AWAY_WIN'}
-                    isLocked={false}
-                    onClick={() => handlePredictionSelect('AWAY_WIN')}
-                  />
-                </div>
-
-                {/* Scan Line Effect */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
-                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-400/10 to-transparent animate-pulse"></div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* LOCKED OVERLAY - Full Screen */}
-          {isLocked && (
-            <div className="fixed inset-0 backdrop-blur-sm bg-black/60 flex flex-col items-center justify-center z-50">
-              <div className="flex flex-col items-center justify-center bg-gray-900/80 p-8 rounded-xl border-2 border-yellow-500/50">
-                <Lock className="w-16 h-16 text-yellow-500 mb-4" />
-                <p className="text-white font-bold text-xl mb-2">Locked</p>
-                <p className="text-gray-300 text-sm mb-6 text-center">You need a Match Result card</p>
-                <button
-                  onClick={() => navigate('/training')}
-                  className="px-8 py-3 bg-yellow-500 text-black font-black uppercase rounded-lg hover:bg-yellow-400 transition-all shadow-lg"
-                >
-                  Get Cards
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 5. BACKDROP FOR CANCELLATION - z-50 to sit above deck but below queue */}
-          {draftPrediction && (
-            <div
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-              onClick={handleBackdropClick}
-            />
-          )}
-
-          {/* 6. CARDS TO BE PLAYED PANEL - z-[55] to sit above backdrop */}
-          {draftPrediction && (
-            <div className="fixed bottom-36 left-0 w-full z-[55] px-4">
-              <div className="bg-gradient-to-b from-gray-900 to-black border-2 border-yellow-500 rounded-xl p-4 shadow-[0_0_30px_rgba(234,179,8,0.5)]">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <TrendingUp className="w-6 h-6 text-yellow-400" />
-                    <div>
-                      <p className="text-white font-black text-sm uppercase">{getPredictionDisplayName()}</p>
-                      <p className="text-gray-400 text-xs">Odds: {draftPrediction.odds.toFixed(2)}x</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-yellow-400 font-black text-2xl">{draftPrediction.potentialReward}</p>
-                    <p className="text-gray-400 text-xs uppercase">Coins</p>
-                  </div>
-                </div>
-                <button
-                  onClick={handlePlayPrediction}
-                  className="w-full min-h-[48px] py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase rounded-lg transition-all active:scale-95 shadow-lg"
-                >
-                  ⚡ PLAY PREDICTION
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 7. CARD DECK PANEL - Bottom Bar */}
-          <div className="fixed bottom-0 w-full z-30">
-            <div className="bg-black/80 backdrop-blur-md border-t-2 border-yellow-600 py-4 px-4">
-              {/* Deck Title */}
-              <div className="text-center mb-3">
-                <h3 className="text-yellow-500 font-black text-xs uppercase tracking-[0.2em]">Your Card Deck</h3>
-                {!selectedCard && (
-                  <p className="text-gray-400 text-xs mt-1">Select a Card</p>
-                )}
-                {selectedCard && (
-                  <p className="text-green-400 text-xs mt-1 flex items-center justify-center gap-1">
-                    <span>✓ Card Selected</span>
-                  </p>
-                )}
-              </div>
-
-              {/* Cards */}
-              <div className="flex justify-center items-end gap-4 overflow-x-auto scrollbar-hide pb-2">
-                {cardTypes.map((card) => {
-                  const count = getCardCount(card.id);
-                  const isActive = count > 0;
-                  const isSelected = selectedCard === card.id;
-                  return (
-                    <button
-                      key={card.id}
-                      onClick={() => handleCardSelect(card.id)}
-                      disabled={!isActive}
-                      className={`group relative flex flex-col items-center gap-1 transition-all duration-300 flex-shrink-0 ${isActive ? 'opacity-100 hover:-translate-y-2 cursor-pointer' : 'opacity-40 grayscale cursor-not-allowed'
-                        } ${isSelected ? 'ring-4 ring-yellow-400 rounded-lg shadow-[0_0_20px_rgba(251,191,36,0.6)]' : ''} ${isActive && !isSelected ? 'shadow-[0_0_20px_rgba(234,179,8,0.6)]' : ''
-                        }`}
-                    >
-                      <div className="relative w-20 h-28 rounded-lg transition-all transform origin-bottom">
-                        <CardBase
-                          rarity={getCardConfig(card.id).rarity}
-                          role={getCardConfig(card.id).role}
-                          label={card.label}
-                          className="w-full h-full drop-shadow-2xl"
-                        />
-                        {isActive && (
-                          <div className="absolute -top-2 -right-2 bg-yellow-500 text-black text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-black shadow-lg z-10">{count}</div>
-                        )}
-                      </div>
-                      <span className={`text-[9px] font-bold uppercase tracking-wider text-center max-w-[5rem] leading-tight ${isActive ? 'text-white' : 'text-gray-500'
-                        } drop-shadow-md`}>{card.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* 8. SUCCESS MODAL - z-[60] highest layer */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 max-w-sm w-full border-2 border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.5)] animate-in fade-in zoom-in duration-300">
-
-            {/* Success Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-12 h-12 text-green-500" />
-              </div>
-            </div>
-
-            {/* Title */}
-            <h2 className="text-white text-2xl font-black uppercase text-center mb-2">
-              Success!
-            </h2>
-
-            {/* Message */}
-            <p className="text-gray-300 text-center mb-6">
-              Prediction Placed:<br />
-              <span className="text-yellow-400 font-bold text-lg">
-                {getPredictionDisplayName()}
+            {/* Center */}
+            <div className="relative z-20 w-28 h-14 bg-zinc-950 border-x border-zinc-700 border-b-4 border-[#2d241e] rounded-b-lg shadow-2xl flex flex-col items-center justify-center pt-0.5 pb-1">
+              <div className="absolute top-0 w-full h-[1px] bg-zinc-600"></div>
+              <div className="text-[7px] text-zinc-500 uppercase tracking-widest font-bold mb-0.5">{formatDate(match.fixture.date)}</div>
+              <span className="text-lg md:text-xl text-white font-black tracking-widest leading-none font-mono drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
+                {match.fixture.status.short === 'NS' ? formatTime(match.fixture.date) : `${match.goals.home}-${match.goals.away}`}
               </span>
-              <br />
-              for <span className="text-green-400 font-bold">{draftPrediction?.potentialReward} coins</span>!
-            </p>
+              {match.fixture.status.short !== 'NS' && (<div className="absolute bottom-1 w-1 h-1 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,1)]"></div>)}
+            </div>
+            {/* Right Wing */}
+            <div className="flex-1 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-r-md border-b-4 border-[#2d241e] flex items-center justify-end pr-3 relative shadow-lg ml-[-8px]">
+              <span className="mr-2 text-black/90 font-black text-[10px] md:text-xs uppercase tracking-tight truncate text-right z-10 leading-none">{match.teams.away.name}</span>
+              <img src={match.teams.away.logo} className="w-5 h-5 object-contain z-10 drop-shadow-md" />
+              <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/40 rounded-r-md pointer-events-none"></div>
+            </div>
+          </div>
+        </div>
+      )}
 
-            {/* Continue Button */}
-            <button
-              onClick={handleContinue}
-              className="w-full min-h-[48px] py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase rounded-lg transition-all active:scale-95 shadow-lg"
-            >
-              Continue
+      {/* DECK (BOTTOM) */}
+      <div className="flex-1"></div>
+      <div className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
+        <div className="absolute bottom-0 w-full h-32 bg-cover bg-bottom z-10" style={{ backgroundImage: 'url(/shelf-console.webp)' }}></div>
+        <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 overflow-x-auto no-scrollbar z-20 pointer-events-auto">
+          {cardTypes.map(card => {
+            const count = getCardCount(card.id);
+            const active = count > 0;
+            const selected = selectedCard === card.id;
+            return (
+              <button
+                key={card.id}
+                onClick={() => handleCardClick(card.id)}
+                disabled={!active}
+                className={`relative transition-all duration-300 flex-shrink-0 ${selected ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30' : active ? 'hover:translate-y-[-8px] z-20' : 'opacity-40 grayscale z-10'}`}
+              >
+                <div className="w-20 h-32 relative">
+                  <div className="absolute inset-0 bg-[url('/frame-standard.webp')] bg-cover bg-center rounded-lg shadow-lg"></div>
+                  <div className="absolute inset-0 flex items-center justify-center p-2 z-10">
+                    <CardBase type={card.id} label={card.label} status="generic" variant="transparent" />
+                  </div>
+                  {active && (<div className="absolute -top-2 -right-2 bg-zinc-900 text-yellow-500 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border border-yellow-500 shadow-lg z-50">x{count}</div>)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* SELECTION MODAL */}
+      {flowState === 'selection' && match && odds && selectedCard === 'c_match_result' && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="grid grid-cols-3 gap-3 w-full max-w-lg mt-20">
+            <button onClick={() => handleOutcomeClick('HOME', odds.home)} className="backdrop-blur-md border border-white/10 bg-gradient-to-b from-blue-500/20 to-blue-900/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform">
+              <img src={match.teams.home.logo} className="w-12 h-12 object-contain" />
+              <h3 className="font-black text-white text-xs uppercase text-center leading-tight">{match.teams.home.name}<br />WIN</h3>
+              <p className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.home * 100)}</p>
+            </button>
+            <button onClick={() => handleOutcomeClick('DRAW', odds.draw)} className="backdrop-blur-md border border-white/10 bg-gradient-to-b from-zinc-500/20 to-zinc-900/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform">
+              <Trophy className="w-10 h-10 text-zinc-400" />
+              <h3 className="font-black text-white text-sm uppercase">DRAW</h3>
+              <p className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.draw * 100)}</p>
+            </button>
+            <button onClick={() => handleOutcomeClick('AWAY', odds.away)} className="backdrop-blur-md border border-white/10 bg-gradient-to-b from-red-500/20 to-red-900/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform">
+              <img src={match.teams.away.logo} className="w-12 h-12 object-contain" />
+              <h3 className="font-black text-white text-xs uppercase text-center leading-tight">{match.teams.away.name}<br />WIN</h3>
+              <p className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.away * 100)}</p>
             </button>
           </div>
+          <div className="absolute inset-0 -z-10" onClick={handleReset}></div>
         </div>
       )}
 
-      <style>{`.clip-path-trapezoid { clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%); }`}</style>
-    </div>
-  );
-};
-
-// PREDICTION BUTTON COMPONENT
-const PredictionButton = ({ type, label, logo, odds, isSelected, isLocked, onClick }) => {
-  const potentialReward = Math.floor(parseFloat(odds) * 100);
-
-  return (
-    <button
-      onClick={onClick}
-      disabled={isLocked}
-      className={`relative h-20 w-full rounded-xl overflow-hidden transition-all duration-300 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer active:scale-98'
-        } ${isSelected ? 'ring-4 ring-yellow-400 shadow-[0_0_30px_rgba(251,191,36,0.8)]' : ''}`}
-    >
-      {/* Background Image */}
-      <div className="absolute inset-0">
-        <img
-          src={isSelected ? '/matchbutton_selected.jpg' : '/matchbutton_default.jpg'}
-          alt="Button Background"
-          className="w-full h-full object-cover"
-        />
-        <div className={`absolute inset-0 ${isSelected ? 'bg-yellow-500/20' : 'bg-black/30'}`}></div>
-      </div>
-
-      {/* Content */}
-      <div className="relative z-10 h-full flex items-center justify-between px-4">
-        {/* Left: Logo or Icon */}
-        <div className="flex items-center gap-3">
-          {logo ? (
-            <img
-              src={logo}
-              alt={label}
-              className="w-10 h-10 shrink-0 object-contain drop-shadow-lg"
-            />
-          ) : (
-            <div className="w-10 h-10 shrink-0 bg-white/20 rounded-full flex items-center justify-center">
-              <span className="text-white font-black text-xl drop-shadow-md">=</span>
+      {/* CONFIRMATION POPUP (CENTERED & FIXED) */}
+      {flowState === 'staging' && stagedBet && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-full max-w-md bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-end mb-6">
+              <div>
+                <p className="text-zinc-500 text-[10px] uppercase tracking-widest mb-1">SELECTED OUTCOME</p>
+                <p className="text-white font-black text-2xl uppercase italic">{stagedBet.selection}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-zinc-500 text-[10px] uppercase tracking-widest mb-1">REWARD</p>
+                <p className="text-yellow-400 font-black text-3xl">{stagedBet.reward} PTS</p>
+              </div>
             </div>
-          )}
-          <div className="text-left">
-            <p className={`font-black text-sm uppercase tracking-wide drop-shadow-md ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
-              {label}
-            </p>
-            <p className="text-gray-300 text-xs drop-shadow-sm">Odds: {parseFloat(odds).toFixed(2)}x</p>
+            <div className="flex gap-3">
+              <button onClick={handleReset} className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-bold uppercase text-zinc-400 text-xs transition-colors">Cancel</button>
+              <button onClick={handlePlay} className="flex-[2] py-4 bg-green-500 hover:bg-green-400 rounded-xl font-black uppercase text-black text-lg transition-colors shadow-lg shadow-green-500/20">CONFIRM PLAY</button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Right: Reward */}
-        <div className="text-right shrink-0">
-          <p className={`font-black text-2xl drop-shadow-md ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
-            {potentialReward}
-          </p>
-          <p className="text-gray-300 text-xs uppercase drop-shadow-sm">Coins</p>
+      {/* SUCCESS MODAL */}
+      {flowState === 'resolved' && (
+        <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in duration-300">
+          <div className="text-center w-full max-w-sm border border-white/10 bg-zinc-900/50 p-8 rounded-3xl relative overflow-hidden">
+            <div className="absolute inset-0 bg-green-500/10 animate-pulse"></div>
+            <div className="relative z-10">
+              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.5)]">
+                <CheckCircle className="w-10 h-10 text-green-500" />
+              </div>
+              <h2 className="font-black uppercase text-white text-3xl mb-2 tracking-tighter">Locked In!</h2>
+              <button onClick={() => window.location.reload()} className="w-full py-4 bg-white text-black font-black uppercase rounded-xl hover:scale-105 transition-transform shadow-xl">Continue</button>
+            </div>
+          </div>
         </div>
-      </div>
-    </button>
+      )}
+
+    </div>
   );
 };
 

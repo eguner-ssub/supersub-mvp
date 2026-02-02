@@ -24,11 +24,11 @@ export default function CardLab() {
                 <h2 className="text-gray-400 font-mono text-xs uppercase tracking-[0.3em] mb-6 border-b border-gray-700 pb-2">
                     State 0: Inventory (Generic)
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <CardBase type="c_match_result" label="Match Result" />
-                    <CardBase type="c_total_goals" label="Total Goals" />
-                    <CardBase type="c_player_score" label="Player Score" />
-                    <CardBase type="c_supersub" label="Super Sub" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl">
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_match_result" label="Match Result" /></div>
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_total_goals" label="Total Goals" /></div>
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_player_score" label="Player Score" /></div>
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_supersub" label="Super Sub" /></div>
                 </div>
             </div>
 
@@ -37,11 +37,11 @@ export default function CardLab() {
                 <h2 className="text-yellow-500 font-mono text-xs uppercase tracking-[0.3em] mb-6 border-b border-yellow-900/50 pb-2">
                     State 1: Active (Live Bet)
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <CardBase type="c_match_result" label="Match Result" selection="Arsenal to Win" status="active" />
-                    <CardBase type="c_total_goals" label="Total Goals" selection="Over 2.5 Goals" status="active" />
-                    <CardBase type="c_player_score" label="Player Score" selection="Saka Score" status="active" />
-                    <CardBase type="c_supersub" label="Super Sub" selection="Nunez Sub" status="active" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl">
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_match_result" label="Match Result" selection="Arsenal to Win" status="active" /></div>
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_total_goals" label="Total Goals" selection="Over 2.5 Goals" status="active" /></div>
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_player_score" label="Player Score" selection="Saka Score" status="active" /></div>
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_supersub" label="Super Sub" selection="Nunez Sub" status="active" /></div>
                 </div>
             </div>
 
@@ -50,11 +50,11 @@ export default function CardLab() {
                 <h2 className="text-white font-mono text-xs uppercase tracking-[0.3em] mb-6 border-b border-gray-700 pb-2">
                     State 2: Settled
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <CardBase type="c_match_result" label="Match Result" selection="Man City Win" status="won" />
-                    <CardBase type="c_total_goals" label="Total Goals" selection="Under 1.5 Goals" status="lost" />
-                    <CardBase type="c_player_score" label="Player Score" selection="Haaland Hat-trick" status="won" />
-                    <CardBase type="c_supersub" label="Super Sub" selection="Maguire Sub" status="lost" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl">
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_match_result" label="Match Result" selection="Man City Win" status="won" /></div>
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_total_goals" label="Total Goals" selection="Under 1.5 Goals" status="lost" /></div>
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_player_score" label="Player Score" selection="Haaland Hat-trick" status="won" /></div>
+                    <div className="w-24 h-36 mx-auto"><CardBase type="c_supersub" label="Super Sub" selection="Maguire Sub" status="lost" /></div>
                 </div>
             </div>
 

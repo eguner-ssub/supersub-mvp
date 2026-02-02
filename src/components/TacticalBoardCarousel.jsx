@@ -1,16 +1,39 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import CardBase from './CardBase'; // Ensure this path matches your project structure
+import CardBase from './CardBase';
 
 const TacticalBoardCarousel = ({ bets = [] }) => {
     const navigate = useNavigate();
     const [activeIndex, setActiveIndex] = useState(0);
 
-    // Fallback Mock Data for Development/Visual Testing
-    const displayBets = bets.length > 0 ? bets : [
-        { id: 1, match_name: 'ARSENAL vs CHELSEA', team_name: 'ARSENAL', market: 'MATCH WINNER', potential_return: 240, status: 'pending' },
-        { id: 2, match_name: 'LIVERPOOL vs MAN CITY', team_name: 'DRAW', market: 'FULL TIME', potential_return: 350, status: 'pending' },
+    // 1. DATA NORMALIZATION
+    const normalizedBets = bets.map(bet => {
+        if (!bet) return null;
+
+        // FIX: Combine teams into one string for the single strip
+        const matchTitle = bet.team_name || bet.match_name || "PENDING MATCH";
+
+        return {
+            id: bet.id || Math.random(),
+            title: matchTitle,
+            pick: bet.selection || "PENDING",
+            pot: bet.potential_reward || bet.potential_return || 0,
+            cardType: bet.card_type || bet.market || 'c_match_result',
+            status: 'active'
+        };
+    }).filter(Boolean);
+
+    // FALLBACK (Visual Test)
+    const displayBets = normalizedBets.length > 0 ? normalizedBets : [
+        {
+            id: 'demo-1',
+            title: 'TOTTENHAM vs MAN CITY',
+            pick: 'HOME',
+            pot: 440,
+            cardType: 'c_match_result',
+            status: 'active'
+        }
     ];
 
     const handleScroll = (e) => {
@@ -21,104 +44,129 @@ const TacticalBoardCarousel = ({ bets = [] }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col font-sans select-none">
+        <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col font-sans select-none overflow-hidden">
 
-            {/* LAYER 0: SCENE BACKGROUND */}
+            {/* LAYER 0: THE DESK (Background) */}
             <div className="absolute inset-0 z-0">
                 <img
-                    src="/assets/bg-board-bench.webp"
-                    alt="Bench Background"
-                    className="w-full h-full object-cover opacity-100"
+                    src="/assets/bg-board-bench.webp" // <--- KEPT AS .webp
+                    alt="Mahogany Desk"
+                    className="w-full h-full object-cover opacity-100 scale-105"
                 />
-                <div className="absolute inset-0 bg-radial-gradient from-transparent via-black/20 to-black/80"></div>
+                {/* Vignette Overlay */}
+                <div className="absolute inset-0 bg-radial-gradient from-transparent via-black/40 to-black/90"></div>
             </div>
 
-            {/* LAYER 1: HUD CONTROLS */}
-            <div className="relative z-50 flex justify-between items-center p-6 pt-12">
-                <h2 className="text-white/80 font-black uppercase tracking-widest text-xs md:text-sm drop-shadow-md">
-                    Tactical Brief ({activeIndex + 1}/{displayBets.length})
-                </h2>
+            {/* LAYER 1: HUD */}
+            <div className="relative z-50 flex justify-between items-start p-6">
+                <div>
+                    <h2 className="text-white/40 font-mono text-[10px] uppercase tracking-[0.3em]">CONFIDENTIAL</h2>
+                    <h1 className="text-white font-black text-xl uppercase italic tracking-tighter">Tactical Brief</h1>
+                </div>
                 <button
                     onClick={() => navigate(-1)}
-                    data-testid="close-button"
                     className="bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10 text-white hover:bg-white/10 transition-colors active:scale-95"
                 >
                     <X size={24} />
                 </button>
             </div>
 
-            {/* LAYER 2: SCROLL CONTAINER */}
+            {/* LAYER 2: THE CAROUSEL */}
             <div
-                className="relative z-10 flex-1 flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-center"
+                className="relative z-10 flex-1 flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-center py-4"
                 onScroll={handleScroll}
-                data-testid="carousel-container"
             >
-                {displayBets.map((bet) => (
-                    <div
-                        key={bet.id}
-                        className="snap-center shrink-0 w-full h-full flex items-center justify-center p-4 perspective-1000"
-                    >
-                        {/* THE BOARD PROP */}
-                        <div className="relative w-full max-w-[90vw] md:max-w-md aspect-[9/16] max-h-[85vh] transition-transform duration-500">
+                {displayBets.map((bet) => {
+                    const label = bet.cardType.replace('c_', '').replace(/_/g, ' ').toUpperCase();
 
-                            <img
-                                src="/assets/tactic-board.webp"
-                                alt="Tactical Board"
-                                className="absolute inset-0 w-full h-full object-contain drop-shadow-2xl"
-                            />
+                    return (
+                        <div
+                            key={bet.id}
+                            className="snap-center shrink-0 w-full h-full flex items-center justify-center p-4 perspective-1000"
+                        >
+                            {/* THE CLIPBOARD CONTAINER */}
+                            <div className="relative w-full max-w-sm aspect-[3/4] transition-transform duration-500">
 
-                            {/* DIEGETIC CONTENT ZONE */}
-                            <div className="absolute top-[12%] left-[10%] right-[10%] bottom-[10%] flex flex-col items-center">
+                                {/* A. BOARD IMAGE (Base Layer) */}
+                                <img
+                                    src="/assets/tactic-board.webp" // <--- KEPT AS .webp
+                                    alt="Tactical Board"
+                                    className="absolute inset-0 w-full h-full object-contain drop-shadow-2xl z-0 rounded-xl"
+                                />
 
-                                {/* Match Header */}
-                                <div className="mt-4 mb-6 transform -rotate-1 w-full text-center">
-                                    <h1 className="font-permanent-marker text-xl md:text-2xl text-black/85 leading-none uppercase break-words">
-                                        {bet.match_name || "MATCH PENDING"}
-                                    </h1>
-                                </div>
+                                {/* B. CONTENT LAYER (Stacked on top) */}
+                                <div className="absolute top-[8%] left-[8%] right-[8%] bottom-[8%] flex flex-col z-10">
 
-                                {/* The Pinned Card */}
-                                <div className="relative group scale-90 origin-top mt-2">
-                                    {/* Glossy Magnet */}
-                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
-                                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-500 via-red-600 to-red-800 shadow-md ring-1 ring-white/20 border border-black/10">
-                                            <div className="absolute top-[3px] left-[4px] w-2 h-1.5 bg-gradient-to-b from-white/90 to-white/10 rounded-full blur-[0.3px]"></div>
+                                    {/* 1. HEADER: Silver Duct Tape */}
+                                    <div className="relative w-[110%] -ml-[5%] mb-4 z-20">
+                                        <div
+                                            className="h-14 w-full flex items-center justify-center relative shadow-lg transform -rotate-1 origin-center"
+                                            style={{
+                                                background: 'linear-gradient(180deg, #e5e7eb 0%, #9ca3af 20%, #f3f4f6 45%, #9ca3af 80%, #6b7280 100%)',
+                                                clipPath: 'polygon(1% 2%, 99% 0%, 100% 98%, 0% 100%)'
+                                            }}
+                                        >
+                                            {/* Noise Texture */}
+                                            <div className="absolute inset-0 opacity-20 bg-noise mix-blend-overlay"></div>
+
+                                            {/* Match Title */}
+                                            <span className="text-black/90 font-black text-lg md:text-xl uppercase tracking-tighter truncate px-2 relative z-30 font-sans">
+                                                {bet.title}
+                                            </span>
                                         </div>
-                                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-black/40 blur-[2px] rounded-full -z-10"></div>
                                     </div>
 
-                                    {/* Card Base */}
-                                    <div className="transform transition-transform duration-300">
-                                        <CardBase
-                                            type={bet.card_type || 'c_match_result'}
-                                            label={bet.market || 'MATCH WINNER'}
-                                            selection={bet.team_name}
-                                            status="active"
-                                        />
+                                    {/* 2. BODY: The Pinned Card */}
+                                    <div className="flex-1 flex items-center justify-center relative w-full z-10">
+                                        <div className="relative group scale-110">
+
+                                            {/* Red Magnet Pin */}
+                                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-50 w-6 h-6 bg-gradient-to-br from-red-500 via-red-600 to-red-900 rounded-full shadow-lg border border-red-400/50">
+                                                <div className="absolute top-[3px] left-[3px] w-2 h-1.5 bg-gradient-to-b from-white/80 to-transparent rounded-full blur-[0.5px]"></div>
+                                            </div>
+
+                                            {/* The Card Component */}
+                                            <div className="transform rotate-2 shadow-2xl transition-transform duration-300 hover:rotate-0">
+                                                <CardBase
+                                                    type={bet.cardType}
+                                                    label={label}
+                                                    selection={bet.pick}
+                                                    status="active"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
+
+                                    {/* 3. FOOTER: The Pot */}
+                                    <div className="mt-auto relative shrink-0 flex justify-center z-10">
+                                        <div className="relative px-8 py-3 transform -rotate-2">
+                                            {/* Red Marker Circle SVG */}
+                                            <svg className="absolute inset-0 w-full h-full text-red-600/90 pointer-events-none overflow-visible" viewBox="0 0 120 60" preserveAspectRatio="none">
+                                                <path d="M10,35 Q20,5 60,5 T110,30 T60,58 T10,35" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+
+                                            {/* Text */}
+                                            <span className="font-permanent-marker text-red-600 text-3xl font-bold relative z-10 block drop-shadow-sm">
+                                                POT: {bet.pot}
+                                            </span>
+                                        </div>
+                                    </div>
+
                                 </div>
-
-                                {/* Pot Amount */}
-                                <div className="mt-auto mb-10 transform -rotate-2">
-                                    <div className="border-[3px] border-red-600/80 rounded-[50%_40%_60%_30%] px-5 py-2 rotate-1">
-                                        <span className="font-permanent-marker text-red-600 text-2xl md:text-3xl font-bold">
-                                            POT: {bet.potential_return || 0}
-                                        </span>
-                                    </div>
-                                </div>
-
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
-            {/* LAYER 3: PAGINATION DOTS */}
-            <div className="relative z-50 h-16 flex justify-center items-start gap-2">
+            {/* LAYER 3: PAGINATION */}
+            <div className="relative z-50 h-16 flex justify-center items-center gap-2">
                 {displayBets.map((_, i) => (
                     <div
                         key={i}
-                        className={`w-2 h-2 rounded-full transition-all duration-300 ${i === activeIndex ? 'bg-yellow-500 w-4 shadow-[0_0_10px_rgba(234,179,8,0.5)]' : 'bg-white/20'
+                        className={`h-1.5 rounded-full transition-all duration-300 ${i === activeIndex
+                                ? 'bg-white w-6 shadow-[0_0_10px_white]'
+                                : 'bg-white/20 w-1.5'
                             }`}
                     />
                 ))}
