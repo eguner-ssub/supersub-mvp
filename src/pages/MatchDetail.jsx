@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Zap, Loader2, Trophy, CheckCircle, Goal, User, ArrowUpCircle } from 'lucide-react';
+import { ArrowLeft, Zap, Loader2, Trophy, CheckCircle, Goal, User, ArrowUpCircle, Signal } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import CardBase from '../components/CardBase';
 
 const MatchDetail = () => {
-  const { id } = useParams();
+  const { id } = useParams(); // Ensure this is not undefined!
   const navigate = useNavigate();
 
   const { userProfile, loading: gameLoading, placeBet, consumeCard, loadProfile, supabase } = useGame();
 
   const [match, setMatch] = useState(null);
   const [odds, setOdds] = useState(null);
+  const [activeBookie, setActiveBookie] = useState(null);
+  const [matchPhase, setMatchPhase] = useState(null); // 'PRE' | 'LIVE' | 'POST'
   const [loading, setLoading] = useState(true);
 
-  // STATE MACHINE: 'idle' | 'selection' | 'staging' | 'resolved'
+  // STATE MACHINE
   const [flowState, setFlowState] = useState('idle');
   const [selectedCard, setSelectedCard] = useState(null);
   const [stagedBet, setStagedBet] = useState(null);
@@ -31,64 +33,181 @@ const MatchDetail = () => {
     return userProfile.inventory.filter(item => item === cardId).length;
   };
 
+  // === MATCH PHASE DETECTOR ===
+  const getMatchPhase = (status) => {
+    const PRE_MATCH = ['NS', 'TBD', 'PST', 'CANC', 'ABD'];
+    const LIVE = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'];
+    const POST_MATCH = ['FT', 'AET', 'PEN'];
+
+    if (PRE_MATCH.includes(status)) return 'PRE';
+    if (LIVE.includes(status)) return 'LIVE';
+    if (POST_MATCH.includes(status)) return 'POST';
+    return 'PRE'; // Default fallback
+  };
+
+  // === ODDS NORMALIZATION ===
+  const processOdds = (data, isLive) => {
+    let markets = [];
+    let bookmakerId = null;
+    let bookmakerName = null;
+
+    if (isLive) {
+      // LIVE: Flat structure - response[0].odds[]
+      markets = data.response?.[0]?.odds || [];
+      bookmakerName = "LIVE";
+    } else {
+      // PRE-MATCH: Nested structure - response[0].bookmakers[]
+      const bookmakers = data.response?.[0]?.bookmakers || [];
+
+      // Priority: Bet365 (6) > 1xBet (10) > Unibet (16) > Bwin (7) > First available
+      const priorityIds = [6, 10, 16, 7];
+      let targetBookmaker = null;
+
+      for (const id of priorityIds) {
+        targetBookmaker = bookmakers.find(b => b.id === id);
+        if (targetBookmaker) break;
+      }
+
+      if (!targetBookmaker) targetBookmaker = bookmakers[0];
+
+      if (targetBookmaker) {
+        markets = targetBookmaker.bets || [];
+        bookmakerId = targetBookmaker.id;
+        bookmakerName = targetBookmaker.name;
+      }
+    }
+
+    // If no markets found, return null to trigger simulation
+    if (markets.length === 0) return null;
+
+    // Helper to extract market values
+    const getMarketValues = (marketName) => {
+      const market = markets.find(m => m.name.toLowerCase() === marketName.toLowerCase()) ||
+        markets.find(m => m.name.toLowerCase().includes(marketName.toLowerCase()));
+      return market ? market.values : [];
+    };
+
+    const matchWinner = getMarketValues("Match Winner");
+    const goalsOverUnder = getMarketValues("Goals Over/Under");
+    const goalscorers = getMarketValues("Goalscorers") || getMarketValues("Anytime Goalscorer");
+
+    return {
+      bookmaker: { id: bookmakerId, name: bookmakerName },
+      odds: {
+        home: matchWinner.find(o => o.value === "Home")?.odd || 2.10,
+        draw: matchWinner.find(o => o.value === "Draw")?.odd || 3.20,
+        away: matchWinner.find(o => o.value === "Away")?.odd || 2.90,
+        goals_over: goalsOverUnder.find(o => o.value === "Over 2.5")?.odd || 1.85,
+        goals_under: goalsOverUnder.find(o => o.value === "Under 2.5")?.odd || 1.95,
+        supersub_yes: 4.50,
+        scorers: goalscorers.length > 0
+          ? goalscorers.map((p, index) => ({ id: index, name: p.value, odds: p.odd })).slice(0, 20)
+          : [
+            { id: 1, name: "Home Striker", odds: 2.2 },
+            { id: 2, name: "Away Striker", odds: 2.8 },
+            { id: 3, name: "Midfield Star", odds: 3.5 }
+          ]
+      }
+    };
+  };
+
+  // === SIMULATION FALLBACK ===
+  const getSimulationOdds = () => ({
+    bookmaker: { id: 9999, name: "SIMULATION" },
+    odds: {
+      home: 2.10,
+      draw: 3.40,
+      away: 3.10,
+      goals_over: 1.85,
+      goals_under: 1.95,
+      supersub_yes: 4.50,
+      scorers: [
+        { id: 1, name: "Haaland", odds: 1.80 },
+        { id: 2, name: "Salah", odds: 2.30 },
+        { id: 3, name: "Saka", odds: 2.60 },
+        { id: 4, name: "Rashford", odds: 2.80 },
+        { id: 5, name: "Isak", odds: 3.00 }
+      ]
+    }
+  });
+
   useEffect(() => {
+    if (!id) {
+      console.error("⛔ CRITICAL: Match ID is missing from URL.");
+      setLoading(false);
+      return;
+    }
+
     const fetchMatchDetail = async () => {
       try {
         setLoading(true);
-        const [matchRes, oddsRes] = await Promise.all([
-          fetch(`/api/matches?id=${id}`),
-          fetch(`/api/odds?fixture=${id}`)
-        ]);
+        const timestamp = Date.now();
+        console.log(`🔌 Fetching Data for Match ID: ${id}`);
 
+        // === STEP 1: FETCH FIXTURE (Sequential) ===
+        const matchRes = await fetch(`/api/matches?id=${id}&t=${timestamp}`);
         if (!matchRes.ok) throw new Error("Match unavailable");
 
         const matchData = await matchRes.json();
-        const oddsData = await oddsRes.json();
+        if (!matchData.response || matchData.response.length === 0) {
+          throw new Error("No match data found");
+        }
 
-        if (matchData.response && matchData.response.length > 0) {
-          setMatch(matchData.response[0]);
+        const matchInfo = matchData.response[0];
+        setMatch(matchInfo);
 
-          // --- ODDS MAPPING (API-FOOTBALL STANDARD) ---
-          const apiResponse = oddsData.response?.[0];
-          const bookmaker = apiResponse?.bookmakers?.[0]; // Usually "Bet365" or first available
-          const markets = bookmaker?.bets || [];
+        // === STEP 2: DETERMINE MATCH PHASE ===
+        const status = matchInfo.fixture.status.short;
+        const phase = getMatchPhase(status);
+        setMatchPhase(phase);
+        console.log(`🎯 Match Phase: ${phase} (Status: ${status})`);
 
-          // Helper to find odds in the standard array structure
-          const findMarket = (name) => markets.find(m => m.name === name)?.values || [];
-          const matchWinner = findMarket("Match Winner");
-          const goalsOverUnder = findMarket("Goals Over/Under");
+        // === STEP 3: CONDITIONAL ODDS FETCHING ===
+        if (phase === 'POST') {
+          // Post-match: No odds needed
+          console.log("⚽ Match finished. Skipping odds fetch.");
+          setOdds(null);
+          setActiveBookie(null);
+        } else {
+          // Determine endpoint
+          const endpoint = phase === 'LIVE'
+            ? `/api/odds/live?fixture=${id}&t=${timestamp}`
+            : `/api/odds?fixture=${id}&bookmaker=6&t=${timestamp}`;
 
-          setOdds({
-            // 1. MATCH RESULT (Standard)
-            home: matchWinner.find(o => o.value === "Home")?.odd || 1.50,
-            draw: matchWinner.find(o => o.value === "Draw")?.odd || 3.50,
-            away: matchWinner.find(o => o.value === "Away")?.odd || 4.50,
+          console.log(`📡 Fetching ${phase} odds from: ${endpoint}`);
 
-            // 2. TOTAL GOALS (Standard Over/Under 2.5)
-            goals_over: goalsOverUnder.find(o => o.value === "Over 2.5")?.odd || 1.85,
-            goals_under: goalsOverUnder.find(o => o.value === "Under 2.5")?.odd || 1.95,
+          const oddsRes = await fetch(endpoint);
+          const oddsData = await oddsRes.json();
 
-            // 3. SUPER SUB (FIXED REWARD - CUSTOM MARKET)
-            // Since this doesn't exist in real life, we set a static multiplier.
-            supersub_yes: 4.50,
+          console.log("📊 Raw Odds Response:", oddsData);
 
-            // 4. PLAYER TO SCORE
-            // API-Football often puts this in a separate endpoint, so we default to mock
-            // unless you have the "players" endpoint integrated.
-            scorers: [
-              { id: 1, name: "Home Striker", odds: 2.2 },
-              { id: 2, name: "Away Striker", odds: 2.8 },
-              { id: 3, name: "Midfield Star", odds: 3.5 }
-            ]
-          });
+          // Process odds
+          const processed = processOdds(oddsData, phase === 'LIVE');
+
+          if (processed) {
+            setOdds(processed.odds);
+            setActiveBookie(processed.bookmaker.name);
+            console.log(`✅ Odds loaded from: ${processed.bookmaker.name}`);
+          } else {
+            // Fallback to simulation
+            console.warn("⚠️ No odds available. Activating Simulation.");
+            const simulation = getSimulationOdds();
+            setOdds(simulation.odds);
+            setActiveBookie(simulation.bookmaker.name);
+          }
         }
       } catch (err) {
-        console.error("Fetch Error:", err);
+        console.error("❌ Fetch Error:", err);
+        // On error, try simulation fallback
+        const simulation = getSimulationOdds();
+        setOdds(simulation.odds);
+        setActiveBookie(simulation.bookmaker.name);
       } finally {
         setLoading(false);
       }
     };
-    if (id) fetchMatchDetail();
+
+    fetchMatchDetail();
   }, [id]);
 
   // --- HANDLERS ---
@@ -104,7 +223,7 @@ const MatchDetail = () => {
       card: selectedCard,
       selection,
       odds: oddsVal,
-      reward: Math.floor(oddsVal * 100) // Reward Calculation (Odds * 100)
+      reward: Math.floor(oddsVal * 100)
     });
     setFlowState('staging');
   };
@@ -164,9 +283,24 @@ const MatchDetail = () => {
         <button onClick={() => navigate('/match-hub')} className="flex items-center justify-center w-10 h-10 bg-black/50 backdrop-blur-md border border-white/20 rounded-full text-white active:scale-95 transition-all">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
-          <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-          <span className="text-white font-bold text-sm">{userProfile.energy}/{userProfile.max_energy}</span>
+
+        <div className="flex flex-col items-end gap-1">
+          {/* ENERGY BAR */}
+          <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
+            <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+            <span className="text-white font-bold text-sm">{userProfile.energy}/{userProfile.max_energy}</span>
+          </div>
+
+          {/* --- THE SIGNAL (VISUAL DEBUGGER) --- */}
+          {activeBookie && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/40 border border-white/5 backdrop-blur-sm">
+              {/* Orange pulse if SIMULATION, Green if Live */}
+              <Signal className={`w-3 h-3 ${activeBookie === 'SIMULATION' ? 'text-orange-500' : 'text-green-500'} animate-pulse`} />
+              <span className={`text-[9px] font-mono uppercase tracking-widest ${activeBookie === 'SIMULATION' ? 'text-orange-400' : 'text-white/60'}`}>
+                {activeBookie}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -186,6 +320,19 @@ const MatchDetail = () => {
               <span className="text-lg md:text-xl text-white font-black tracking-widest leading-none font-mono drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
                 {match.fixture.status.short === 'NS' ? formatTime(match.fixture.date) : `${match.goals.home}-${match.goals.away}`}
               </span>
+
+              {/* MATCH PHASE INDICATOR */}
+              {matchPhase === 'LIVE' && (
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-0.5 bg-red-600 rounded-full shadow-lg animate-pulse">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  <span className="text-white text-[8px] font-black uppercase tracking-wider">LIVE</span>
+                </div>
+              )}
+              {matchPhase === 'POST' && (
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-0.5 bg-zinc-700 rounded-full shadow-lg">
+                  <span className="text-zinc-300 text-[8px] font-black uppercase tracking-wider">FINISHED</span>
+                </div>
+              )}
             </div>
             {/* Right Wing */}
             <div className="flex-1 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-r-md border-b-4 border-[#2d241e] flex items-center justify-end pr-3 relative shadow-lg ml-[-8px]">
@@ -196,34 +343,58 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* DECK (BOTTOM) */}
-      <div className="flex-1"></div>
-      <div className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
-        <div className="absolute bottom-0 w-full h-32 bg-cover bg-bottom z-10" style={{ backgroundImage: 'url(/shelf-console.webp)' }}></div>
-        <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 overflow-x-auto no-scrollbar z-20 pointer-events-auto">
-          {cardTypes.map(card => {
-            const count = getCardCount(card.id);
-            const active = count > 0;
-            const selected = selectedCard === card.id;
-            return (
-              <button
-                key={card.id}
-                onClick={() => handleCardClick(card.id)}
-                disabled={!active}
-                className={`relative transition-all duration-300 flex-shrink-0 ${selected ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30' : active ? 'hover:translate-y-[-8px] z-20' : 'opacity-40 grayscale z-10'}`}
-              >
-                <div className="w-20 h-32 relative">
-                  <div className="absolute inset-0 bg-[url('/frame-standard.webp')] bg-cover bg-center rounded-lg shadow-lg"></div>
-                  <div className="absolute inset-0 flex items-center justify-center p-2 z-10">
-                    <CardBase type={card.id} label={card.label} status="generic" variant="transparent" />
-                  </div>
-                  {active && (<div className="absolute -top-2 -right-2 bg-zinc-900 text-yellow-500 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border border-yellow-500 shadow-lg z-50">x{count}</div>)}
+      {/* DECK (BOTTOM) - Hidden for finished matches */}
+      {matchPhase !== 'POST' && (
+        <>
+          <div className="flex-1"></div>
+          <div className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
+            <div className="absolute bottom-0 w-full h-32 bg-cover bg-bottom z-10" style={{ backgroundImage: 'url(/shelf-console.webp)' }}></div>
+            <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 overflow-x-auto no-scrollbar z-20 pointer-events-auto">
+              {cardTypes.map(card => {
+                const count = getCardCount(card.id);
+                const active = count > 0;
+                const selected = selectedCard === card.id;
+                return (
+                  <button
+                    key={card.id}
+                    onClick={() => handleCardClick(card.id)}
+                    disabled={!active}
+                    className={`relative transition-all duration-300 flex-shrink-0 ${selected ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30' : active ? 'hover:translate-y-[-8px] z-20' : 'opacity-40 grayscale z-10'}`}
+                  >
+                    <div className="w-20 h-32 relative">
+                      <div className="absolute inset-0 bg-[url('/frame-standard.webp')] bg-cover bg-center rounded-lg shadow-lg"></div>
+                      <div className="absolute inset-0 flex items-center justify-center p-2 z-10">
+                        <CardBase type={card.id} label={card.label} status="generic" variant="transparent" />
+                      </div>
+                      {active && (<div className="absolute -top-2 -right-2 bg-zinc-900 text-yellow-500 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border border-yellow-500 shadow-lg z-50">x{count}</div>)}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* FINISHED MATCH BANNER */}
+      {matchPhase === 'POST' && match && (
+        <div className="fixed bottom-0 w-full z-50 pb-8">
+          <div className="max-w-md mx-auto px-4">
+            <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
+              <div className="text-center">
+                <div className="text-zinc-500 text-xs uppercase tracking-widest mb-2">FULL TIME</div>
+                <div className="text-white font-black text-4xl mb-2">{match.goals.home} - {match.goals.away}</div>
+                <div className="text-zinc-400 text-sm">
+                  {match.teams.home.name} vs {match.teams.away.name}
                 </div>
-              </button>
-            );
-          })}
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <p className="text-zinc-500 text-xs">Betting is closed for this match</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* SELECTION MODAL (DYNAMIC) */}
       {flowState === 'selection' && match && odds && selectedCard && (
