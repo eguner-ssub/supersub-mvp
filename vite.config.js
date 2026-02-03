@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './vitest.setup.js',
+    include: ['src/tests/integration/**/*.test.jsx'],
   },
   // Proxy configuration to connect frontend (5173) to backend (3000)
   server: {

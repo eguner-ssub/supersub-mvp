@@ -1,5 +1,5 @@
 import React from 'react';
-import CardBase from '../components/CardBase';
+import CardBase from '../shared/ui/CardBase';
 import { CARD_CONFIG } from '../utils/cardConfig';
 
 /**
@@ -80,7 +80,7 @@ const CardShowcase = () => {
 />
 
 // NEW WAY (Pure CSS/SVG)
-import CardBase from '../components/CardBase';
+import CardBase from '../shared/ui/CardBase';
 import { getCardConfig } from '../utils/cardConfig';
 
 const config = getCardConfig('c_match_result');

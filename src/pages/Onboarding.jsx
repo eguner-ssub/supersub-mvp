@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../shared/context/GameContext';
 import { ArrowRight, PenTool, CheckCircle, Coins, Zap, Layers } from 'lucide-react';
-import MobileLayout from '../components/MobileLayout';
+import MobileLayout from '../shared/ui/MobileLayout';
 
 const Onboarding = () => {
   const [managerName, setManagerName] = useState('');

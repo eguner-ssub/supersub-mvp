@@ -1,5 +1,5 @@
 import React from 'react';
-import CardBase from '../components/CardBase';
+import CardBase from '../shared/ui/CardBase';
 
 /**
  * Test Page for CardBase Component

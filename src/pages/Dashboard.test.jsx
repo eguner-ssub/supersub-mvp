@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from './Dashboard';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../shared/context/GameContext';
 
 // --- MOCKS ---
 const mockNavigate = vi.fn();

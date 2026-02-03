@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import CardBase from '../components/CardBase';
+import CardBase from '../shared/ui/CardBase';
 import { CARD_TYPES, CARD_STATES } from '../utils/cardConfig';
 
 /**

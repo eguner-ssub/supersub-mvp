@@ -1,10 +1,10 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { GameProvider, useGame } from './context/GameContext';
+import { GameProvider, useGame } from './shared/context/GameContext';
 import { Loader2 } from 'lucide-react';
 
 // Components
-import NavigationShell from './components/NavigationShell';
+import NavigationShell from './shared/ui/NavigationShell';
 import LoadingScreen from './components/LoadingScreen';
 import { useAssetPreloader } from './hooks/useAssetPreloader';
 
@@ -13,10 +13,10 @@ import Landing from './pages/Landing';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
-import MatchHub from './pages/MatchHub';
-import MatchDetail from './pages/MatchDetail';
+import MatchHub from './features/match-day/MatchHub';
+import MatchDetail from './features/match-day/MatchDetail';
 import Training from './pages/Training';
-import LockerRoom from './pages/LockerRoom';
+import LockerRoom from './features/locker-room/LockerRoom';
 import CardsInPlay from './pages/CardsInPlay';
 import Settings from './pages/Settings';
 import Account from './pages/Account';
@@ -29,7 +29,7 @@ import ComingSoon from './pages/ComingSoon';
 
 // Pages - Lazy Loading (Large pages with heavy assets)
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const ManagerOffice = lazy(() => import('./pages/ManagerOffice'));
+const ManagerOffice = lazy(() => import('./features/office/ManagerOffice'));
 
 
 

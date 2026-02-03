@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../shared/context/GameContext';
 import { ArrowLeft, LogOut, User, Mail, Shield, ChevronRight } from 'lucide-react';
-import MobileLayout from '../components/MobileLayout';
+import MobileLayout from '../shared/ui/MobileLayout';
 
 const Settings = () => {
   const navigate = useNavigate();

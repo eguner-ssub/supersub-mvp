@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../shared/context/GameContext';
 import { Zap, Coins, Loader2, ShoppingBag, X, ClipboardList, TrendingUp, Cone } from 'lucide-react';
 import gameDataRaw from '../data/gameData.json';
 import { getCardConfig } from '../utils/cardConfig';
-import CardBase from '../components/CardBase';
+import CardBase from '../shared/ui/CardBase';
 import WinModal from '../components/WinModal';
 
 export default function Dashboard() {

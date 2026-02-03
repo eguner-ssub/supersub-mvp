@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ManagerOffice from '../pages/ManagerOffice';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../shared/context/GameContext';
 
 // Mock Dependencies
 vi.mock('../context/GameContext', () => ({

@@ -1,5 +1,5 @@
 import React from 'react';
-import CardBase from '../components/CardBase';
+import CardBase from '../shared/ui/CardBase';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 

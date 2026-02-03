@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Account from './Account';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../shared/context/GameContext';
 
 // Mock mocks
 vi.mock('../context/GameContext', () => ({

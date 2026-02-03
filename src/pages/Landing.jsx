@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../shared/context/GameContext';
 import { LogIn, UserPlus, Loader2 } from 'lucide-react';
 
 const Landing = () => {

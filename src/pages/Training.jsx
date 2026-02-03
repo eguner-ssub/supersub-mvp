@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../shared/context/GameContext';
 import { ArrowLeft, CheckCircle, XCircle, Zap, HelpCircle, Clock, Loader2, Brain, Trophy, PlayCircle } from 'lucide-react';
-import MobileLayout from '../components/MobileLayout';
+import MobileLayout from '../shared/ui/MobileLayout';
 import AdOverlay from '../components/AdOverlay';
 import gameData from '../data/gameData.json';
 

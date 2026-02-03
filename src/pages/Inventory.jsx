@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../shared/context/GameContext';
 import { ArrowLeft, Zap, X } from 'lucide-react';
-import MobileLayout from '../components/MobileLayout';
+import MobileLayout from '../shared/ui/MobileLayout';
 import { mockConsumables } from '../data/mockInventory';
 // 1. IMPORT THE COMPONENT
-import CardBase from '../components/CardBase';
+import CardBase from '../shared/ui/CardBase';
 
 const Inventory = () => {
   const navigate = useNavigate();

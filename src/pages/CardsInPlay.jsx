@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Coins } from 'lucide-react';
-import MobileLayout from '../components/MobileLayout';
+import MobileLayout from '../shared/ui/MobileLayout';
 import { mockCardsInPlay, getCardTypeDisplay, getCardTypeIcon } from '../data/mockInventory';
 
 const CardsInPlay = () => {
