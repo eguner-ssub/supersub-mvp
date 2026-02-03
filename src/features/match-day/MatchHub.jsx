@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
-import CardBase from '../../shared/ui/CardBase';
 
 // HELPER: Strict Date Comparison
 const isSameDay = (d1, d2) => {
@@ -15,7 +14,6 @@ const isSameDay = (d1, d2) => {
 
 const MatchHub = () => {
   const navigate = useNavigate();
-  const { userProfile } = useGame();
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [matches, setMatches] = useState([]);
@@ -25,20 +23,37 @@ const MatchHub = () => {
     const fetchMatches = async () => {
       setLoading(true);
       try {
-        // Fetch all matches (filtering happens client-side for now)
         const res = await fetch('/api/matches');
         const data = await res.json();
-        setMatches(data.response || []);
+        const fetchedMatches = data.response || [];
+        setMatches(fetchedMatches);
+
+        // SMART DATE LOGIC:
+        // Check if the current selectedDate has matches. If not, find the next best one.
+        // We do this BEFORE setting loading to false.
+        if (fetchedMatches.length > 0) {
+          // Check against the initial 'selectedDate' (which is Today on first render)
+          // We use a temp date object here because state updates are async
+          let targetDate = new Date();
+          const hasMatchesToday = fetchedMatches.some(m => isSameDay(m.fixture.date, targetDate));
+
+          if (!hasMatchesToday) {
+            // If no matches today, force update to the first available match date
+            targetDate = new Date(fetchedMatches[0].fixture.date);
+            setSelectedDate(targetDate);
+          }
+        }
       } catch (err) {
         console.error("Fetch failed", err);
       } finally {
+        // Only reveal the UI once we've decided on the date
         setLoading(false);
       }
     };
     fetchMatches();
-  }, [selectedDate]);
+  }, []);
 
-  // CORE FIX: Filter displayed matches by selectedDate
+  // Filter based on the (potentially updated) selectedDate
   const displayedMatches = matches.filter(match =>
     isSameDay(match.fixture.date, selectedDate)
   );
@@ -51,13 +66,14 @@ const MatchHub = () => {
 
   return (
     <div className="min-h-screen bg-black text-white pb-20 font-sans select-none">
-      {/* Header & Date Picker */}
+      {/* Header */}
       <div className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10 p-4">
         <div className="flex justify-between items-center mb-4">
           <button onClick={() => navigate(-1)} className="p-2 bg-white/10 rounded-full"><ChevronLeft className="w-5 h-5" /></button>
           <h1 className="text-xl font-black uppercase tracking-widest">Match Hub</h1>
           <div className="w-9"></div>
         </div>
+        {/* Date Controls */}
         <div className="flex items-center justify-between bg-zinc-900 rounded-xl p-2 border border-white/10">
           <button onClick={() => changeDate(-1)} className="p-2 hover:bg-white/10 rounded-lg"><ChevronLeft className="w-5 h-5 text-zinc-400" /></button>
           <div className="flex items-center gap-2">
@@ -76,7 +92,7 @@ const MatchHub = () => {
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-yellow-500" /></div>
         ) : displayedMatches.length > 0 ? (
           displayedMatches.map((match) => (
-            <div key={match.fixture.id} onClick={() => navigate(`/match/${match.fixture.id}`)} className="bg-zinc-900 border border-white/10 rounded-xl p-4 active:scale-95 transition-transform">
+            <div key={match.fixture.id} onClick={() => navigate(`/match/${match.fixture.id}`)} className="bg-zinc-900 border border-white/10 rounded-xl p-4 active:scale-95 transition-transform cursor-pointer hover:bg-zinc-800">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{match.league?.name || 'LEAGUE'}</span>
                 <span className="text-[10px] font-mono text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded">
@@ -100,7 +116,7 @@ const MatchHub = () => {
           <div className="flex flex-col items-center justify-center py-20 opacity-50">
             <span className="text-4xl mb-2">📅</span>
             <p className="font-bold">No Matches Found</p>
-            <p className="text-xs text-zinc-500">Check the calendar date.</p>
+            <p className="text-xs text-zinc-500">Try checking upcoming dates.</p>
           </div>
         )}
       </div>
