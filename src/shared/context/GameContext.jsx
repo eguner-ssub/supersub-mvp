@@ -51,16 +51,24 @@ export const GameProvider = ({ children }) => {
 
   // --- GAME ACTIONS ---
 
-  // 1. PLACE BET (Updated to include Odds)
-  const placeBet = async (match, selection, potentialReward, cardType, odds) => { // <--- Added 'odds' param
+  /**
+   * PLACE BET
+   * Updated to identify and save the team_name to the database for data integrity.
+   */
+  const placeBet = async (match, selection, potentialReward, cardType, odds) => {
     if (!userProfile) return { success: false, error: 'No user' };
 
     try {
-      // CONSTRUCT THE TITLE 
-      // We explicitly format "Home vs Away" here so it is saved permanently.
       const homeTeam = match.teams.home.name;
       const awayTeam = match.teams.away.name;
       const matchTitle = `${homeTeam} vs ${awayTeam}`;
+
+      // STEP 1 FIX: Determine team_name for database record
+      let teamName = null;
+      if (selection === 'HOME_WIN') teamName = homeTeam;
+      else if (selection === 'AWAY_WIN') teamName = awayTeam;
+      else if (selection === 'DRAW') teamName = 'Draw';
+      // For scorers, the name is usually part of the selection string or handled via MatchDetail
 
       const { data, error } = await supabase
         .from('predictions')
@@ -69,11 +77,12 @@ export const GameProvider = ({ children }) => {
             user_id: userProfile.id,
             match_id: match.fixture.id,
             selection: selection,
+            team_name: teamName, // Now saved to DB instead of null
             potential_reward: potentialReward,
-            card_type: cardType, // e.g., 'c_match_result'
+            card_type: cardType,
             status: 'PENDING',
             match_title: matchTitle,
-            odds: odds // <--- SAVING ODDS TO DB
+            odds: odds
           }
         ])
         .select();
@@ -87,48 +96,28 @@ export const GameProvider = ({ children }) => {
     }
   };
 
-  // 2. CONSUME CARD
   const consumeCard = async (cardId) => {
     if (!userProfile) return false;
-
-    // A. Safe Inventory Copy
     const currentInv = Array.isArray(userProfile.inventory) ? [...userProfile.inventory] : [];
-
-    // B. Find Index
     const cardIndex = currentInv.indexOf(cardId);
-    if (cardIndex === -1) return false; // Card not found
-
-    // C. Optimistic Update
+    if (cardIndex === -1) return false;
     currentInv.splice(cardIndex, 1);
     setUserProfile(prev => ({ ...prev, inventory: currentInv }));
 
-    // D. Database Sync
     const { error } = await supabase
       .from('profiles')
       .update({ inventory: currentInv })
       .eq('id', userProfile.id);
 
-    if (error) {
-      console.error("Card Consumption Failed:", error.message);
-      return false;
-    }
-    return true;
+    return !error;
   };
 
-  // 3. OTHER ACTIONS
   const updateInventory = async (newCardIds) => {
     if (!userProfile?.id) return;
     const currentInv = Array.isArray(userProfile.inventory) ? userProfile.inventory : [];
     const updatedInv = [...currentInv, ...newCardIds];
-
     setUserProfile(prev => ({ ...prev, inventory: updatedInv }));
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ inventory: updatedInv })
-      .eq('id', userProfile.id);
-
-    if (error) console.error('Inventory Sync Failed:', error.message);
+    await supabase.from('profiles').update({ inventory: updatedInv }).eq('id', userProfile.id);
   };
 
   const spendEnergy = async (amount) => {
@@ -138,12 +127,8 @@ export const GameProvider = ({ children }) => {
     await supabase.from('profiles').update({ energy: newEnergy }).eq('id', userProfile.id);
   };
 
-  const checkActiveBets = async () => {
-    // Placeholder for your settlement engine logic
-    console.log("Checking active bets...");
-  };
+  const checkActiveBets = async () => { console.log("Checking active bets..."); };
 
-  // --- INITIALIZATION ---
   useEffect(() => {
     let mounted = true;
     async function initSession() {
@@ -167,15 +152,8 @@ export const GameProvider = ({ children }) => {
   }, []);
 
   const value = {
-    userProfile,
-    loading,
-    supabase,
-    placeBet,    // <--- EXPORTED NEW FUNCTION
-    consumeCard,
-    spendEnergy,
-    updateInventory,
-    checkActiveBets,
-    loadProfile
+    userProfile, loading, supabase, placeBet, consumeCard,
+    spendEnergy, updateInventory, checkActiveBets, loadProfile
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

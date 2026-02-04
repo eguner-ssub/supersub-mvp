@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { Zap, X } from 'lucide-react';
-import { mockConsumables } from '../../data/mockInventory';
+import { useGame } from '../../shared/context/GameContext';
 
 const ViewFridge = () => {
+    const { userProfile } = useGame();
     const [showDrinkPopup, setShowDrinkPopup] = useState(false);
     const [showToast, setShowToast] = useState(false);
+
+    // Get consumables from userProfile or default to 0
+    const energyDrinks = userProfile?.consumables?.energy_drinks || 0;
 
     const handleDrink = () => {
         console.log('✅ Energy Drink consumed!');
@@ -37,7 +41,7 @@ const ViewFridge = () => {
                             </div>
                             <div className="text-center">
                                 <p className="text-white font-bold text-sm">Energy Drink</p>
-                                <p className="text-blue-300 text-xs font-mono">x{mockConsumables.energy_drinks}</p>
+                                <p className="text-blue-300 text-xs font-mono">x{energyDrinks}</p>
                             </div>
                         </div>
                     </button>

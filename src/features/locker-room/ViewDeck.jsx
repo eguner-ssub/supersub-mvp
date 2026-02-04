@@ -1,11 +1,9 @@
 import React from 'react';
 import { useGame } from '../../shared/context/GameContext';
-import { getCardsByStatus } from '../../data/mockInventory';
 import CardBase from '../../shared/ui/CardBase';
 
 const ViewDeck = () => {
     const { userProfile } = useGame();
-    const availableCards = getCardsByStatus('AVAILABLE');
 
     const cardTypes = [
         { id: 'c_match_result', label: 'Match Result' },

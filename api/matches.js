@@ -1,5 +1,6 @@
 export default async function handler(req, res) {
-  const { league = 39, season: requestedSeason, id, date } = req.query;
+  const { league, season: requestedSeason, id } = req.query;
+  let { date } = req.query;
 
   // 1. ROBUST KEY RETRIEVAL
   const apiKey = process.env.VITE_API_FOOTBALL_KEY || process.env.FOOTBALL_API_KEY || "";
@@ -16,17 +17,22 @@ export default async function handler(req, res) {
   };
 
   // 2. DYNAMIC SEASON HANDLING
-  // Determine current year and build season fallback list
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth(); // 0-11
 
-  // Football seasons typically run Aug-May, so if we're in Jan-Jul, use previous year
-  const defaultSeason = currentMonth < 7 ? currentYear : currentYear;
+  // European seasons run Aug-May: if we're in Jan-Jun (0-5), the season is previous year
+  const europeanDefaultSeason = currentMonth < 6 ? currentYear - 1 : currentYear;
   const seasonsToTry = requestedSeason
     ? [parseInt(requestedSeason)]
-    : [defaultSeason, defaultSeason + 1, defaultSeason - 1];
+    : [europeanDefaultSeason, europeanDefaultSeason + 1, europeanDefaultSeason - 1];
 
-  console.log(`🔍 [Matches API] Seasons to try: ${seasonsToTry.join(', ')}`);
+  console.log(`🔍 [Matches API] European default season: ${europeanDefaultSeason}, Seasons to try: ${seasonsToTry.join(', ')}`);
+
+  // 3. GLOBAL FEED DEFAULT: If no specific ID or league requested, default to date-based query
+  if (!date && !id && !league) {
+    date = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
+    console.log(`🌍 [Matches API] Global feed enabled - defaulting to today: ${date}`);
+  }
 
   try {
     // SCENARIO 1: Date-Specific Query (Bypass round logic)
@@ -42,47 +48,69 @@ export default async function handler(req, res) {
         });
       }
 
-      // Use the requested season or default
-      const season = requestedSeason ? parseInt(requestedSeason) : defaultSeason;
+      // Explicitly calculate seasons for February 2026
+      // EPL/Championship: 2025/26 season = season ID 2025
+      // Série A: Calendar year - try 2026 first, fallback to 2025
+      const europeanSeason = requestedSeason ? parseInt(requestedSeason) : europeanDefaultSeason;
+      const brazilianSeasons = [currentYear, currentYear - 1]; // [2026, 2025]
 
-      // Multi-League Support: EPL (39) + Championship (40)
-      const LEAGUES = [39, 40];
-      console.log(`🏆 [Matches API] Fetching from leagues: ${LEAGUES.join(', ')}`);
+      // Multi-League Support with EXPLICIT Season Mapping
+      // NOTE: Keep in sync with src/shared/config/coverage.js
+      const LEAGUE_CONFIG = [
+        { id: 39, name: 'EPL', seasons: [europeanSeason] },           // 2025 for Feb 2026
+        { id: 40, name: 'Championship', seasons: [europeanSeason] },  // 2025 for Feb 2026
+        { id: 71, name: 'Série A', seasons: brazilianSeasons },       // [2026, 2025]
+      ];
+
+      console.log(`🏆 [Matches API] EPL/Champ season: ${europeanSeason}, Brazil seasons: ${brazilianSeasons.join('/')}`);
+      console.log(`🏆 [Matches API] Fetching from ${LEAGUE_CONFIG.length} leagues`);
 
       try {
-        // Parallel fetch for all leagues
-        const fetchPromises = LEAGUES.map(async (leagueId) => {
-          try {
-            const response = await fetch(
-              `${baseUrl}/fixtures?league=${leagueId}&season=${season}&date=${date}`,
-              { headers }
-            );
+        // Parallel fetch for all leagues (with multi-season fallback for SA leagues)
+        const fetchPromises = LEAGUE_CONFIG.map(async (league) => {
+          let allData = [];
 
-            // Handle rate limits
-            if (response.status === 429 || response.status === 403) {
-              console.error(`🚫 [Matches API] Rate limit hit for league ${leagueId}: ${response.status}`);
-              return { leagueId, error: 'RATE_LIMIT', data: [] };
+          // Try each season for this league
+          for (const season of league.seasons) {
+            try {
+              const response = await fetch(
+                `${baseUrl}/fixtures?league=${league.id}&season=${season}&date=${date}`,
+                { headers }
+              );
+
+              // Handle rate limits
+              if (response.status === 429 || response.status === 403) {
+                console.error(`🚫 [Matches API] Rate limit hit for ${league.name} (season ${season}): ${response.status}`);
+                return { leagueId: league.id, error: 'RATE_LIMIT', data: [] };
+              }
+
+              if (!response.ok) {
+                console.error(`❌ [Matches API] Fetch failed for ${league.name} (season ${season}): ${response.status}`);
+                continue; // Try next season
+              }
+
+              const data = await response.json();
+
+              // Check for API errors
+              if (data.errors && Object.keys(data.errors).length > 0) {
+                console.error(`❌ [Matches API] API errors for ${league.name} (season ${season}):`, data.errors);
+                continue; // Try next season
+              }
+
+              const matches = data.response || [];
+              console.log(`✅ [Matches API] ${league.name} (season ${season}): ${matches.length} matches`);
+
+              if (matches.length > 0) {
+                allData = [...allData, ...matches];
+                break; // Found matches, no need to try other seasons
+              }
+            } catch (error) {
+              console.error(`❌ [Matches API] Exception for ${league.name} (season ${season}):`, error.message);
+              continue; // Try next season
             }
-
-            if (!response.ok) {
-              console.error(`❌ [Matches API] Date fetch failed for league ${leagueId}: ${response.status}`);
-              return { leagueId, error: 'FETCH_FAILED', data: [] };
-            }
-
-            const data = await response.json();
-
-            // Check for API errors
-            if (data.errors && Object.keys(data.errors).length > 0) {
-              console.error(`❌ [Matches API] API errors for league ${leagueId}:`, data.errors);
-              return { leagueId, error: 'API_ERROR', data: [] };
-            }
-
-            console.log(`✅ [Matches API] League ${leagueId}: ${data.response?.length || 0} matches`);
-            return { leagueId, error: null, data: data.response || [] };
-          } catch (error) {
-            console.error(`❌ [Matches API] Exception for league ${leagueId}:`, error.message);
-            return { leagueId, error: 'EXCEPTION', data: [] };
           }
+
+          return { leagueId: league.id, error: null, data: allData };
         });
 
         // Wait for all fetches to complete
@@ -111,8 +139,8 @@ export default async function handler(req, res) {
         return res.status(200).json({
           response: sortedMatches,
           date_queried: date,
-          season_used: season,
-          leagues_queried: LEAGUES,
+          season_used: europeanSeason,
+          leagues_queried: LEAGUE_CONFIG.map(l => l.id),
           league_results: results.map(r => ({
             league: r.leagueId,
             count: r.data.length,

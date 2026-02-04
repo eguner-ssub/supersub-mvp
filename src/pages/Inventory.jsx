@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useGame } from '../shared/context/GameContext';
 import { ArrowLeft, Zap, X } from 'lucide-react';
 import MobileLayout from '../shared/ui/MobileLayout';
-import { mockConsumables } from '../data/mockInventory';
 // 1. IMPORT THE COMPONENT
 import CardBase from '../shared/ui/CardBase';
 
@@ -65,7 +64,7 @@ const Inventory = () => {
                   </div>
                   <div className="text-center">
                     <p className="text-gray-300 font-bold text-xs uppercase tracking-wide group-hover:text-white">Energy Drink</p>
-                    <p className="text-blue-400 text-[10px] font-mono mt-1">x{mockConsumables.energy_drinks}</p>
+                    <p className="text-blue-400 text-[10px] font-mono mt-1">x{userProfile?.consumables?.energy_drinks || 0}</p>
                   </div>
                 </div>
               </button>
