@@ -24,7 +24,9 @@ import CardShowcase from './pages/CardShowcase';
 import CardBaseDemo from './pages/CardBaseDemo';
 import CardTest from './pages/CardTest';
 import CardLab from './pages/CardLab';
+import GenericLab from './features/inventory/GenericLab';
 import ComingSoon from './pages/ComingSoon';
+import APIDebugger from './features/debug/APIDebugger';
 
 
 // Pages - Lazy Loading (Large pages with heavy assets)
@@ -134,11 +136,14 @@ export const AppRoutes = () => {
         element={<ProtectedRoute><ComingSoon title="Global Rankings" message="Competition season hasn't started yet." /></ProtectedRoute>}
       />
 
-      {/* DEMO ROUTE - Card System Showcase */}
       <Route path="/card-showcase" element={<CardShowcase />} />
       <Route path="/card-base-demo" element={<CardBaseDemo />} />
       <Route path="/card-test" element={<CardTest />} />
       <Route path="/lab" element={<CardLab />} />
+      <Route path="/lab/generic" element={<GenericLab />} />
+
+      {/* DEBUG ROUTE - API Inspector */}
+      <Route path="/debug" element={<APIDebugger />} />
 
 
       {/* Fallback logic - Default to Manager Office */}

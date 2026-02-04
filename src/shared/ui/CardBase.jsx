@@ -1,9 +1,8 @@
 import React from 'react';
 
 // ============================================================================
-// 1. CONFIGURATION
+// ASSET MAPPING (WebP)
 // ============================================================================
-// We keep these for later, but we will add a CSS fallback if they fail/missing.
 const FRAME_SRC = '/assets/cards/frame-standard.webp';
 
 const ICONS = {
@@ -11,13 +10,11 @@ const ICONS = {
   c_total_goals: '/assets/cards/icon-totalgoals.webp',
   c_player_score: '/assets/cards/icon-playertoscore.webp',
   c_supersub: '/assets/cards/icon-supersub.webp',
-  default: '/assets/cards/icon-supersub.webp',
 };
 
 // ============================================================================
-// 2. COMPONENT
+// COMPONENT
 // ============================================================================
-
 export default function CardBase({
   type,
   label,
@@ -27,86 +24,93 @@ export default function CardBase({
   className = ''
 }) {
 
-  const isMerged = !!selection;
-  const iconSrc = ICONS[type] || ICONS.default;
+  const iconSrc = ICONS[type] || ICONS.c_supersub;
+  const isGeneric = status === 'generic';
 
-  // CSS Fallback Styles (Use these if you don't have the .webp frame)
-  const activeGradient = "bg-gradient-to-b from-neutral-800 via-neutral-900 to-black";
-  const goldBorder = status === 'active' ? "border-2 border-yellow-600/60 shadow-[0_0_15px_rgba(234,179,8,0.2)]" : "border border-white/10";
+  // Dynamic Selection Text Logic
+  let displaySelection = selection;
+
+  // Total Goals Exception: "Over 2.5" → "3 or More Goals"
+  if (type === 'c_total_goals' && selection === 'Over 2.5') {
+    displaySelection = '3 or More Goals';
+  }
+
+  // Goalscorer Exception: "[Name]" → "[Name] to Score"
+  if (type === 'c_player_score' && selection && !selection.includes('to Score')) {
+    displaySelection = `${selection} to Score`;
+  }
+
+  // 4-State Glow Logic (Applied to Root Container)
+  let glowClass = ''; // State 0 (Inventory): No glow
+  if (status === 'pending' || status === 'active') {
+    glowClass = 'shadow-[0_0_20px_rgba(234,179,8,0.5)]';
+  } else if (status === 'won') {
+    glowClass = 'shadow-[0_0_20px_rgba(34,197,94,0.5)]';
+  } else if (status === 'lost') {
+    glowClass = 'shadow-[0_0_20px_rgba(220,38,38,0.5)]';
+  }
 
   return (
     <div
       onClick={onClick}
-      // Added 'activeGradient' and 'goldBorder' to ensure visibility without images
-      className={`relative w-full aspect-[9/16] group cursor-pointer active:scale-95 transition-transform duration-200 select-none rounded-lg overflow-hidden ${activeGradient} ${goldBorder} ${className}`}
+      className={`relative aspect-[2/3] w-full overflow-hidden cursor-pointer active:scale-95 transition-transform duration-200 select-none ${glowClass} ${className}`}
     >
 
-      {/* LAYER 0: THE CHASSIS (Background Frame) */}
-      {/* We attempt to load the image, but the parent div now has a color too */}
+      {/* LAYER 1: Background Frame */}
       <img
         src={FRAME_SRC}
-        alt="Frame"
-        className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none opacity-0" // Hidden for now since we know it's missing
-        onError={(e) => e.target.style.display = 'none'}
+        alt="Card Frame"
+        className="absolute inset-0 w-full h-full object-cover z-0"
       />
 
-      {/* LAYER 1: THE ICON (Foreground) */}
-      <div className="absolute inset-0 flex items-center justify-center z-10 pb-10">
-        {/* If Icon is missing, we show a fallback text circle */}
-        {iconSrc ? (
+      {/* LAYER 2: Content Container */}
+      <div className="absolute inset-0 z-10 flex flex-col">
+
+        {/* BADGES (Top) - Only for Active/Won/Lost, hidden in Generic/Pending */}
+        {status === 'active' && (
+          <div className="absolute top-[-4px] left-1/2 -translate-x-1/2 z-20 bg-yellow-500 text-black text-[7px] font-black uppercase px-2 py-0.5 rounded shadow-md animate-pulse">
+            LIVE
+          </div>
+        )}
+        {status === 'won' && (
+          <div className="absolute top-[-4px] left-1/2 -translate-x-1/2 z-20 bg-green-600 text-white text-[7px] font-black uppercase px-2 py-0.5 rounded shadow-md border border-green-400">
+            WON
+          </div>
+        )}
+        {status === 'lost' && (
+          <div className="absolute top-[-4px] left-1/2 -translate-x-1/2 z-20 bg-zinc-800 text-red-500 text-[7px] font-black uppercase px-2 py-0.5 rounded shadow-md border border-red-900">
+            LOST
+          </div>
+        )}
+
+        {/* ICON AREA - Centered and shifted upward for balanced spacing */}
+        <div className="flex-1 flex items-center justify-center px-4 pb-6">
           <img
             src={iconSrc}
             alt={type}
-            className={`w-[60%] h-[60%] object-contain transition-all duration-700 ease-out 
-                ${isMerged ? 'opacity-20 blur-[1px]' : 'opacity-80'}
-            `}
-            onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'flex'; // Show fallback
-            }}
+            className="w-[75%] h-auto object-contain drop-shadow-md"
           />
-        ) : null}
-
-        {/* Fallback Icon (CSS Circle) - Shows if image fails */}
-        <div className="hidden w-20 h-20 rounded-full border-2 border-white/10 items-center justify-center bg-white/5">
-          <span className="text-2xl">⚽</span>
         </div>
-      </div>
 
-      {/* LAYER 2: GENERIC LABEL (Inventory State) */}
-      {!isMerged && (
-        <div className="absolute bottom-[18%] w-full text-center z-20 px-4 flex flex-col items-center">
-          <div className="w-8 h-[1px] bg-white/20 mb-1" />
-          <span className="block text-[9px] font-black text-white/60 uppercase tracking-[0.2em]">
-            {label || 'TACTIC'}
-          </span>
-        </div>
-      )}
-
-      {/* LAYER 3: MERGED DATA (Played State) */}
-      {isMerged && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-30 p-2 text-center">
-
-          {/* Dark Glass Panel behind text */}
-          <div className="bg-black/60 backdrop-blur-sm p-3 rounded-xl border border-white/10 w-full max-w-[90%] shadow-lg">
-
-            {/* LIVE BADGE */}
-            {status === 'active' && (
-              <div className="inline-block px-2 py-0.5 mb-2 rounded text-[8px] font-black uppercase tracking-wider bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 animate-pulse">
-                LIVE
-              </div>
-            )}
-
-            <h3 className="text-white font-black italic uppercase text-lg leading-tight drop-shadow-md break-words w-full">
-              {selection}
-            </h3>
-
-            <p className="text-[8px] font-mono text-yellow-400/80 uppercase tracking-widest mt-2 border-b border-yellow-500/30 pb-1 inline-block">
-              {label}
-            </p>
+        {/* SELECTION TEXT - Only for States 1, 2, 3 (Pending, Active, Settled) */}
+        {!isGeneric && displaySelection && (
+          <div className="absolute bottom-[22%] left-1/2 -translate-x-1/2 w-[85%] text-center">
+            <span className="text-[9px] font-black uppercase text-white leading-none break-words">
+              {displaySelection}
+            </span>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* LABEL SLOT (Bottom) - Only for State 0 (Generic) */}
+        {isGeneric && label && (
+          <div className="absolute bottom-[14%] left-0 right-0 text-center">
+            <span className="text-[9px] font-black uppercase text-zinc-400 tracking-[0.2em]">
+              {label}
+            </span>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }

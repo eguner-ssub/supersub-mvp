@@ -7,7 +7,7 @@ export default function CardLab() {
     const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen bg-neutral-900 p-8 flex flex-col gap-12 overflow-y-auto">
+        <div className="min-h-screen bg-neutral-900 p-8 flex flex-col gap-16 overflow-y-auto">
 
             {/* Header */}
             <div className="flex items-center gap-4">
@@ -19,42 +19,59 @@ export default function CardLab() {
                 </h1>
             </div>
 
-            {/* 1. INVENTORY STATE (Silver/Steel) */}
+            {/* STATE 0: INVENTORY (Generic) */}
             <div>
-                <h2 className="text-gray-400 font-mono text-xs uppercase tracking-[0.3em] mb-6 border-b border-gray-700 pb-2">
-                    State 0: Inventory (Generic)
+                <h2 className="text-gray-400 font-mono text-xs uppercase tracking-[0.3em] mb-2 border-b border-gray-700 pb-2">
+                    State 0: Inventory (The Sleeper)
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl">
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_match_result" label="Match Result" /></div>
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_total_goals" label="Total Goals" /></div>
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_player_score" label="Player Score" /></div>
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_supersub" label="Super Sub" /></div>
+                <p className="text-zinc-600 text-xs mb-6">Raw metallic slab. Label displayed at bottom.</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl">
+                    <div className="w-32 md:w-40"><CardBase type="c_match_result" label="MATCH RESULT" status="generic" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_total_goals" label="TOTAL GOALS" status="generic" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_player_score" label="GOALSCORER" status="generic" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPER SUB" status="generic" /></div>
                 </div>
             </div>
 
-            {/* 2. LIVE STATE (Amber Glow) */}
+            {/* STATE 1: PENDING (The Wager) */}
             <div>
-                <h2 className="text-yellow-500 font-mono text-xs uppercase tracking-[0.3em] mb-6 border-b border-yellow-900/50 pb-2">
-                    State 1: Active (Live Bet)
+                <h2 className="text-yellow-600 font-mono text-xs uppercase tracking-[0.3em] mb-2 border-b border-yellow-900/30 pb-2">
+                    State 1: Pending (The Wager)
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl">
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_match_result" label="Match Result" selection="Arsenal to Win" status="active" /></div>
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_total_goals" label="Total Goals" selection="Over 2.5 Goals" status="active" /></div>
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_player_score" label="Player Score" selection="Saka Score" status="active" /></div>
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_supersub" label="Super Sub" selection="Nunez Sub" status="active" /></div>
+                <p className="text-zinc-600 text-xs mb-6">Gold glow, NO badges. Selection replaces label.</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl">
+                    <div className="w-32 md:w-40"><CardBase type="c_match_result" label="MATCH RESULT" selection="Arsenal Win" status="pending" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_total_goals" label="TOTAL GOALS" selection="Over 2.5" status="pending" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_player_score" label="GOALSCORER" selection="Woltemade" status="pending" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPER SUB" selection="SUPER SUB" status="pending" /></div>
                 </div>
             </div>
 
-            {/* 3. SETTLED STATE (Win/Green vs Loss/Red) */}
+            {/* STATE 2: ACTIVE (The Action) */}
             <div>
-                <h2 className="text-white font-mono text-xs uppercase tracking-[0.3em] mb-6 border-b border-gray-700 pb-2">
-                    State 2: Settled
+                <h2 className="text-yellow-400 font-mono text-xs uppercase tracking-[0.3em] mb-2 border-b border-yellow-500/50 pb-2">
+                    State 2: Active (The Action)
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl">
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_match_result" label="Match Result" selection="Man City Win" status="won" /></div>
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_total_goals" label="Total Goals" selection="Under 1.5 Goals" status="lost" /></div>
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_player_score" label="Player Score" selection="Haaland Hat-trick" status="won" /></div>
-                    <div className="w-24 h-36 mx-auto"><CardBase type="c_supersub" label="Super Sub" selection="Maguire Sub" status="lost" /></div>
+                <p className="text-zinc-600 text-xs mb-6">Gold glow + yellow LIVE badge. Selection displayed.</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl">
+                    <div className="w-32 md:w-40"><CardBase type="c_match_result" label="MATCH RESULT" selection="Arsenal Win" status="active" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_total_goals" label="TOTAL GOALS" selection="Over 2.5" status="active" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_player_score" label="GOALSCORER" selection="Saka" status="active" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPER SUB" selection="SUPER SUB" status="active" /></div>
+                </div>
+            </div>
+
+            {/* STATE 3: SETTLED (The Result) */}
+            <div>
+                <h2 className="text-white font-mono text-xs uppercase tracking-[0.3em] mb-2 border-b border-gray-700 pb-2">
+                    State 3: Settled (The Result)
+                </h2>
+                <p className="text-zinc-600 text-xs mb-6">Green (WON) or Red (LOST) glow with badges.</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl">
+                    <div className="w-32 md:w-40"><CardBase type="c_match_result" label="MATCH RESULT" selection="Man City Win" status="won" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_total_goals" label="TOTAL GOALS" selection="Under 1.5" status="lost" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_player_score" label="GOALSCORER" selection="Haaland" status="won" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPER SUB" selection="SUPER SUB" status="lost" /></div>
                 </div>
             </div>
 
