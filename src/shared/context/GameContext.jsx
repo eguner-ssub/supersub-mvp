@@ -8,8 +8,6 @@ export const useGame = () => useContext(GameContext);
 export const GameProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // ZOMBIE PROTECTION: Tracks the latest request ID
   const activeRequestId = useRef(0);
 
   const loadProfile = async (session) => {
@@ -25,99 +23,123 @@ export const GameProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
+      // 1. Fetch Basic Profile
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
         .single();
 
       if (activeRequestId.current !== myRequestId) return;
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      // Ensure inventory is always an array
-      if (!data.inventory) data.inventory = [];
+      // 2. Fetch Dedicated Inventory
+      const { data: invData, error: invError } = await supabase
+        .from('inventory')
+        .select('card_id, count')
+        .eq('user_id', session.user.id);
 
-      setUserProfile(data);
+      if (invError) throw invError;
+
+      // 3. Transform rows into a Map for O(1) lookups
+      const inventoryMap = {};
+      invData?.forEach(row => {
+        inventoryMap[row.card_id] = row.count;
+      });
+
+      setUserProfile({ ...profile, inventoryMap });
 
     } catch (error) {
       if (activeRequestId.current !== myRequestId) return;
       console.error('🔥 CONNECTION FAILURE:', error.message);
     } finally {
-      if (activeRequestId.current === myRequestId) {
-        setLoading(false);
-      }
+      if (activeRequestId.current === myRequestId) setLoading(false);
     }
   };
 
-  // --- GAME ACTIONS ---
+  /**
+   * CONSUME CARD
+   * Subtracts 1 from the count in the dedicated inventory table.
+   */
+  const consumeCard = async (cardId) => {
+    if (!userProfile) return false;
+    const currentCount = userProfile.inventoryMap?.[cardId] || 0;
+    if (currentCount <= 0) return false;
+
+    // Update the inventory table row
+    const { error } = await supabase
+      .from('inventory')
+      .update({ count: currentCount - 1 })
+      .eq('user_id', userProfile.id)
+      .eq('card_id', cardId);
+
+    if (error) {
+      console.error("Card consumption failed:", error.message);
+      return false;
+    }
+
+    // Optimistic UI update
+    setUserProfile(prev => ({
+      ...prev,
+      inventoryMap: { ...prev.inventoryMap, [cardId]: currentCount - 1 }
+    }));
+    return true;
+  };
 
   /**
-   * PLACE BET
-   * Updated to identify and save the team_name to the database for data integrity.
+   * UPDATE INVENTORY
+   * Supports bulk adding cards (e.g., from a pack or testing).
    */
+  const updateInventory = async (newCardIds) => {
+    if (!userProfile?.id || !newCardIds.length) return;
+
+    const additions = {};
+    newCardIds.forEach(id => { additions[id] = (additions[id] || 0) + 1; });
+    const newMap = { ...userProfile.inventoryMap };
+
+    for (const [cardId, amount] of Object.entries(additions)) {
+      const currentCount = newMap[cardId] || 0;
+
+      const { error } = await supabase
+        .from('inventory')
+        .upsert({
+          user_id: userProfile.id,
+          card_id: cardId,
+          count: currentCount + amount
+        }, { onConflict: 'user_id,card_id' });
+
+      if (!error) newMap[cardId] = currentCount + amount;
+    }
+
+    setUserProfile(prev => ({ ...prev, inventoryMap: newMap }));
+  };
+
   const placeBet = async (match, selection, potentialReward, cardType, odds) => {
     if (!userProfile) return { success: false, error: 'No user' };
-
     try {
       const homeTeam = match.teams.home.name;
       const awayTeam = match.teams.away.name;
-      const matchTitle = `${homeTeam} vs ${awayTeam}`;
-
-      // STEP 1 FIX: Determine team_name for database record
-      let teamName = null;
-      if (selection === 'HOME_WIN') teamName = homeTeam;
-      else if (selection === 'AWAY_WIN') teamName = awayTeam;
-      else if (selection === 'DRAW') teamName = 'Draw';
-      // For scorers, the name is usually part of the selection string or handled via MatchDetail
+      let teamName = selection === 'HOME_WIN' ? homeTeam : (selection === 'AWAY_WIN' ? awayTeam : 'Draw');
 
       const { data, error } = await supabase
         .from('predictions')
-        .insert([
-          {
-            user_id: userProfile.id,
-            match_id: match.fixture.id,
-            selection: selection,
-            team_name: teamName, // Now saved to DB instead of null
-            potential_reward: potentialReward,
-            card_type: cardType,
-            status: 'PENDING',
-            match_title: matchTitle,
-            odds: odds
-          }
-        ])
-        .select();
+        .insert([{
+          user_id: userProfile.id,
+          match_id: match.fixture.id,
+          selection,
+          team_name: teamName,
+          potential_reward: potentialReward,
+          card_type: cardType,
+          status: 'PENDING',
+          match_title: `${homeTeam} vs ${awayTeam}`,
+          odds
+        }]).select();
 
       if (error) throw error;
       return { success: true, data };
-
     } catch (err) {
-      console.error("Bet Placement Failed:", err.message);
       return { success: false, error: err.message };
     }
-  };
-
-  const consumeCard = async (cardId) => {
-    if (!userProfile) return false;
-    const currentInv = Array.isArray(userProfile.inventory) ? [...userProfile.inventory] : [];
-    const cardIndex = currentInv.indexOf(cardId);
-    if (cardIndex === -1) return false;
-    currentInv.splice(cardIndex, 1);
-    setUserProfile(prev => ({ ...prev, inventory: currentInv }));
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ inventory: currentInv })
-      .eq('id', userProfile.id);
-
-    return !error;
-  };
-
-  const updateInventory = async (newCardIds) => {
-    if (!userProfile?.id) return;
-    const currentInv = Array.isArray(userProfile.inventory) ? userProfile.inventory : [];
-    const updatedInv = [...currentInv, ...newCardIds];
-    setUserProfile(prev => ({ ...prev, inventory: updatedInv }));
-    await supabase.from('profiles').update({ inventory: updatedInv }).eq('id', userProfile.id);
   };
 
   const spendEnergy = async (amount) => {
@@ -127,34 +149,20 @@ export const GameProvider = ({ children }) => {
     await supabase.from('profiles').update({ energy: newEnergy }).eq('id', userProfile.id);
   };
 
-  const checkActiveBets = async () => { console.log("Checking active bets..."); };
-
   useEffect(() => {
     let mounted = true;
     async function initSession() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (mounted) {
-        if (session) await loadProfile(session);
-        else setLoading(false);
-      }
+      if (mounted && session) await loadProfile(session);
+      else if (mounted) setLoading(false);
     }
     initSession();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) {
-        activeRequestId.current += 1;
-        loadProfile(session);
-      }
+      if (mounted) { activeRequestId.current += 1; loadProfile(session); }
     });
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  const value = {
-    userProfile, loading, supabase, placeBet, consumeCard,
-    spendEnergy, updateInventory, checkActiveBets, loadProfile
-  };
-
+  const value = { userProfile, loading, supabase, placeBet, consumeCard, spendEnergy, updateInventory, loadProfile };
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 };

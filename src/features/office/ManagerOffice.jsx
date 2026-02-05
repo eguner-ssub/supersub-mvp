@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp, Zap, Coins } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
@@ -7,35 +7,75 @@ const ManagerOffice = () => {
     const navigate = useNavigate();
     const { userProfile } = useGame();
 
+    // State to track if any matches are currently live globally
+    const [anyLiveMatches, setAnyLiveMatches] = useState(false);
+
     const energy = userProfile?.energy || 0;
     const maxEnergy = userProfile?.max_energy || 5;
     const coins = userProfile?.coins || 0;
     const clubName = userProfile?.club_name || "Manager";
 
+    /**
+     * EFFECT: Global Live Match Check
+     * Hits the match API to check for live statuses across supported leagues
+     */
+    useEffect(() => {
+        const checkGlobalLiveStatus = async () => {
+            try {
+                // Fetch today's matches (defaults to current date if no param provided)
+                const res = await fetch('/api/matches');
+                const data = await res.json();
+
+                if (data.response && Array.isArray(data.response)) {
+                    // Define live statuses based on MatchHub logic
+                    const liveStatuses = ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'];
+
+                    // Check if at least one match is currently active
+                    const isAnyMatchLive = data.response.some(match =>
+                        liveStatuses.includes(match.fixture.status.short)
+                    );
+
+                    setAnyLiveMatches(isAnyMatchLive);
+                }
+            } catch (err) {
+                console.error("Failed to check global live status:", err);
+            }
+        };
+
+        checkGlobalLiveStatus();
+
+        // Optional: Refresh every 5 minutes to stay updated with real-time match shifts
+        const interval = setInterval(checkGlobalLiveStatus, 300000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Dynamic Asset Selection
+    const roomBackground = anyLiveMatches
+        ? "/assets/manager-room-packed.webp"
+        : "/assets/manager-room-empty.webp";
+
     return (
         <div className="w-full h-[100dvh] bg-black flex items-center justify-center overflow-hidden font-sans select-none">
             <div className="relative aspect-[9/16] h-full max-h-[100dvh] w-auto shadow-2xl overflow-hidden bg-gray-900">
 
+                {/* BACKGROUND IMAGE - Swaps based on global live state */}
                 <img
-                    src="/assets/manager-room-empty.webp"
+                    src={roomBackground}
                     alt="Manager Office"
-                    className="absolute inset-0 w-full h-full object-fill z-0"
+                    className="absolute inset-0 w-full h-full object-fill z-0 transition-opacity duration-700"
                 />
 
-                {/* --- HITBOXES (Based on Reference Image) --- */}
-
-                {/* 1. WINDOW (Match Hub) - Top Right Quadrant */}
+                {/* --- HITBOXES --- */}
                 <div
                     data-testid="hotspot-window"
                     onClick={() => navigate('/match-hub')}
                     className="absolute top-[10%] left-[45%] w-[55%] h-[40%] z-10 cursor-pointer active:scale-95 transition-transform"
                 >
-                    <div className="absolute top-[40%] right-[30%] bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10 shadow-xl animate-pulse">
-                        <Trophy className="w-4 h-4 text-white" />
+                    <div className={`absolute top-[40%] right-[30%] bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10 shadow-xl ${anyLiveMatches ? 'animate-pulse' : ''}`}>
+                        <Trophy className={`w-4 h-4 ${anyLiveMatches ? 'text-yellow-400' : 'text-white'}`} />
                     </div>
                 </div>
 
-                {/* 2. BOOKCASE (History) - Left Vertical Strip */}
                 <div
                     data-testid="hotspot-bookcase"
                     onClick={() => navigate('/inventory?tab=ledger')}
@@ -46,7 +86,6 @@ const ManagerOffice = () => {
                     </div>
                 </div>
 
-                {/* 3. LAPTOP (Stats/Dashboard) - Center Bottom */}
                 <div
                     data-testid="hotspot-laptop"
                     onClick={() => navigate('/stats')}
@@ -57,7 +96,6 @@ const ManagerOffice = () => {
                     </div>
                 </div>
 
-                {/* 4. TABLET (Leaderboard) - Bottom Right */}
                 <div
                     data-testid="hotspot-tablet"
                     onClick={() => navigate('/leaderboard')}
@@ -68,7 +106,6 @@ const ManagerOffice = () => {
                     </div>
                 </div>
 
-                {/* 5. PHONE (Inbox) - Bottom Left */}
                 <div
                     data-testid="hotspot-phone"
                     onClick={() => navigate('/inbox')}
@@ -93,7 +130,6 @@ const ManagerOffice = () => {
                         <span className="text-white font-bold text-sm font-mono pt-0.5">{coins}</span>
                     </div>
                 </div>
-
             </div>
         </div>
     );

@@ -28,7 +28,8 @@ const MatchDetail = () => {
     { id: 'c_supersub', label: 'Super Sub' }
   ];
 
-  const getCardCount = (cardId) => userProfile?.inventory?.filter(item => item === cardId).length || 0;
+  // NEW: Updated card count for the selection shelf
+  const getCardCount = (cardId) => userProfile?.inventoryMap?.[cardId] || 0;
 
   useEffect(() => {
     if (!id) return;
@@ -65,16 +66,12 @@ const MatchDetail = () => {
     fetchMatchDetail();
   }, [id]);
 
-  /**
-   * handleOutcomeClick
-   * STEP 3 FIX: Now accepts a friendly label for UI display in the confirmation bar.
-   */
   const handleOutcomeClick = (selection, oddsVal, displayLabel) => {
     setStagedBet({
       card: selectedCard,
       selection,
       odds: oddsVal,
-      displayLabel: displayLabel, // Friendly name like "Arsenal" or "Over 2.5 Goals"
+      displayLabel,
       reward: Math.floor(oddsVal * 100)
     });
     setFlowState('staging');
@@ -104,7 +101,6 @@ const MatchDetail = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
       </div>
 
-      {/* HEADER */}
       <div className="absolute top-0 left-0 w-full px-4 pt-8 pb-4 flex justify-between items-center z-[60]">
         <button onClick={() => navigate('/match-hub')} className="w-10 h-10 bg-black/50 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white"><ArrowLeft className="w-5 h-5" /></button>
         <div className="flex flex-col items-end gap-1">
@@ -121,7 +117,6 @@ const MatchDetail = () => {
         </div>
       </div>
 
-      {/* SCOREBOARD */}
       {match && (
         <div className="absolute top-16 w-full z-40 px-2">
           <div className="relative w-full max-w-lg mx-auto h-14 flex items-center justify-center mt-3 drop-shadow-2xl">
@@ -142,7 +137,6 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* CARD SHELF */}
       {matchPhase !== 'POST' && (
         <div className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
           <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
@@ -168,7 +162,6 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* SELECTION MODALS */}
       {flowState === 'selection' && match && odds && selectedCard && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
           {selectedCard === 'c_match_result' && (
@@ -230,7 +223,6 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* CONFIRMATION BAR */}
       {flowState === 'staging' && stagedBet && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-zinc-900/95 border border-white/10 rounded-2xl p-6 shadow-2xl">
@@ -246,7 +238,6 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* SUCCESS MODAL */}
       {flowState === 'resolved' && (
         <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-md flex items-center justify-center p-6">
           <div className="text-center w-full max-w-sm border border-white/10 bg-zinc-900/50 p-8 rounded-3xl relative overflow-hidden">
