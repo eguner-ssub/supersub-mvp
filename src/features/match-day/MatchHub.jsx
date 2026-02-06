@@ -16,10 +16,8 @@ const MatchHub = () => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Derive a stable date string for fetch dependency
   const dateString = formatDateForAPI(selectedDate);
 
-  // Fetch matches whenever dateString changes
   useEffect(() => {
     const fetchMatches = async () => {
       setLoading(true);
@@ -44,11 +42,19 @@ const MatchHub = () => {
     setSelectedDate(newDate);
   };
 
+  // Status Helpers
   const isLive = (status) => ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(status);
+  const isFinished = (status) => ['FT', 'AET', 'PEN'].includes(status);
   const isNotStarted = (status) => ['NS', 'TBD'].includes(status);
 
+  // Helper to get color for status badge
+  const getStatusColor = (status) => {
+    if (isLive(status)) return 'text-red-500 border-red-600/30 bg-red-600/20';
+    if (isFinished(status)) return 'text-zinc-400 border-zinc-700 bg-zinc-800';
+    return 'text-yellow-500 border-yellow-500/20 bg-yellow-500/10';
+  };
+
   return (
-    // ADDED pb-32 to clear the NavigationShell dock
     <div className="min-h-screen bg-black text-white pb-32 font-sans select-none relative">
       {/* Header */}
       <div className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10 p-4">
@@ -84,57 +90,68 @@ const MatchHub = () => {
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-yellow-500" /></div>
         ) : matches.length > 0 ? (
-          matches.map((match) => (
-            <div
-              key={match.fixture.id}
-              onClick={() => navigate(`/match/${match.fixture.id}`)}
-              className="bg-zinc-900 border border-white/10 rounded-xl p-4 active:scale-95 transition-transform cursor-pointer hover:bg-zinc-800"
-            >
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{match.league?.name || 'LEAGUE'}</span>
+          matches.map((match) => {
+            const status = match.fixture.status.short;
+            const statusColor = getStatusColor(status);
 
-                <div className="flex items-center gap-2">
-                  {isLive(match.fixture.status.short) ? (
-                    <div className="flex items-center gap-1.5 bg-red-600/20 px-2 py-0.5 rounded border border-red-600/30 animate-pulse">
-                      <div className="w-1 h-1 bg-red-500 rounded-full"></div>
-                      <span className="text-[9px] font-black text-red-500 uppercase italic">Live</span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] font-mono text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded">
-                      {new Date(match.fixture.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            return (
+              <div
+                key={match.fixture.id}
+                onClick={() => navigate(`/match/${match.fixture.id}`)}
+                className="bg-zinc-900 border border-white/10 rounded-xl p-4 active:scale-95 transition-transform cursor-pointer hover:bg-zinc-800"
+              >
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{match.league?.name || 'LEAGUE'}</span>
+
+                  {/* IMPROVED STATUS BADGE */}
+                  <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border ${statusColor}`}>
+                    {isLive(status) && <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>}
+                    <span className="text-[9px] font-black uppercase italic">
+                      {/* Show Time for NS, otherwise Status Code (1H, HT, FT) */}
+                      {isNotStarted(status)
+                        ? new Date(match.fixture.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : status}
                     </span>
-                  )}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <img src={match.teams.home.logo} className="w-8 h-8 object-contain" alt="Home" />
+                    <span className="font-bold text-sm truncate">{match.teams.home.name}</span>
+                  </div>
+
+                  <div className="px-4 min-w-[70px] flex flex-col items-center justify-center">
+                    {!isNotStarted(status) ? (
+                      <div className="flex flex-col items-center">
+                        <span className="font-mono text-lg font-black text-white leading-none tracking-tighter">
+                          {match.goals.home} - {match.goals.away}
+                        </span>
+
+                        {/* TIME / HT INDICATOR */}
+                        {status === 'HT' ? (
+                          <span className="text-[8px] font-bold text-yellow-500 mt-1 uppercase">HT</span>
+                        ) : (
+                          match.fixture.status.elapsed && isLive(status) && (
+                            <span className="text-[8px] font-bold text-yellow-500 mt-1">{match.fixture.status.elapsed}'</span>
+                          )
+                        )}
+
+                        {isFinished(status) && <span className="text-[8px] font-bold text-zinc-500 mt-1">Final</span>}
+                      </div>
+                    ) : (
+                      <span className="font-mono text-zinc-600 text-xs">VS</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
+                    <span className="font-bold text-sm truncate text-right">{match.teams.away.name}</span>
+                    <img src={match.teams.away.logo} className="w-8 h-8 object-contain" alt="Away" />
+                  </div>
                 </div>
               </div>
-
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <img src={match.teams.home.logo} className="w-8 h-8 object-contain" alt="Home" />
-                  <span className="font-bold text-sm truncate">{match.teams.home.name}</span>
-                </div>
-
-                <div className="px-4 min-w-[70px] flex flex-col items-center justify-center">
-                  {!isNotStarted(match.fixture.status.short) ? (
-                    <div className="flex flex-col items-center">
-                      <span className="font-mono text-lg font-black text-white leading-none tracking-tighter">
-                        {match.goals.home} - {match.goals.away}
-                      </span>
-                      {match.fixture.status.elapsed && isLive(match.fixture.status.short) && (
-                        <span className="text-[8px] font-bold text-yellow-500 mt-1">{match.fixture.status.elapsed}'</span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="font-mono text-zinc-600 text-xs">VS</span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
-                  <span className="font-bold text-sm truncate text-right">{match.teams.away.name}</span>
-                  <img src={match.teams.away.logo} className="w-8 h-8 object-contain" alt="Away" />
-                </div>
-              </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="flex flex-col items-center justify-center py-20 opacity-50">
             <span className="text-4xl mb-2">📅</span>

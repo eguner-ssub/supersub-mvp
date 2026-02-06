@@ -39,6 +39,15 @@ export const LEAGUE_COVERAGE = {
         theOddsApiKey: 'soccer_saudi_arabia_pro_league',
         seasonType: 'european',
     },
+
+    // NEW: German Bundesliga
+    BUNDESLIGA: {
+        id: 78,
+        name: 'Bundesliga',
+        country: 'Germany',
+        theOddsApiKey: 'soccer_germany_bundesliga',
+        seasonType: 'european',
+    },
 };
 
 // Helper to get league config by API-Football ID
