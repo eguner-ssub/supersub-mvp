@@ -30,6 +30,15 @@ export const LEAGUE_COVERAGE = {
         theOddsApiKey: 'soccer_brazil_campeonato',
         seasonType: 'calendar', // Jan-Dec
     },
+
+    // Saudi Pro League
+    SAUDI_PRO_LEAGUE: {
+        id: 307,
+        name: 'Pro League',
+        country: 'Saudi Arabia',
+        theOddsApiKey: 'soccer_saudi_arabia_pro_league',
+        seasonType: 'european',
+    },
 };
 
 // Helper to get league config by API-Football ID

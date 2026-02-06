@@ -3,23 +3,13 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
-// --- 1. PATH RESOLUTION ---
-// Since this script runs in /scripts/ and your file is at /.env.local
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
-// --- 2. CONFIGURATION ---
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const API_FOOTBALL_KEY = process.env.VITE_API_FOOTBALL_KEY;
-
-// CRITICAL: Use Service Role Key to bypass RLS, otherwise you see 0 bets.
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-
-console.log("\n🛰️ --- ENVIRONMENT CHECK ---");
-console.log("Supabase Connection:", SUPABASE_URL ? "✅ READY" : "❌ MISSING");
-console.log("Football API Key:", API_FOOTBALL_KEY ? "✅ READY" : "❌ MISSING");
-console.log("Access Level:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ ADMIN (Service Role)" : "⚠️ GUEST (Anon - RLS Restricted)");
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY || !API_FOOTBALL_KEY) {
     console.error("❌ ERROR: Missing required API keys. Check .env.local");
@@ -27,7 +17,6 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !API_FOOTBALL_KEY) {
 }
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// --- 3. SETTLEMENT ENGINE ---
 /**
  * Calculates result based on match data
  */
@@ -42,7 +31,8 @@ const calculateResult = (cardType, selection, matchData) => {
     const events = matchData.events || [];
     const lineups = matchData.lineups || [];
 
-    const type = cardType?.toLowerCase() || '';
+    // LEGACY FIX: Fallback to match_result if cardType is null
+    const type = (cardType || 'c_match_result').toLowerCase();
 
     // A. MATCH RESULT
     if (type.includes('match_result') || type.includes('match_winner')) {
@@ -53,7 +43,7 @@ const calculateResult = (cardType, selection, matchData) => {
         return { status: selection === actualOutcome ? 'WON' : 'LOST' };
     }
 
-    // B. TOTAL GOALS (Over/Under 2.5)
+    // B. TOTAL GOALS
     if (type.includes('total_goals')) {
         const total = homeGoals + awayGoals;
         const isOver = total > 2.5;
@@ -61,7 +51,7 @@ const calculateResult = (cardType, selection, matchData) => {
         return { status: (pickedOver === isOver) ? 'WON' : 'LOST' };
     }
 
-    // C. SUPERSUB (Substitute Goalscorer Jackpot)
+    // C. SUPERSUB
     if (type.includes('supersub')) {
         const benchIds = new Set();
         lineups.forEach(team => {
@@ -69,44 +59,19 @@ const calculateResult = (cardType, selection, matchData) => {
                 if (sub.player?.id) benchIds.add(sub.player.id);
             });
         });
-
-        const subScored = events.some(e =>
-            e.type === 'Goal' &&
-            e.detail !== 'Missed Penalty' &&
-            benchIds.has(e.player?.id)
-        );
+        const subScored = events.some(e => e.type === 'Goal' && e.detail !== 'Missed Penalty' && benchIds.has(e.player?.id));
         return { status: subScored ? 'WON' : 'LOST' };
-    }
-
-    // D. PLAYER SCORE (Anytime Scorer)
-    if (type.includes('player_score')) {
-        const playerScored = events.some(e =>
-            e.type === 'Goal' &&
-            e.detail !== 'Missed Penalty' &&
-            selection.includes(e.player?.name || '---')
-        );
-        return { status: playerScored ? 'WON' : 'LOST' };
     }
 
     return { status: 'LOST' };
 };
 
-// --- 4. MAIN EXECUTION ---
 async function runSettlement() {
     console.log("\n🎰 --- STARTING BACKEND SETTLEMENT ---");
 
-    // Fetch pending predictions
-    const { data: bets, error } = await supabase
-        .from('predictions')
-        .select('*')
-        .eq('status', 'PENDING');
+    const { data: bets, error } = await supabase.from('predictions').select('*').eq('status', 'PENDING');
 
-    if (error) {
-        console.error("❌ DB Error:", error.message);
-        return;
-    }
-
-    if (!bets || bets.length === 0) {
+    if (error || !bets || bets.length === 0) {
         console.log("📭 No pending bets to settle.");
         return;
     }
@@ -116,20 +81,13 @@ async function runSettlement() {
 
     for (const matchId of uniqueMatchIds) {
         try {
-            const url = `https://v3.football.api-sports.io/fixtures?id=${matchId}`;
-            const res = await fetch(url, {
-                headers: {
-                    'x-rapidapi-host': 'v3.football.api-sports.io',
-                    'x-rapidapi-key': API_FOOTBALL_KEY
-                }
+            const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${matchId}`, {
+                headers: { 'x-rapidapi-key': API_FOOTBALL_KEY }
             });
             const data = await res.json();
             const matchData = data.response?.[0];
 
-            if (!matchData) {
-                console.warn(`   ⚠️ No data for match ${matchId}. Skipping.`);
-                continue;
-            }
+            if (!matchData) continue;
 
             const status = matchData.fixture.status.short;
             const matchName = `${matchData.teams.home.name} vs ${matchData.teams.away.name}`;
@@ -148,14 +106,10 @@ async function runSettlement() {
                 if (result.status !== 'PENDING') {
                     console.log(`      📝 Bet ${bet.id} (${bet.selection}): ${result.status}`);
 
-                    // Update database
-                    await supabase
-                        .from('predictions')
-                        .update({ status: result.status })
-                        .eq('id', bet.id);
+                    await supabase.from('predictions').update({ status: result.status }).eq('id', bet.id);
 
                     if (result.status === 'WON') {
-                        // Execute Payout RPC
+                        // RPC Call Fixed: Matches parameters in the SQL function
                         const { error: payoutErr } = await supabase.rpc('payout_user', {
                             p_user_id: bet.user_id,
                             p_amount: bet.potential_reward
