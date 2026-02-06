@@ -24,15 +24,10 @@ const MatchHub = () => {
     const fetchMatches = async () => {
       setLoading(true);
       try {
-        // Pass the selected date as a query parameter
         const res = await fetch(`/api/matches?date=${dateString}`);
         const data = await res.json();
-
-        // API now returns only matches for the specified date - no client-side filtering needed
         const fetchedMatches = data.response || [];
         setMatches(fetchedMatches);
-
-        console.log(`📅 [MatchHub] Fetched ${fetchedMatches.length} matches for ${dateString}`);
       } catch (err) {
         console.error("Fetch failed", err);
         setMatches([]);
@@ -41,7 +36,7 @@ const MatchHub = () => {
       }
     };
     fetchMatches();
-  }, [dateString]); // Stable string dependency
+  }, [dateString]);
 
   const changeDate = (days) => {
     const newDate = new Date(selectedDate);
@@ -49,18 +44,19 @@ const MatchHub = () => {
     setSelectedDate(newDate);
   };
 
-  // Helper to determine if a match is currently active
   const isLive = (status) => ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(status);
-
-  // Helper to determine if match has not started
   const isNotStarted = (status) => ['NS', 'TBD'].includes(status);
 
   return (
-    <div className="min-h-screen bg-black text-white pb-20 font-sans select-none">
+    // ADDED pb-32 to clear the NavigationShell dock
+    <div className="min-h-screen bg-black text-white pb-32 font-sans select-none relative">
       {/* Header */}
       <div className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10 p-4">
         <div className="flex justify-between items-center mb-4">
-          <button onClick={() => navigate(-1)} className="p-2 bg-white/10 rounded-full active:scale-95 transition-all">
+          <button
+            onClick={() => navigate('/manager-office')}
+            className="p-2 bg-white/10 rounded-full active:scale-95 transition-all"
+          >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <h1 className="text-xl font-black uppercase tracking-widest">Match Hub</h1>
@@ -97,7 +93,6 @@ const MatchHub = () => {
               <div className="flex justify-between items-center mb-3">
                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{match.league?.name || 'LEAGUE'}</span>
 
-                {/* STATUS BADGE: Show LIVE or Kick-off time */}
                 <div className="flex items-center gap-2">
                   {isLive(match.fixture.status.short) ? (
                     <div className="flex items-center gap-1.5 bg-red-600/20 px-2 py-0.5 rounded border border-red-600/30 animate-pulse">
@@ -113,13 +108,11 @@ const MatchHub = () => {
               </div>
 
               <div className="flex justify-between items-center">
-                {/* Home Team */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <img src={match.teams.home.logo} className="w-8 h-8 object-contain" alt="Home" />
                   <span className="font-bold text-sm truncate">{match.teams.home.name}</span>
                 </div>
 
-                {/* MIDDLE SECTION: Show Score if Live/Finished, else VS */}
                 <div className="px-4 min-w-[70px] flex flex-col items-center justify-center">
                   {!isNotStarted(match.fixture.status.short) ? (
                     <div className="flex flex-col items-center">
@@ -135,7 +128,6 @@ const MatchHub = () => {
                   )}
                 </div>
 
-                {/* Away Team */}
                 <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
                   <span className="font-bold text-sm truncate text-right">{match.teams.away.name}</span>
                   <img src={match.teams.away.logo} className="w-8 h-8 object-contain" alt="Away" />
@@ -154,4 +146,5 @@ const MatchHub = () => {
     </div>
   );
 };
+
 export default MatchHub;

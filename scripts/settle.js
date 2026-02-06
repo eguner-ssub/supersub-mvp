@@ -31,7 +31,6 @@ const calculateResult = (cardType, selection, matchData) => {
     const events = matchData.events || [];
     const lineups = matchData.lineups || [];
 
-    // LEGACY FIX: Fallback to match_result if cardType is null
     const type = (cardType || 'c_match_result').toLowerCase();
 
     // A. MATCH RESULT
@@ -39,7 +38,6 @@ const calculateResult = (cardType, selection, matchData) => {
         let actualOutcome = 'DRAW';
         if (homeGoals > awayGoals) actualOutcome = 'HOME_WIN';
         else if (awayGoals > homeGoals) actualOutcome = 'AWAY_WIN';
-
         return { status: selection === actualOutcome ? 'WON' : 'LOST' };
     }
 
@@ -69,15 +67,19 @@ const calculateResult = (cardType, selection, matchData) => {
 async function runSettlement() {
     console.log("\n🎰 --- STARTING BACKEND SETTLEMENT ---");
 
-    const { data: bets, error } = await supabase.from('predictions').select('*').eq('status', 'PENDING');
+    // NEW: Fetch both PENDING and LIVE bets to manage transitions
+    const { data: bets, error } = await supabase
+        .from('predictions')
+        .select('*')
+        .in('status', ['PENDING', 'LIVE']);
 
     if (error || !bets || bets.length === 0) {
-        console.log("📭 No pending bets to settle.");
+        console.log("📭 No active bets to process.");
         return;
     }
 
     const uniqueMatchIds = [...new Set(bets.map(b => b.match_id))];
-    console.log(`📋 Found ${bets.length} bets across ${uniqueMatchIds.length} matches.`);
+    console.log(`📋 Found ${bets.length} active bets across ${uniqueMatchIds.length} matches.`);
 
     for (const matchId of uniqueMatchIds) {
         try {
@@ -91,37 +93,37 @@ async function runSettlement() {
 
             const status = matchData.fixture.status.short;
             const matchName = `${matchData.teams.home.name} vs ${matchData.teams.away.name}`;
-
-            if (!['FT', 'AET', 'PEN'].includes(status)) {
-                console.log(`   ⏳ [${status}] ${matchName}: Waiting for full time.`);
-                continue;
-            }
-
-            console.log(`   ✅ [${status}] ${matchName}: Processing settlement...`);
-
             const matchBets = bets.filter(b => b.match_id === matchId);
-            for (const bet of matchBets) {
-                const result = calculateResult(bet.card_type, bet.selection, matchData);
 
-                if (result.status !== 'PENDING') {
-                    console.log(`      📝 Bet ${bet.id} (${bet.selection}): ${result.status}`);
-
-                    await supabase.from('predictions').update({ status: result.status }).eq('id', bet.id);
-
-                    if (result.status === 'WON') {
-                        // RPC Call Fixed: Matches parameters in the SQL function
-                        const { error: payoutErr } = await supabase.rpc('payout_user', {
-                            p_user_id: bet.user_id,
-                            p_amount: bet.potential_reward
-                        });
-
-                        if (payoutErr) console.error(`      ❌ Payout failed: ${payoutErr.message}`);
-                        else console.log(`      💰 Payout Success: ${bet.potential_reward} coins.`);
+            // 1. SETTLEMENT LOGIC (FINISHED)
+            if (['FT', 'AET', 'PEN'].includes(status)) {
+                console.log(`   ✅ [${status}] ${matchName}: Settling match...`);
+                for (const bet of matchBets) {
+                    const result = calculateResult(bet.card_type, bet.selection, matchData);
+                    if (result.status !== 'PENDING') {
+                        console.log(`      📝 Bet ${bet.id}: ${result.status}`);
+                        await supabase.from('predictions').update({ status: result.status }).eq('id', bet.id);
+                        if (result.status === 'WON') {
+                            await supabase.rpc('payout_user', { p_user_id: bet.user_id, p_amount: bet.potential_reward });
+                        }
                     }
                 }
             }
+            // 2. TRANSITION LOGIC (LIVE)
+            else if (['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(status)) {
+                console.log(`   📡 [${status}] ${matchName}: Match is active.`);
+                for (const bet of matchBets) {
+                    if (bet.status === 'PENDING') {
+                        console.log(`      ⏱️ Moving Bet ${bet.id} to LIVE status.`);
+                        await supabase.from('predictions').update({ status: 'LIVE' }).eq('id', bet.id);
+                    }
+                }
+            } else {
+                console.log(`   ⏳ [${status}] ${matchName}: Match not started.`);
+            }
+
         } catch (err) {
-            console.error(`   ❌ Error fetching match ${matchId}:`, err.message);
+            console.error(`   ❌ Error processing match ${matchId}:`, err.message);
         }
     }
     console.log("\n🏁 --- SETTLEMENT RUN COMPLETE ---\n");
