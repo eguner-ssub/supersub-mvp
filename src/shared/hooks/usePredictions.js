@@ -15,7 +15,7 @@ export const usePredictions = (statusFilter = null) => {
         setLoading(true);
 
         try {
-            // EXPLICIT SCHEMA: Bypass Supabase cache by listing all columns
+            // Fetching explicit columns to ensure data consistency
             let query = supabase
                 .from('predictions')
                 .select(`
@@ -28,12 +28,13 @@ export const usePredictions = (statusFilter = null) => {
                     potential_reward,
                     status,
                     card_type,
-                    created_at
+                    created_at,
+                    updated_at
                 `)
                 .eq('user_id', userProfile.id)
                 .order('created_at', { ascending: false });
 
-            // Apply status filter
+            // Apply existing status filters for UI tabs
             if (statusFilter === 'PENDING') {
                 query = query.eq('status', 'PENDING');
             } else if (statusFilter === 'LIVE') {
@@ -58,9 +59,39 @@ export const usePredictions = (statusFilter = null) => {
         }
     };
 
+    // 1. Initial Data Fetch
     useEffect(() => {
         fetchPredictions();
     }, [userProfile?.id, statusFilter, supabase]);
+
+    // 2. REAL-TIME SUBSCRIPTION
+    useEffect(() => {
+        if (!userProfile?.id || !supabase) return;
+
+        // Create a channel to listen for database changes specifically for this user
+        const subscription = supabase
+            .channel('public:predictions_updates')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE', // Listen for status transitions (e.g., LIVE -> WON)
+                    schema: 'public',
+                    table: 'predictions',
+                    filter: `user_id=eq.${userProfile.id}`
+                },
+                (payload) => {
+                    // When the settlement script updates a row, refresh the local state
+                    console.log("📡 Real-time settlement update received:", payload);
+                    fetchPredictions();
+                }
+            )
+            .subscribe();
+
+        // Cleanup subscription on unmount
+        return () => {
+            supabase.removeChannel(subscription);
+        };
+    }, [userProfile?.id, supabase]);
 
     return { predictions, loading, refetch: fetchPredictions };
 };

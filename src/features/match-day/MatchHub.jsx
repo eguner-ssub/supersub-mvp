@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { useGame } from '../../shared/context/GameContext';
+// import { useGame } from '../../shared/context/GameContext'; // Uncomment if needed
 
 // HELPER: Format date as YYYY-MM-DD for API
 const formatDateForAPI = (date) => {
@@ -55,9 +55,11 @@ const MatchHub = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white pb-32 font-sans select-none relative">
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10 p-4">
+    // FIX 1: Lock height to viewport and use flex-col
+    <div className="h-[100dvh] w-full flex flex-col bg-black text-white font-sans select-none overflow-hidden">
+
+      {/* FIX 2: Static Header (No longer needs 'sticky' because it sits at the top of the flex column) */}
+      <div className="flex-none bg-black/80 backdrop-blur-md border-b border-white/10 p-4 z-50">
         <div className="flex justify-between items-center mb-4">
           <button
             onClick={() => navigate('/manager-office')}
@@ -85,8 +87,8 @@ const MatchHub = () => {
         </div>
       </div>
 
-      {/* Match List */}
-      <div className="p-4 space-y-3">
+      {/* FIX 3: Scrollable Content Area (flex-1 takes remaining space) */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide p-4 pb-32 space-y-3">
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-yellow-500" /></div>
         ) : matches.length > 0 ? (
@@ -103,11 +105,10 @@ const MatchHub = () => {
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{match.league?.name || 'LEAGUE'}</span>
 
-                  {/* IMPROVED STATUS BADGE */}
+                  {/* Status Badge */}
                   <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border ${statusColor}`}>
                     {isLive(status) && <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>}
                     <span className="text-[9px] font-black uppercase italic">
-                      {/* Show Time for NS, otherwise Status Code (1H, HT, FT) */}
                       {isNotStarted(status)
                         ? new Date(match.fixture.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         : status}
@@ -128,7 +129,6 @@ const MatchHub = () => {
                           {match.goals.home} - {match.goals.away}
                         </span>
 
-                        {/* TIME / HT INDICATOR */}
                         {status === 'HT' ? (
                           <span className="text-[8px] font-bold text-yellow-500 mt-1 uppercase">HT</span>
                         ) : (
