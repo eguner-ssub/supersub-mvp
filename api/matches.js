@@ -43,12 +43,11 @@ export default async function handler(req, res) {
       const europeanSeason = requestedSeason ? parseInt(requestedSeason) : europeanDefaultSeason;
       const brazilianSeasons = [currentYear, currentYear - 1]; // [2026, 2025]
 
-      // Multi-League Support with Saudi Pro League and Bundesliga added
+      // Multi-League Support - UPDATED: Saudi Pro League (307) removed
       const LEAGUE_CONFIG = [
         { id: 39, name: 'EPL', seasons: [europeanSeason] },
         { id: 40, name: 'Championship', seasons: [europeanSeason] },
         { id: 71, name: 'Série A', seasons: brazilianSeasons },
-        { id: 307, name: 'Saudi Pro League', seasons: [europeanSeason] },
         { id: 78, name: 'Bundesliga', seasons: [europeanSeason] },
       ];
 

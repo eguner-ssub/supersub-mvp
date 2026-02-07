@@ -31,16 +31,7 @@ export const LEAGUE_COVERAGE = {
         seasonType: 'calendar', // Jan-Dec
     },
 
-    // Saudi Pro League
-    SAUDI_PRO_LEAGUE: {
-        id: 307,
-        name: 'Pro League',
-        country: 'Saudi Arabia',
-        theOddsApiKey: 'soccer_saudi_arabia_pro_league',
-        seasonType: 'european',
-    },
-
-    // NEW: German Bundesliga
+    // German Bundesliga
     BUNDESLIGA: {
         id: 78,
         name: 'Bundesliga',
