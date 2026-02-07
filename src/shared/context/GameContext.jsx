@@ -23,7 +23,6 @@ export const GameProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      // 1. Fetch Basic Profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -33,7 +32,6 @@ export const GameProvider = ({ children }) => {
       if (activeRequestId.current !== myRequestId) return;
       if (profileError) throw profileError;
 
-      // 2. Fetch Dedicated Inventory
       const { data: invData, error: invError } = await supabase
         .from('inventory')
         .select('card_id, count')
@@ -41,7 +39,6 @@ export const GameProvider = ({ children }) => {
 
       if (invError) throw invError;
 
-      // 3. Transform rows into a Map for O(1) lookups
       const inventoryMap = {};
       invData?.forEach(row => {
         inventoryMap[row.card_id] = row.count;
@@ -57,16 +54,11 @@ export const GameProvider = ({ children }) => {
     }
   };
 
-  /**
-   * CONSUME CARD
-   * Subtracts 1 from the count in the dedicated inventory table.
-   */
   const consumeCard = async (cardId) => {
     if (!userProfile) return false;
     const currentCount = userProfile.inventoryMap?.[cardId] || 0;
     if (currentCount <= 0) return false;
 
-    // Update the inventory table row
     const { error } = await supabase
       .from('inventory')
       .update({ count: currentCount - 1 })
@@ -78,7 +70,6 @@ export const GameProvider = ({ children }) => {
       return false;
     }
 
-    // Optimistic UI update
     setUserProfile(prev => ({
       ...prev,
       inventoryMap: { ...prev.inventoryMap, [cardId]: currentCount - 1 }
@@ -86,10 +77,6 @@ export const GameProvider = ({ children }) => {
     return true;
   };
 
-  /**
-   * UPDATE INVENTORY
-   * Supports bulk adding cards (e.g., from a pack or testing).
-   */
   const updateInventory = async (newCardIds) => {
     if (!userProfile?.id || !newCardIds.length) return;
 
@@ -132,7 +119,8 @@ export const GameProvider = ({ children }) => {
           card_type: cardType,
           status: 'PENDING',
           match_title: `${homeTeam} vs ${awayTeam}`,
-          odds
+          odds,
+          stake: 100 // Added to ensure correct display in ViewLive
         }]).select();
 
       if (error) throw error;

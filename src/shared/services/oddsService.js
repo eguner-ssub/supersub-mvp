@@ -49,10 +49,6 @@ export const getHybridOdds = async (match, apiKey) => {
     }
 };
 
-/**
- * PARSE THE ODDS API
- * Specifically targets the 2.5 totals line
- */
 const parseTheOddsApi = (event) => {
     const bookmakers = event.bookmakers || [];
     const preferredKeys = ['williamhill', 'unibet', 'betfair', 'bet365', 'pinnacle'];
@@ -70,7 +66,6 @@ const parseTheOddsApi = (event) => {
             home: getPrice(h2h?.outcomes, event.home_team) || 0,
             away: getPrice(h2h?.outcomes, event.away_team) || 0,
             draw: getPrice(h2h?.outcomes, 'Draw') || 0,
-            // FIX: Explicitly find the 2.5 point line to avoid incorrect rewards
             goals_over: totals?.outcomes.find(o => o.name === 'Over' && o.point === 2.5)?.price || 0,
             goals_under: totals?.outcomes.find(o => o.name === 'Under' && o.point === 2.5)?.price || 0,
             supersub_yes: 4.50,
@@ -79,10 +74,6 @@ const parseTheOddsApi = (event) => {
     };
 };
 
-/**
- * PARSE API-FOOTBALL
- * Fixes the "Broad Matching" bug that was pulling team-specific goals
- */
 const parseApiFootball = (data, isLive) => {
     let markets = [];
     let bookmakerName = isLive ? "LIVE" : "Official Odds";
@@ -91,7 +82,7 @@ const parseApiFootball = (data, isLive) => {
         markets = data.response?.[0]?.odds || [];
     } else {
         const bookmakers = data.response?.[0]?.bookmakers || [];
-        const target = bookmakers.find(b => [6, 10, 16, 7].includes(b.id)) || bookmakers[0];
+        const target = bookmakers.find(b => [8, 1, 6, 10, 16, 7].includes(b.id)) || bookmakers[0];
         if (target) {
             markets = target.bets;
             bookmakerName = target.name;
@@ -100,26 +91,45 @@ const parseApiFootball = (data, isLive) => {
 
     if (!markets || markets.length === 0) return null;
 
-    // FIX: Changed from .includes() to exact match to avoid "Away Team Goals Over/Under"
-    const findMarket = (nameKey) => markets.find(m => m.name.toLowerCase() === nameKey.toLowerCase());
+    // Robust matching for various bookmaker naming conventions
+    const findMarket = (searchTerms) => markets.find(m => {
+        const name = m.name.toLowerCase();
+        const isTarget = searchTerms.some(term => name.includes(term.toLowerCase()));
+        const isTeamSpecific = name.includes("home") || name.includes("away") || name.includes("team");
+        return isTarget && !isTeamSpecific;
+    });
 
-    const matchWinner = findMarket("Match Winner") || findMarket("1x2");
-    const goals = findMarket("Goals Over/Under");
-    const scorers = findMarket("Anytime Goalscorer") || findMarket("Goalscorers");
+    const matchWinner = findMarket(["match winner", "1x2", "full time result"]);
+    const goalsMarket = findMarket(["goals over/under", "total goals", "over/under"]);
+    const scorers = findMarket(["anytime goalscorer", "goalscorers", "to score anytime"]);
 
-    const getOdd = (market, name) => market?.values.find(v => v.value.toString().toLowerCase() === name.toLowerCase())?.odd;
+    const getOdd = (market, name) => {
+        return market?.values?.find(v => v.value.toString().toLowerCase() === name.toLowerCase())?.odd;
+    };
+
+    const getGoalsOdd = (direction) => {
+        if (!goalsMarket?.values) return 0;
+        const found = goalsMarket.values.find(v => {
+            const val = v.value.toString();
+            return (val.includes(direction) || val.startsWith(direction[0])) && val.includes("2.5");
+        });
+        return found ? parseFloat(found.odd) : 0;
+    };
 
     return {
         source: `API-Football (${bookmakerName})`,
         odds: {
-            home: getOdd(matchWinner, "Home") || 0,
-            draw: getOdd(matchWinner, "Draw") || 0,
-            away: getOdd(matchWinner, "Away") || 0,
-            // FIX: Robustly filter for the "2.5" string within the values array
-            goals_over: goals?.values.find(v => v.value.toString().includes("Over") && v.value.toString().includes("2.5"))?.odd || 0,
-            goals_under: goals?.values.find(v => v.value.toString().includes("Under") && v.value.toString().includes("2.5"))?.odd || 0,
+            home: parseFloat(getOdd(matchWinner, "Home") || 0),
+            draw: parseFloat(getOdd(matchWinner, "Draw") || 0),
+            away: parseFloat(getOdd(matchWinner, "Away") || 0),
+            goals_over: getGoalsOdd("Over"),
+            goals_under: getGoalsOdd("Under"),
             supersub_yes: 4.50,
-            scorers: scorers ? scorers.values.map((p, i) => ({ id: i, name: p.value, odds: p.odd })).slice(0, 15) : []
+            scorers: scorers ? scorers.values.map((p, i) => ({
+                id: i,
+                name: p.value,
+                odds: parseFloat(p.odd)
+            })).slice(0, 15) : []
         }
     };
 };

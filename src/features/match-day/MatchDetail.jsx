@@ -28,7 +28,7 @@ const MatchDetail = () => {
     { id: 'c_supersub', label: 'Super Sub' }
   ];
 
-  // NEW: Updated card count for the selection shelf
+  // Updated card count for the selection shelf
   const getCardCount = (cardId) => userProfile?.inventoryMap?.[cardId] || 0;
 
   useEffect(() => {
@@ -238,11 +238,12 @@ const MatchDetail = () => {
         </div>
       )}
 
+      {/* MODIFIED: STAY ON PAGE INSTEAD OF NAVIGATING AWAY */}
       {flowState === 'resolved' && (
         <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-md flex items-center justify-center p-6">
           <div className="text-center w-full max-w-sm border border-white/10 bg-zinc-900/50 p-8 rounded-3xl relative overflow-hidden">
             <h2 className="text-white font-black uppercase text-3xl mb-4">Locked In!</h2>
-            <button onClick={() => navigate('/match-hub')} className="w-full py-4 bg-white text-black font-black uppercase rounded-xl shadow-xl">Continue</button>
+            <button onClick={handleReset} className="w-full py-4 bg-white text-black font-black uppercase rounded-xl shadow-xl">Continue</button>
           </div>
         </div>
       )}
