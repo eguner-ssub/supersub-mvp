@@ -101,12 +101,15 @@ export const GameProvider = ({ children }) => {
     setUserProfile(prev => ({ ...prev, inventoryMap: newMap }));
   };
 
-  const placeBet = async (match, selection, potentialReward, cardType, odds) => {
+  /**
+   * PLACE BET
+   * Fixed: Now takes 'displayLabel' to prevent non-match result cards from being called "Draw"
+   */
+  const placeBet = async (match, selection, potentialReward, cardType, odds, displayLabel) => {
     if (!userProfile) return { success: false, error: 'No user' };
     try {
       const homeTeam = match.teams.home.name;
       const awayTeam = match.teams.away.name;
-      let teamName = selection === 'HOME_WIN' ? homeTeam : (selection === 'AWAY_WIN' ? awayTeam : 'Draw');
 
       const { data, error } = await supabase
         .from('predictions')
@@ -114,13 +117,13 @@ export const GameProvider = ({ children }) => {
           user_id: userProfile.id,
           match_id: match.fixture.id,
           selection,
-          team_name: teamName,
+          team_name: displayLabel, // Stores "Over 2.5 Goals", Player Name, etc.
           potential_reward: potentialReward,
           card_type: cardType,
           status: 'PENDING',
           match_title: `${homeTeam} vs ${awayTeam}`,
           odds,
-          stake: 100 // Added to ensure correct display in ViewLive
+          stake: 100
         }]).select();
 
       if (error) throw error;
