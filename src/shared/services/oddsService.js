@@ -82,6 +82,7 @@ const parseApiFootball = (data, isLive) => {
         markets = data.response?.[0]?.odds || [];
     } else {
         const bookmakers = data.response?.[0]?.bookmakers || [];
+        // Prioritize Bet365 (8) or Marathonbet (1)
         const target = bookmakers.find(b => [8, 1, 6, 10, 16, 7].includes(b.id)) || bookmakers[0];
         if (target) {
             markets = target.bets;
@@ -91,17 +92,17 @@ const parseApiFootball = (data, isLive) => {
 
     if (!markets || markets.length === 0) return null;
 
-    // Robust matching for various bookmaker naming conventions
-    const findMarket = (searchTerms) => markets.find(m => {
+    // FIX: Flexible partial matching (case-insensitive) to catch variations
+    const findMarket = (keywords) => markets.find(m => {
         const name = m.name.toLowerCase();
-        const isTarget = searchTerms.some(term => name.includes(term.toLowerCase()));
-        const isTeamSpecific = name.includes("home") || name.includes("away") || name.includes("team");
-        return isTarget && !isTeamSpecific;
+        return keywords.some(k => name.includes(k.toLowerCase()));
     });
 
-    const matchWinner = findMarket(["match winner", "1x2", "full time result"]);
-    const goalsMarket = findMarket(["goals over/under", "total goals", "over/under"]);
-    const scorers = findMarket(["anytime goalscorer", "goalscorers", "to score anytime"]);
+    const matchWinner = findMarket(["Match Winner", "1x2", "Full Time"]);
+    const goalsMarket = findMarket(["Goals Over/Under", "Total Goals", "Over/Under"]);
+
+    // FIX: Broad search for any scorer market
+    const scorers = findMarket(["Scorer", "Goalscorer", "To Score"]);
 
     const getOdd = (market, name) => {
         return market?.values?.find(v => v.value.toString().toLowerCase() === name.toLowerCase())?.odd;
@@ -125,11 +126,12 @@ const parseApiFootball = (data, isLive) => {
             goals_over: getGoalsOdd("Over"),
             goals_under: getGoalsOdd("Under"),
             supersub_yes: 4.50,
+            // Return top 20 scorers if found, robust mapping
             scorers: scorers ? scorers.values.map((p, i) => ({
                 id: i,
                 name: p.value,
                 odds: parseFloat(p.odd)
-            })).slice(0, 15) : []
+            })).slice(0, 20) : []
         }
     };
 };

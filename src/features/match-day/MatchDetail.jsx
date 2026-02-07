@@ -48,20 +48,39 @@ const MatchDetail = () => {
 
         if (phase !== 'POST') {
           const oddsData = await getHybridOdds(matchInfo, ODDS_API_KEY);
+
           if (oddsData && oddsData.odds) {
-            setOdds(oddsData.odds);
+            let finalOdds = oddsData.odds;
+
+            // FALLBACK: If API returns odds but NO scorers (common in pre-match), generate them
+            // This prevents the "Empty List" issue
+            if (!finalOdds.scorers || finalOdds.scorers.length === 0) {
+              const homeName = matchInfo.teams.home.name.substring(0, 3).toUpperCase();
+              const awayName = matchInfo.teams.away.name.substring(0, 3).toUpperCase();
+
+              finalOdds.scorers = [
+                { id: 'sim1', name: `${homeName} Striker`, odds: 2.10 },
+                { id: 'sim2', name: `${awayName} Forward`, odds: 2.40 },
+                { id: 'sim3', name: `${homeName} Winger`, odds: 3.10 },
+                { id: 'sim4', name: `${awayName} Midfielder`, odds: 3.50 },
+                { id: 'sim5', name: `${homeName} Captain`, odds: 2.80 },
+                { id: 'sim6', name: `${awayName} Star`, odds: 2.20 },
+              ];
+            }
+
+            setOdds(finalOdds);
             setActiveBookie(oddsData.source);
           } else {
-            // Default Simulation Odds
+            // Full Simulation fallback if API fails completely
             setOdds({
               home: 2.10, draw: 3.20, away: 2.80,
               goals_over: 1.85, goals_under: 1.95,
               supersub_yes: 4.50,
               scorers: [
-                { id: 's1', name: 'E. Haaland', odds: 1.75 },
-                { id: 's2', name: 'K. De Bruyne', odds: 3.20 },
-                { id: 's3', name: 'M. Salah', odds: 2.10 },
-                { id: 's4', name: 'L. Diaz', odds: 3.50 }
+                { id: 's1', name: 'Home Star', odds: 1.90 },
+                { id: 's2', name: 'Away Star', odds: 2.20 },
+                { id: 's3', name: 'Home Striker', odds: 2.50 },
+                { id: 's4', name: 'Away Striker', odds: 3.00 }
               ]
             });
             setActiveBookie("SIMULATION");
@@ -102,7 +121,18 @@ const MatchDetail = () => {
     setFlowState('idle');
   };
 
+  // Helper to split players evenly between Home and Away columns for the UI
+  const getScorerColumns = () => {
+    if (!odds?.scorers) return [[], []];
+    const midpoint = Math.ceil(odds.scorers.length / 2);
+    const leftCol = odds.scorers.slice(0, midpoint);
+    const rightCol = odds.scorers.slice(midpoint);
+    return [leftCol, rightCol];
+  };
+
   if (gameLoading || !userProfile) return <div className="bg-black h-[100dvh] flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500 w-8 h-8" /></div>;
+
+  const [leftScorers, rightScorers] = getScorerColumns();
 
   return (
     <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
@@ -128,22 +158,27 @@ const MatchDetail = () => {
         </div>
       </div>
 
-      {/* Match Banner */}
+      {/* Match Banner - UPDATED: Added min-w-0 to prevent layout shift */}
       {match && (
         <div className="absolute top-16 w-full z-40 px-2">
           <div className="relative w-full max-w-lg mx-auto h-14 flex items-center justify-center mt-3 drop-shadow-2xl">
-            <div className="flex-1 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-l-md border-b-4 border-[#2d241e] flex items-center pl-3">
-              <img src={match.teams.home.logo} className="w-5 h-5 object-contain" alt="Home" />
+            {/* Home Team */}
+            <div className="flex-1 min-w-0 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-l-md border-b-4 border-[#2d241e] flex items-center pl-3">
+              <img src={match.teams.home.logo} className="w-5 h-5 object-contain flex-shrink-0" alt="Home" />
               <span className="ml-2 text-black/90 font-black text-[10px] md:text-xs uppercase truncate leading-none">{match.teams.home.name}</span>
             </div>
-            <div className="w-28 h-14 bg-zinc-950 border-x border-zinc-700 border-b-4 border-[#2d241e] rounded-b-lg flex flex-col items-center justify-center">
+
+            {/* Scoreboard (Fixed Width) */}
+            <div className="w-28 h-14 bg-zinc-950 border-x border-zinc-700 border-b-4 border-[#2d241e] rounded-b-lg flex flex-col items-center justify-center flex-shrink-0 z-10">
               <span className="text-lg md:text-xl text-white font-black font-mono">
                 {match.fixture.status.short === 'NS' ? new Date(match.fixture.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : `${match.goals.home}-${match.goals.away}`}
               </span>
             </div>
-            <div className="flex-1 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-r-md border-b-4 border-[#2d241e] flex items-center justify-end pr-3">
+
+            {/* Away Team */}
+            <div className="flex-1 min-w-0 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-r-md border-b-4 border-[#2d241e] flex items-center justify-end pr-3">
               <span className="mr-2 text-black/90 font-black text-[10px] md:text-xs uppercase truncate text-right leading-none">{match.teams.away.name}</span>
-              <img src={match.teams.away.logo} className="w-5 h-5 object-contain" alt="Away" />
+              <img src={match.teams.away.logo} className="w-5 h-5 object-contain flex-shrink-0" alt="Away" />
             </div>
           </div>
         </div>
@@ -206,29 +241,22 @@ const MatchDetail = () => {
             <div className="flex gap-6 w-full max-w-lg">
               <button onClick={() => handleOutcomeClick('OVER_2.5', odds.goals_over, 'Over 2.5 Goals')} className="flex-1 bg-zinc-900/80 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
                 <ArrowUpCircle className="w-16 h-16 text-emerald-500" />
-                <div className="text-center">
-                  <p className="text-white font-black text-2xl">OVER 2.5</p>
-                  <p className="text-emerald-500 font-bold">+{Math.floor(odds.goals_over * 100)} PTS</p>
-                </div>
+                <div className="text-center"><p className="text-white font-black text-2xl">OVER 2.5</p><p className="text-emerald-500 font-bold">+{Math.floor(odds.goals_over * 100)} PTS</p></div>
               </button>
               <button onClick={() => handleOutcomeClick('UNDER_2.5', odds.goals_under, 'Under 2.5 Goals')} className="flex-1 bg-zinc-900/80 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
                 <Goal className="w-16 h-16 text-red-500" />
-                <div className="text-center">
-                  <p className="text-white font-black text-2xl">UNDER 2.5</p>
-                  <p className="text-red-500 font-bold">+{Math.floor(odds.goals_under * 100)} PTS</p>
-                </div>
+                <div className="text-center"><p className="text-white font-black text-2xl">UNDER 2.5</p><p className="text-red-500 font-bold">+{Math.floor(odds.goals_under * 100)} PTS</p></div>
               </button>
             </div>
           )}
 
-          {/* UPDATED: Player Score (Goalscorer) UI - Side-by-Side Top 10 */}
+          {/* Player Score UI - Dual Column */}
           {selectedCard === 'c_player_score' && (
             <div className="w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
               <div className="bg-zinc-800/50 p-6 border-b border-white/5 flex justify-between items-center">
                 <h3 className="text-white font-black uppercase tracking-tighter text-xl">Select Scorer</h3>
                 <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">Anytime Market</span>
               </div>
-
               <div className="grid grid-cols-2 h-[60vh]">
                 {/* Home Column */}
                 <div className="border-r border-white/5 flex flex-col">
@@ -237,18 +265,14 @@ const MatchDetail = () => {
                     <span className="text-zinc-400 text-[10px] font-black uppercase truncate">{match.teams.home.name}</span>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
-                    {odds.scorers?.slice(0, 10).map((player) => (
+                    {leftScorers.map((player) => (
                       <button key={player.id} onClick={() => handleOutcomeClick(`SCORE_${player.id}`, player.odds, player.name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
-                        <div className="flex items-center gap-3">
-                          <User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" />
-                          <span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span>
-                        </div>
+                        <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span></div>
                         <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-
                 {/* Away Column */}
                 <div className="flex flex-col">
                   <div className="p-4 bg-black/20 flex items-center gap-2 justify-end">
@@ -256,13 +280,9 @@ const MatchDetail = () => {
                     <img src={match.teams.away.logo} className="w-5 h-5 object-contain" alt="" />
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
-                    {/* For UI balance if API returns flat list, we can offset or show next set */}
-                    {odds.scorers?.slice(10, 20).map((player) => (
+                    {rightScorers.map((player) => (
                       <button key={player.id} onClick={() => handleOutcomeClick(`SCORE_${player.id}`, player.odds, player.name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
-                        <div className="flex items-center gap-3">
-                          <User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" />
-                          <span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span>
-                        </div>
+                        <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span></div>
                         <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
                       </button>
                     ))}
@@ -276,17 +296,9 @@ const MatchDetail = () => {
           {selectedCard === 'c_supersub' && (
             <div className="w-full max-w-sm">
               <button onClick={() => handleOutcomeClick('SUPERSUB_YES', odds.supersub_yes, 'Super Sub')} className="w-full bg-gradient-to-br from-yellow-600/20 to-black border border-yellow-500/50 rounded-3xl p-10 flex flex-col items-center gap-6 hover:scale-105 transition-transform">
-                <div className="relative">
-                  <Zap className="w-20 h-20 text-yellow-400 fill-yellow-400" />
-                  <div className="absolute inset-0 bg-yellow-400 blur-2xl opacity-20 animate-pulse"></div>
-                </div>
-                <div className="text-center">
-                  <h3 className="text-white font-black text-3xl uppercase tracking-tighter">Super Sub</h3>
-                  <p className="text-white/60 text-xs mt-2 uppercase tracking-widest">Any Substitute to Score</p>
-                </div>
-                <div className="bg-yellow-500 text-black font-black px-8 py-3 rounded-full text-2xl shadow-[0_0_20px_rgba(234,179,8,0.4)]">
-                  +{Math.floor(odds.supersub_yes * 100)} PTS
-                </div>
+                <div className="relative"><Zap className="w-20 h-20 text-yellow-400 fill-yellow-400" /><div className="absolute inset-0 bg-yellow-400 blur-2xl opacity-20 animate-pulse"></div></div>
+                <div className="text-center"><h3 className="text-white font-black text-3xl uppercase tracking-tighter">Super Sub</h3><p className="text-white/60 text-xs mt-2 uppercase tracking-widest">Any Substitute to Score</p></div>
+                <div className="bg-yellow-500 text-black font-black px-8 py-3 rounded-full text-2xl shadow-[0_0_20px_rgba(234,179,8,0.4)]">+{Math.floor(odds.supersub_yes * 100)} PTS</div>
               </button>
             </div>
           )}
@@ -298,16 +310,9 @@ const MatchDetail = () => {
         <div className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
             <div className="flex justify-between items-start mb-8">
-              <div className="space-y-1">
-                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Outcome Selection</p>
-                <h3 className="text-white font-black text-3xl uppercase italic tracking-tighter leading-tight">{stagedBet.displayLabel}</h3>
-              </div>
-              <div className="text-right space-y-1">
-                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Reward</p>
-                <p className="text-yellow-400 font-black text-4xl tracking-tighter">{stagedBet.reward} <span className="text-xs uppercase">pts</span></p>
-              </div>
+              <div className="space-y-1"><p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Outcome Selection</p><h3 className="text-white font-black text-3xl uppercase italic tracking-tighter leading-tight">{stagedBet.displayLabel}</h3></div>
+              <div className="text-right space-y-1"><p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Reward</p><p className="text-yellow-400 font-black text-4xl tracking-tighter">{stagedBet.reward} <span className="text-xs uppercase">pts</span></p></div>
             </div>
-
             <div className="flex gap-4">
               <button onClick={handleReset} className="flex-1 py-4 bg-zinc-800 rounded-2xl font-bold uppercase text-zinc-400 text-xs tracking-widest hover:bg-zinc-700 transition-colors">Cancel</button>
               <button onClick={handlePlay} className="flex-[2] py-4 bg-emerald-500 rounded-2xl font-black uppercase text-black text-xl shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:scale-105 transition-all">Confirm Play</button>
@@ -321,9 +326,7 @@ const MatchDetail = () => {
         <div className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="text-center w-full max-w-sm border border-white/10 bg-zinc-900/50 p-10 rounded-[3rem] relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent"></div>
-            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30">
-              <Trophy className="w-10 h-10 text-emerald-400" />
-            </div>
+            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30"><Trophy className="w-10 h-10 text-emerald-400" /></div>
             <h2 className="text-white font-black uppercase text-4xl tracking-tighter mb-4">Locked In!</h2>
             <p className="text-zinc-500 text-sm mb-8 uppercase tracking-widest font-bold">Your prediction has been logged in the Locker Room</p>
             <button onClick={handleReset} className="w-full py-5 bg-white text-black font-black uppercase rounded-2xl shadow-2xl hover:bg-zinc-200 transition-colors tracking-tighter text-lg">Continue Scouting</button>
