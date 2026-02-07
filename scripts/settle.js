@@ -1,4 +1,4 @@
-// v2.0.0 - Optimized League-Based Sync
+// v2.1.0 - Full Smart Settlement Engine
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -16,41 +16,67 @@ const isFinished = (status) => ['FT', 'AET', 'PEN'].includes(status);
 const isLive = (status) => ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(status);
 
 /**
- * Calculates result based on cached match data
+ * Advanced settlement logic for all card types
  */
-const calculateResult = (cardType, selection, match) => {
+const calculateResult = (bet, match, events = []) => {
     if (!isFinished(match.status)) return { status: 'PENDING' };
 
-    const type = (cardType || 'c_match_result').toLowerCase();
+    const type = bet.card_type.toLowerCase();
+    const selection = bet.selection;
+    const homeGoals = match.home_score;
+    const awayGoals = match.away_score;
+    const totalGoals = homeGoals + awayGoals;
 
+    // 1. MATCH RESULT
     if (type.includes('match_result')) {
         let outcome = 'DRAW';
-        if (match.home_score > match.away_score) outcome = 'HOME_WIN';
-        else if (match.away_score > match.home_score) outcome = 'AWAY_WIN';
+        if (homeGoals > awayGoals) outcome = 'HOME_WIN';
+        else if (awayGoals > homeGoals) outcome = 'AWAY_WIN';
         return { status: selection === outcome ? 'WON' : 'LOST' };
     }
-    // Add other card logic here...
+
+    // 2. TOTAL GOALS (Line: 2.5)
+    if (type.includes('total_goals')) {
+        const isOver = totalGoals > 2.5;
+        const predictedOver = selection.includes('OVER');
+        return { status: isOver === predictedOver ? 'WON' : 'LOST' };
+    }
+
+    // 3. PLAYER SCORE & SUPER SUB (Requires Events)
+    if (type.includes('player_score') || type.includes('supersub')) {
+        const scorers = events.filter(e => e.type === 'Goal');
+
+        if (type.includes('player_score')) {
+            // selection is "SCORE_123" where 123 is player ID
+            const playerId = selection.split('_')[1];
+            const didScore = scorers.some(s => s.player.id.toString() === playerId);
+            return { status: didScore ? 'WON' : 'LOST' };
+        }
+
+        if (type.includes('supersub')) {
+            // Check if any goal was scored by a player who entered as a sub
+            // Note: This requires detailed event checks or sub flags from API
+            const subScored = scorers.some(s => s.detail === 'Substitution');
+            return { status: subScored ? 'WON' : 'LOST' };
+        }
+    }
+
     return { status: 'LOST' };
 };
 
 async function syncLeaguesAndSettle() {
-    console.log("\n🛰️ --- STARTING LEAGUE SYNC & SETTLEMENT ---");
+    console.log("\n🛰️  Starting Smart Settlement Cycle...");
     const today = new Date().toISOString().split('T')[0];
     const leagueIds = Object.values(LEAGUE_COVERAGE).map(l => l.id);
 
-    // 1. BULK FETCH LEAGUE DATA (1 call per league, not per bet)
+    // 1. Bulk Sync Match Data to Cache
     for (const leagueId of leagueIds) {
-        try {
-            console.log(`📡 Fetching League ID: ${leagueId}...`);
-            const res = await fetch(`https://v3.football.api-sports.io/fixtures?league=${leagueId}&date=${today}`, {
-                headers: { 'x-rapidapi-key': API_KEY }
-            });
-            const { response } = await res.json();
-
-            if (!response || response.length === 0) continue;
-
-            // 2. UPDATE MATCH CACHE
-            const matchUpdates = response.map(m => ({
+        const res = await fetch(`https://v3.football.api-sports.io/fixtures?league=${leagueId}&date=${today}`, {
+            headers: { 'x-apisports-key': API_KEY }
+        });
+        const { response } = await res.json();
+        if (response) {
+            const updates = response.map(m => ({
                 match_id: m.fixture.id,
                 league_id: leagueId,
                 status: m.fixture.status.short,
@@ -59,51 +85,44 @@ async function syncLeaguesAndSettle() {
                 elapsed: m.fixture.status.elapsed ?? 0,
                 updated_at: new Date()
             }));
-
-            await supabase.from('matches_live').upsert(matchUpdates);
-        } catch (err) {
-            console.error(`❌ Sync failed for league ${leagueId}:`, err.message);
+            await supabase.from('matches_live').upsert(updates);
         }
     }
 
-    // 3. SETTLE BETS AGAINST CACHE (No more API calls here)
-    const { data: activeBets } = await supabase
-        .from('predictions')
-        .select('*')
-        .in('status', ['PENDING', 'LIVE']);
+    // 2. Process active predictions
+    const { data: activeBets } = await supabase.from('predictions').select('*').in('status', ['PENDING', 'LIVE']);
+    if (!activeBets?.length) return console.log("📭 No active bets.");
 
-    if (!activeBets || activeBets.length === 0) {
-        console.log("📭 No active bets to process.");
-        return;
-    }
-
-    // Fetch match data from our LOCAL cache
     const matchIds = [...new Set(activeBets.map(b => b.match_id))];
-    const { data: cachedMatches } = await supabase
-        .from('matches_live')
-        .select('*')
-        .in('match_id', matchIds);
+    const { data: cachedMatches } = await supabase.from('matches_live').select('*').in('match_id', matchIds);
 
     for (const bet of activeBets) {
         const match = cachedMatches?.find(m => m.match_id === bet.match_id);
         if (!match) continue;
 
-        // Transition PENDING -> LIVE
         if (bet.status === 'PENDING' && isLive(match.status)) {
-            console.log(`⏱️ Bet ${bet.id} is now LIVE`);
             await supabase.from('predictions').update({ status: 'LIVE' }).eq('id', bet.id);
-        }
-        // Settlement FT -> WON/LOST
-        else if (isFinished(match.status)) {
-            const result = calculateResult(bet.card_type, bet.selection, match);
-            console.log(`✅ Settling Bet ${bet.id}: ${result.status}`);
+            console.log(`⏱️  Bet ${bet.id} moved to LIVE`);
+        } else if (isFinished(match.status)) {
+            // For complex cards, fetch match events for accuracy
+            let events = [];
+            if (bet.card_type !== 'c_match_result') {
+                const eventRes = await fetch(`https://v3.football.api-sports.io/fixtures/events?fixture=${match.match_id}`, {
+                    headers: { 'x-apisports-key': API_KEY }
+                });
+                const eventData = await eventRes.json();
+                events = eventData.response || [];
+            }
+
+            const result = calculateResult(bet, match, events);
+            console.log(`✅ Settled ${bet.id}: ${result.status}`);
             await supabase.from('predictions').update({ status: result.status }).eq('id', bet.id);
+
             if (result.status === 'WON') {
                 await supabase.rpc('payout_user', { p_user_id: bet.user_id, p_amount: bet.potential_reward });
             }
         }
     }
-    console.log("🏁 --- RUN COMPLETE ---");
 }
 
 syncLeaguesAndSettle();

@@ -49,6 +49,10 @@ export const getHybridOdds = async (match, apiKey) => {
     }
 };
 
+/**
+ * PARSE THE ODDS API
+ * Specifically targets the 2.5 totals line
+ */
 const parseTheOddsApi = (event) => {
     const bookmakers = event.bookmakers || [];
     const preferredKeys = ['williamhill', 'unibet', 'betfair', 'bet365', 'pinnacle'];
@@ -57,6 +61,7 @@ const parseTheOddsApi = (event) => {
 
     const h2h = target.markets.find(m => m.key === 'h2h');
     const totals = target.markets.find(m => m.key === 'totals');
+
     const getPrice = (outcomes, name) => outcomes?.find(o => o.name === name)?.price;
 
     return {
@@ -65,14 +70,19 @@ const parseTheOddsApi = (event) => {
             home: getPrice(h2h?.outcomes, event.home_team) || 0,
             away: getPrice(h2h?.outcomes, event.away_team) || 0,
             draw: getPrice(h2h?.outcomes, 'Draw') || 0,
-            goals_over: totals?.outcomes.find(o => o.name === 'Over')?.price || 0,
-            goals_under: totals?.outcomes.find(o => o.name === 'Under')?.price || 0,
+            // FIX: Explicitly find the 2.5 point line to avoid incorrect rewards
+            goals_over: totals?.outcomes.find(o => o.name === 'Over' && o.point === 2.5)?.price || 0,
+            goals_under: totals?.outcomes.find(o => o.name === 'Under' && o.point === 2.5)?.price || 0,
             supersub_yes: 4.50,
             scorers: []
         }
     };
 };
 
+/**
+ * PARSE API-FOOTBALL
+ * Fixes the "Broad Matching" bug that was pulling team-specific goals
+ */
 const parseApiFootball = (data, isLive) => {
     let markets = [];
     let bookmakerName = isLive ? "LIVE" : "Official Odds";
@@ -90,7 +100,9 @@ const parseApiFootball = (data, isLive) => {
 
     if (!markets || markets.length === 0) return null;
 
-    const findMarket = (nameKey) => markets.find(m => m.name.toLowerCase().includes(nameKey.toLowerCase()));
+    // FIX: Changed from .includes() to exact match to avoid "Away Team Goals Over/Under"
+    const findMarket = (nameKey) => markets.find(m => m.name.toLowerCase() === nameKey.toLowerCase());
+
     const matchWinner = findMarket("Match Winner") || findMarket("1x2");
     const goals = findMarket("Goals Over/Under");
     const scorers = findMarket("Anytime Goalscorer") || findMarket("Goalscorers");
@@ -103,7 +115,7 @@ const parseApiFootball = (data, isLive) => {
             home: getOdd(matchWinner, "Home") || 0,
             draw: getOdd(matchWinner, "Draw") || 0,
             away: getOdd(matchWinner, "Away") || 0,
-            // STEP 2 FIX: Ensure we specifically grab the Over/Under 2.5 line
+            // FIX: Robustly filter for the "2.5" string within the values array
             goals_over: goals?.values.find(v => v.value.toString().includes("Over") && v.value.toString().includes("2.5"))?.odd || 0,
             goals_under: goals?.values.find(v => v.value.toString().includes("Under") && v.value.toString().includes("2.5"))?.odd || 0,
             supersub_yes: 4.50,
