@@ -2,27 +2,28 @@ name: Match Settlement Service
 
 on:
   schedule:
+    # Runs every 5 minutes (standard for live-score apps)
     - cron: '*/5 * * * *'
-  workflow_dispatch:
+  workflow_dispatch: # Allows you to still run it manually if needed
 
 jobs:
   settle:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '18'
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Run Settlement Script
+      - name: Run Settlement Engine
+        run: node scripts/settle.js
         env:
+          # These MUST match the keys in your GitHub Secrets
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           VITE_API_FOOTBALL_KEY: ${{ secrets.VITE_API_FOOTBALL_KEY }}
-        run: node scripts/settle.js

@@ -15,7 +15,6 @@ export const usePredictions = (statusFilter = null) => {
         setLoading(true);
 
         try {
-            // Fetching explicit columns to ensure data consistency
             let query = supabase
                 .from('predictions')
                 .select(`
@@ -34,63 +33,81 @@ export const usePredictions = (statusFilter = null) => {
                 .eq('user_id', userProfile.id)
                 .order('created_at', { ascending: false });
 
-            // Apply existing status filters for UI tabs
-            if (statusFilter === 'PENDING') {
-                query = query.eq('status', 'PENDING');
-            } else if (statusFilter === 'LIVE') {
-                query = query.eq('status', 'LIVE');
-            } else if (statusFilter === 'SETTLED') {
-                query = query.in('status', ['WON', 'LOST']);
+            if (statusFilter) {
+                if (statusFilter === 'SETTLED') {
+                    query = query.in('status', ['WON', 'LOST']);
+                } else {
+                    query = query.eq('status', statusFilter);
+                }
             }
 
             const { data, error } = await query;
 
-            if (error) {
-                console.error('Error fetching predictions:', error);
-                setPredictions([]);
+            if (error) throw error;
+
+            // CLIENT-SIDE KICKOFF CHECK
+            // If viewing PENDING bets, verify if any have actually started
+            if (statusFilter === 'PENDING' && data?.length > 0) {
+                const today = new Date().toLocaleDateString('sv-SE');
+                const res = await fetch(`/api/matches?date=${today}`);
+                const matchData = await res.json();
+                const liveMatches = matchData.response || [];
+
+                const liveStatuses = ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'];
+
+                for (const bet of data) {
+                    const match = liveMatches.find(m => m.fixture.id === bet.match_id);
+                    if (match && liveStatuses.includes(match.fixture.status.short)) {
+                        // Update DB: move from PENDING to LIVE
+                        await supabase
+                            .from('predictions')
+                            .update({ status: 'LIVE' })
+                            .eq('id', bet.id);
+
+                        console.log(`🚀 Match ${bet.match_id} started. Moving card ${bet.id} to Tablet.`);
+                    }
+                }
+
+                // If any were updated, we return the filtered list (excluding now-live matches)
+                // The real-time subscription will handle the UI refresh
+                setPredictions(data.filter(b => {
+                    const m = liveMatches.find(lm => lm.fixture.id === b.match_id);
+                    return !(m && liveStatuses.includes(m.fixture.status.short));
+                }));
             } else {
                 setPredictions(data || []);
             }
+
         } catch (err) {
-            console.error('Exception fetching predictions:', err);
+            console.error('Prediction Fetch Error:', err);
             setPredictions([]);
         } finally {
             setLoading(false);
         }
     };
 
-    // 1. Initial Data Fetch
     useEffect(() => {
         fetchPredictions();
     }, [userProfile?.id, statusFilter, supabase]);
 
-    // 2. REAL-TIME SUBSCRIPTION
     useEffect(() => {
         if (!userProfile?.id || !supabase) return;
 
-        // Create a channel to listen for database changes specifically for this user
         const subscription = supabase
-            .channel('public:predictions_updates')
+            .channel('predictions-live-sync')
             .on(
                 'postgres_changes',
                 {
-                    event: 'UPDATE', // Listen for status transitions (e.g., LIVE -> WON)
+                    event: 'UPDATE',
                     schema: 'public',
                     table: 'predictions',
                     filter: `user_id=eq.${userProfile.id}`
                 },
-                (payload) => {
-                    // When the settlement script updates a row, refresh the local state
-                    console.log("📡 Real-time settlement update received:", payload);
-                    fetchPredictions();
-                }
+                () => fetchPredictions()
             )
             .subscribe();
 
-        // Cleanup subscription on unmount
-        return () => {
-            supabase.removeChannel(subscription);
-        };
+        return () => { supabase.removeChannel(subscription); };
     }, [userProfile?.id, supabase]);
 
     return { predictions, loading, refetch: fetchPredictions };
