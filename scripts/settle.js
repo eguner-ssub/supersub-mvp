@@ -1,4 +1,4 @@
-// v2.1.0 - Full Smart Settlement Engine
+// v2.2.0 - Final Smart Settlement Engine
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -44,19 +44,17 @@ const calculateResult = (bet, match, events = []) => {
 
     // 3. PLAYER SCORE & SUPER SUB (Requires Events)
     if (type.includes('player_score') || type.includes('supersub')) {
-        const scorers = events.filter(e => e.type === 'Goal');
+        const goals = events.filter(e => e.type === 'Goal');
 
         if (type.includes('player_score')) {
-            // selection is "SCORE_123" where 123 is player ID
             const playerId = selection.split('_')[1];
-            const didScore = scorers.some(s => s.player.id.toString() === playerId);
+            const didScore = goals.some(g => g.player.id?.toString() === playerId);
             return { status: didScore ? 'WON' : 'LOST' };
         }
 
         if (type.includes('supersub')) {
-            // Check if any goal was scored by a player who entered as a sub
-            // Note: This requires detailed event checks or sub flags from API
-            const subScored = scorers.some(s => s.detail === 'Substitution');
+            // Note: Detail 'Substitution' in a Goal event indicates a sub scored
+            const subScored = goals.some(g => g.detail === 'Substitution' || g.comments?.toLowerCase().includes('sub'));
             return { status: subScored ? 'WON' : 'LOST' };
         }
     }
@@ -71,27 +69,34 @@ async function syncLeaguesAndSettle() {
 
     // 1. Bulk Sync Match Data to Cache
     for (const leagueId of leagueIds) {
-        const res = await fetch(`https://v3.football.api-sports.io/fixtures?league=${leagueId}&date=${today}`, {
-            headers: { 'x-apisports-key': API_KEY }
-        });
-        const { response } = await res.json();
-        if (response) {
-            const updates = response.map(m => ({
-                match_id: m.fixture.id,
-                league_id: leagueId,
-                status: m.fixture.status.short,
-                home_score: m.goals.home ?? 0,
-                away_score: m.goals.away ?? 0,
-                elapsed: m.fixture.status.elapsed ?? 0,
-                updated_at: new Date()
-            }));
-            await supabase.from('matches_live').upsert(updates);
+        try {
+            const res = await fetch(`https://v3.football.api-sports.io/fixtures?league=${leagueId}&date=${today}`, {
+                headers: { 'x-apisports-key': API_KEY }
+            });
+            const { response } = await res.json();
+
+            if (response && response.length > 0) {
+                const updates = response.map(m => ({
+                    match_id: m.fixture.id,
+                    league_id: leagueId,
+                    match_date: m.fixture.date.split('T')[0], // CRITICAL: Fixes Match Hub filtering
+                    status: m.fixture.status.short,
+                    home_score: m.goals.home ?? 0,
+                    away_score: m.goals.away ?? 0,
+                    elapsed: m.fixture.status.elapsed ?? 0,
+                    updated_at: new Date()
+                }));
+                await supabase.from('matches_live').upsert(updates);
+                console.log(`✅ Synced ${updates.length} matches for League ${leagueId}`);
+            }
+        } catch (err) {
+            console.error(`❌ Sync failed for league ${leagueId}:`, err.message);
         }
     }
 
     // 2. Process active predictions
     const { data: activeBets } = await supabase.from('predictions').select('*').in('status', ['PENDING', 'LIVE']);
-    if (!activeBets?.length) return console.log("📭 No active bets.");
+    if (!activeBets?.length) return console.log("📭 No active bets to process.");
 
     const matchIds = [...new Set(activeBets.map(b => b.match_id))];
     const { data: cachedMatches } = await supabase.from('matches_live').select('*').in('match_id', matchIds);
@@ -100,12 +105,15 @@ async function syncLeaguesAndSettle() {
         const match = cachedMatches?.find(m => m.match_id === bet.match_id);
         if (!match) continue;
 
+        // Transition PENDING -> LIVE
         if (bet.status === 'PENDING' && isLive(match.status)) {
             await supabase.from('predictions').update({ status: 'LIVE' }).eq('id', bet.id);
-            console.log(`⏱️  Bet ${bet.id} moved to LIVE`);
-        } else if (isFinished(match.status)) {
-            // For complex cards, fetch match events for accuracy
+            console.log(`⏱️  Bet ${bet.id} is now LIVE`);
+        }
+        // Settlement FT -> WON/LOST
+        else if (isFinished(match.status)) {
             let events = [];
+            // Fetch events only if needed (for player/sub cards)
             if (bet.card_type !== 'c_match_result') {
                 const eventRes = await fetch(`https://v3.football.api-sports.io/fixtures/events?fixture=${match.match_id}`, {
                     headers: { 'x-apisports-key': API_KEY }
@@ -115,7 +123,7 @@ async function syncLeaguesAndSettle() {
             }
 
             const result = calculateResult(bet, match, events);
-            console.log(`✅ Settled ${bet.id}: ${result.status}`);
+            console.log(`✅ Settling ${bet.id}: ${result.status}`);
             await supabase.from('predictions').update({ status: result.status }).eq('id', bet.id);
 
             if (result.status === 'WON') {
@@ -123,6 +131,7 @@ async function syncLeaguesAndSettle() {
             }
         }
     }
+    console.log("🏁 Settlement Cycle Complete.");
 }
 
 syncLeaguesAndSettle();
