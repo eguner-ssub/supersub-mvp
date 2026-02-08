@@ -1,7 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Copy your supported IDs here
+const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78]; 
+
 Deno.serve(async (req) => {
-  // Setup the Supabase Client (REQUIRED TO WRITE TO DB)
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -10,8 +12,6 @@ Deno.serve(async (req) => {
   const API_KEY = Deno.env.get('SPORTS_API_KEY')?.trim()
   const today = new Date().toISOString().split('T')[0]
   
-  console.log(`Syncing matches for date: ${today}`)
-
   const response = await fetch(`https://v3.football.api-sports.io/fixtures?date=${today}`, {
     headers: { 
       'x-apisports-key': API_KEY || '',
@@ -21,17 +21,22 @@ Deno.serve(async (req) => {
   
   const result = await response.json()
 
-  if (result.errors && Object.keys(result.errors).length > 0) {
-    return new Response(JSON.stringify({ error: result.errors }), { status: 500 })
-  }
-
   if (!result.response || result.response.length === 0) {
-    return new Response(JSON.stringify({ message: "No matches found for today" }), { status: 200 })
+    return new Response(JSON.stringify({ message: "No matches found" }), { status: 200 })
   }
 
-  // Mapping data to match your table columns
-  const updates = result.response.map((item: any) => ({
+  // SANITIZATION LOGIC: Filter out any match NOT in your coverage
+  const filteredMatches = result.response.filter((item: any) => 
+    SUPPORTED_LEAGUE_IDS.includes(item.league.id)
+  )
+
+  if (filteredMatches.length === 0) {
+    return new Response(JSON.stringify({ message: "No matches from covered leagues today" }), { status: 200 })
+  }
+
+  const updates = filteredMatches.map((item: any) => ({
     id: item.fixture.id,
+    league_id: item.league.id, // Now storing the league ID
     home_team: item.teams.home.name,
     away_team: item.teams.away.name,
     status: item.fixture.status.short,
@@ -41,18 +46,13 @@ Deno.serve(async (req) => {
     last_updated: new Date().toISOString()
   }))
 
-  // THE PART THAT WAS MISSING: Actually saving to the table
   const { error } = await supabase
     .from('matches')
     .upsert(updates, { onConflict: 'id' })
 
-  if (error) {
-    console.error("Database Error:", error.message)
-    return new Response(JSON.stringify({ db_error: error.message }), { status: 500 })
-  }
+  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 })
 
   return new Response(JSON.stringify({ 
-    message: `Successfully synced ${updates.length} matches`,
-    success: true 
+    message: `Sanitized Sync: Saved ${updates.length} matches from supported leagues.` 
   }), { status: 200 })
 })
