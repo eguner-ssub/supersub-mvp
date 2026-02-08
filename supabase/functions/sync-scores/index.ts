@@ -1,7 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Matches from these specific league IDs will be processed
-const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78]; 
+// Updated to include Serie A (135) and Liga Portugal (94)
+const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
 
 Deno.serve(async (req) => {
   const supabase = createClient(
