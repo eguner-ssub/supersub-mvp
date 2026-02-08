@@ -4,16 +4,13 @@
  */
 
 export const LEAGUE_COVERAGE = {
-    // English Premier League
     EPL: {
         id: 39,
         name: 'Premier League',
         country: 'England',
         theOddsApiKey: 'soccer_epl',
-        seasonType: 'european', // Aug-May
+        seasonType: 'european',
     },
-
-    // English Championship
     CHAMPIONSHIP: {
         id: 40,
         name: 'Championship',
@@ -21,17 +18,27 @@ export const LEAGUE_COVERAGE = {
         theOddsApiKey: 'soccer_england_efl_championship',
         seasonType: 'european',
     },
-
-    // Brazilian Série A
+    SERIE_A: {
+        id: 135,
+        name: 'Serie A',
+        country: 'Italy',
+        theOddsApiKey: 'soccer_italy_serie_a',
+        seasonType: 'european',
+    },
+    LIGA_PORTUGAL: {
+        id: 94,
+        name: 'Liga Portugal',
+        country: 'Portugal',
+        theOddsApiKey: 'soccer_portugal_primeira_liga',
+        seasonType: 'european',
+    },
     SERIE_A_BRAZIL: {
         id: 71,
         name: 'Série A',
         country: 'Brazil',
         theOddsApiKey: 'soccer_brazil_campeonato',
-        seasonType: 'calendar', // Jan-Dec
+        seasonType: 'calendar',
     },
-
-    // German Bundesliga
     BUNDESLIGA: {
         id: 78,
         name: 'Bundesliga',
@@ -40,7 +47,6 @@ export const LEAGUE_COVERAGE = {
         seasonType: 'european',
     },
 };
-
 // Helper to get league config by API-Football ID
 export const getLeagueById = (id) => {
     return Object.values(LEAGUE_COVERAGE).find(league => league.id === id) || null;

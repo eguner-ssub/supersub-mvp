@@ -22,37 +22,31 @@ export default async function handler(req, res) {
 
   // European seasons run Aug-May: if we're in Jan-Jun (0-5), the season is previous year
   const europeanDefaultSeason = currentMonth < 6 ? currentYear - 1 : currentYear;
-  const seasonsToTry = requestedSeason
-    ? [parseInt(requestedSeason)]
-    : [europeanDefaultSeason, europeanDefaultSeason + 1, europeanDefaultSeason - 1];
-
-  console.log(`🔍 [Matches API] European default season: ${europeanDefaultSeason}, Seasons to try: ${seasonsToTry.join(', ')}`);
 
   // 3. GLOBAL FEED DEFAULT: If no specific ID or league requested, default to date-based query
   if (!date && !id && !league) {
-    date = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
+    date = new Date().toISOString().split('T')[0];
     console.log(`🌍 [Matches API] Global feed enabled - defaulting to today: ${date}`);
   }
 
   try {
     // SCENARIO 1: Date-Specific Query (Bypass round logic)
     if (date) {
-      console.log(`📅 [Matches API] Fetching fixtures for date: ${date}`);
-
-      // Explicitly calculate seasons for February 2026
       const europeanSeason = requestedSeason ? parseInt(requestedSeason) : europeanDefaultSeason;
       const brazilianSeasons = [currentYear, currentYear - 1]; // [2026, 2025]
 
-      // Multi-League Support - UPDATED: Saudi Pro League (307) removed
+      // Multi-League Support - UPDATED: Added Italy (135) and Portugal (94)
       const LEAGUE_CONFIG = [
         { id: 39, name: 'EPL', seasons: [europeanSeason] },
         { id: 40, name: 'Championship', seasons: [europeanSeason] },
-        { id: 71, name: 'Série A', seasons: brazilianSeasons },
+        { id: 135, name: 'Serie A', seasons: [europeanSeason] },
+        { id: 94, name: 'Liga Portugal', seasons: [europeanSeason] },
+        { id: 71, name: 'Série A (Brazil)', seasons: brazilianSeasons },
         { id: 78, name: 'Bundesliga', seasons: [europeanSeason] },
       ];
 
       try {
-        // Parallel fetch for all leagues
+        // Parallel fetch for all leagues to avoid cascading delays
         const fetchPromises = LEAGUE_CONFIG.map(async (league) => {
           let allData = [];
 
@@ -74,6 +68,7 @@ export default async function handler(req, res) {
 
               if (matches.length > 0) {
                 allData = [...allData, ...matches];
+                // Break once data is found for the primary season to save calls
                 break;
               }
             } catch (error) {
@@ -87,7 +82,7 @@ export default async function handler(req, res) {
         const results = await Promise.all(fetchPromises);
         const allMatches = results.flatMap(r => r.data);
 
-        // Sort by fixture date
+        // Sort by fixture date for a clean chronological feed
         const sortedMatches = allMatches.sort((a, b) =>
           new Date(a.fixture.date) - new Date(b.fixture.date)
         );
@@ -113,6 +108,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ response: [] });
 
   } catch (error) {
+    console.error("❌ [Matches API] Error:", error.message);
     return res.status(200).json({ error: 'API_UNAVAILABLE', response: [] });
   }
 }
