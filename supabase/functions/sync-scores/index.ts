@@ -1,6 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Matches from these specific league IDs will be processed
+/**
+ * LEAGUE COVERAGE
+ * Central source of truth for league IDs.
+ */
 const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94]; 
 
 Deno.serve(async (req) => {
@@ -14,15 +17,16 @@ Deno.serve(async (req) => {
   const todayStr = now.toISOString().split('T')[0];
   const twentyMinsFromNow = new Date(now.getTime() + 20 * 60000).toISOString();
 
-  // --- SMART GATEKEEPER: SHOULD WE CALL THE API? ---
-  
-  // 1. Check if we have any matches at all for today in the DB
+  // --- 1. SMART GATEKEEPER ---
+  // We check the DB first to see if we even need to talk to the API.
+
+  // A. Check if the daily schedule is already in the DB
   const { count: todayCount } = await supabase
     .from('matches')
     .select('*', { count: 'exact', head: true })
     .gte('kickoff_time', todayStr);
 
-  // 2. Check for Live matches or matches starting within 20 minutes
+  // B. Check for active matches or matches starting within 20 minutes
   const { data: activeMatches } = await supabase
     .from('matches')
     .select('id')
@@ -32,17 +36,16 @@ Deno.serve(async (req) => {
   const isTableEmptyForToday = todayCount === 0;
   const hasActiveAction = activeMatches && activeMatches.length > 0;
 
-  // If we already have the schedule AND nothing is happening/starting soon, ABORT.
+  // HIBERNATION: If schedule exists and no games are live/starting soon, exit.
   if (!isTableEmptyForToday && !hasActiveAction) {
-    console.log("Smart Skip: Matches are scheduled but none are live or imminent.");
+    console.log("Smart Skip: No live or imminent matches. Hibernating to save credits.");
     return new Response(JSON.stringify({ 
       skipped: true, 
-      message: "No active matches. API credits preserved." 
+      message: "Hibernating: No active matches." 
     }), { status: 200 });
   }
 
-  // --- PROCEED TO API SYNC ---
-  
+  // --- 2. MAIN SYNC LOGIC ---
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const datesToSync = [yesterday.toISOString().split('T')[0], todayStr];
@@ -51,7 +54,7 @@ Deno.serve(async (req) => {
 
   for (const date of datesToSync) {
     try {
-      // 1. Fetch Fixtures
+      // Fetch Basic Fixtures for the day
       const response = await fetch(`https://v3.football.api-sports.io/fixtures?date=${date}`, {
         headers: { 'x-apisports-key': API_KEY || '', 'Content-Type': 'application/json' }
       });
@@ -67,51 +70,66 @@ Deno.serve(async (req) => {
 
       const updates = [];
 
-      // 2. Process Matches & Fetch Events if Needed
+      // Loop through matches to check for narrative data (Lineups/Events)
       for (const item of filteredMatches) {
-        let eventsData = null; // Default to null (don't overwrite existing events with empty)
+        let eventsData = null;
+        let lineupsData = null;
 
-        // CRITICAL: Only fetch events if the match is Finished (FT, AET, PEN)
-        // This captures the match data exactly when it finishes, before the "Smart Sleep" kicks in next run.
-        if (['FT', 'AET', 'PEN'].includes(item.fixture.status.short)) {
+        const matchId = item.fixture.id;
+        const status = item.fixture.status.short;
+
+        // A. FETCH LINEUPS
+        // Fetch when match is in First Half (1H) or Half Time (HT) for engagement
+        if (['1H', 'HT'].includes(status)) {
+            try {
+                const lineupRes = await fetch(`https://v3.football.api-sports.io/fixtures/lineups?fixture=${matchId}`, {
+                    headers: { 'x-apisports-key': API_KEY || '' }
+                });
+                const lineupJson = await lineupRes.json();
+                lineupsData = lineupJson.response || [];
+            } catch (e) {
+                console.error(`Failed to fetch lineups for ${matchId}`);
+            }
+        }
+
+        // B. FETCH EVENTS
+        // Fetch only when finished (FT) to settle Anytime Goalscorer and Supersub markets
+        if (['FT', 'AET', 'PEN'].includes(status)) {
            try {
-             // We fetch events specifically for this finished match
-             const eventRes = await fetch(`https://v3.football.api-sports.io/fixtures/events?fixture=${item.fixture.id}`, {
+             const eventRes = await fetch(`https://v3.football.api-sports.io/fixtures/events?fixture=${matchId}`, {
                headers: { 'x-apisports-key': API_KEY || '' }
              });
              const eventJson = await eventRes.json();
              eventsData = eventJson.response || [];
            } catch (e) {
-             console.error(`Failed to fetch events for match ${item.fixture.id}:`, e);
+             console.error(`Failed to fetch events for ${matchId}`);
            }
         }
 
-        // Construct the update object
+        // Construct Update Payload
         const updatePayload: any = {
-            id: item.fixture.id,
+            id: matchId,
             league_id: item.league.id,
             home_team: item.teams.home.name,
             away_team: item.teams.away.name,
-            status: item.fixture.status.short,
+            status: status,
             home_score: item.goals.home ?? 0,
             away_score: item.goals.away ?? 0,
             kickoff_time: item.fixture.date,
             last_updated: new Date().toISOString()
         };
 
-        // Only add events field if we actually fetched them (preserves bandwidth/data)
-        if (eventsData !== null) {
-            updatePayload.events = eventsData;
-        }
+        if (eventsData !== null) updatePayload.events = eventsData;
+        if (lineupsData !== null) updatePayload.lineups = lineupsData;
 
         updates.push(updatePayload);
       }
 
-      // 3. Upsert to DB
+      // 3. UPSERT TO DATABASE
       if (updates.length > 0) {
         const { error } = await supabase.from('matches').upsert(updates, { onConflict: 'id' });
         if (!error) totalSynced += updates.length;
-        else console.error(`DB Error for ${date}:`, error.message);
+        else console.error(`Database Upsert Error:`, error.message);
       }
 
     } catch (err) {
@@ -121,6 +139,9 @@ Deno.serve(async (req) => {
 
   return new Response(JSON.stringify({ 
     success: true,
-    message: `Sync complete. Processed ${totalSynced} matches (with events for finished games).` 
-  }), { status: 200 });
+    message: `Sync complete. Processed ${totalSynced} matches.` 
+  }), { 
+    status: 200,
+    headers: { "Content-Type": "application/json" }
+  });
 })

@@ -4,6 +4,8 @@ import { ArrowLeft, Zap, Loader2, Trophy, Signal, Goal, User, ArrowUpCircle, X }
 import { useGame } from '../../shared/context/GameContext';
 import CardBase from '../../shared/ui/CardBase';
 import { getHybridOdds } from '../../shared/services/oddsService';
+import TacticalHUD from '../../shared/ui/TacticalHUD';
+import MatchTerminationTerminal from '../../shared/ui/MatchTerminationTerminal';
 
 const ODDS_API_KEY = import.meta.env.VITE_ODDS_API_KEY;
 
@@ -136,8 +138,24 @@ const MatchDetail = () => {
 
   return (
     <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
+      {/* Dynamic Background with Cross-Fade */}
       <div className="absolute inset-0 z-0">
-        <img src="/bg-tunnel.webp" className="absolute inset-0 w-full h-full object-cover" alt="Tunnel" />
+        {/* LIVE State Background */}
+        <img
+          src="/assets/bg-tunnel-live.webp"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${matchPhase === 'LIVE' ? 'opacity-100' : 'opacity-0'
+            }`}
+          alt="Live Match Tunnel"
+        />
+
+        {/* PRE-MATCH / FINISHED State Background */}
+        <img
+          src="/assets/bg-tunnel-prepost.webp"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${matchPhase === 'PRE' || matchPhase === 'POST' ? 'opacity-100' : 'opacity-0'
+            }`}
+          alt="Pre/Post Match Tunnel"
+        />
+
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
       </div>
 
@@ -158,34 +176,27 @@ const MatchDetail = () => {
         </div>
       </div>
 
-      {/* Match Banner - UPDATED: Added min-w-0 to prevent layout shift */}
+      {/* Tactical HUD - CSS-Driven Scoreboard */}
       {match && (
-        <div className="absolute top-16 w-full z-40 px-2">
-          <div className="relative w-full max-w-lg mx-auto h-14 flex items-center justify-center mt-3 drop-shadow-2xl">
-            {/* Home Team */}
-            <div className="flex-1 min-w-0 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-l-md border-b-4 border-[#2d241e] flex items-center pl-3">
-              <img src={match.teams.home.logo} className="w-5 h-5 object-contain flex-shrink-0" alt="Home" />
-              <span className="ml-2 text-black/90 font-black text-[10px] md:text-xs uppercase truncate leading-none">{match.teams.home.name}</span>
-            </div>
-
-            {/* Scoreboard (Fixed Width) */}
-            <div className="w-28 h-14 bg-zinc-950 border-x border-zinc-700 border-b-4 border-[#2d241e] rounded-b-lg flex flex-col items-center justify-center flex-shrink-0 z-10">
-              <span className="text-lg md:text-xl text-white font-black font-mono">
-                {match.fixture.status.short === 'NS' ? new Date(match.fixture.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : `${match.goals.home}-${match.goals.away}`}
-              </span>
-            </div>
-
-            {/* Away Team */}
-            <div className="flex-1 min-w-0 h-9 bg-gradient-to-b from-gray-200 via-gray-100 to-gray-400 rounded-r-md border-b-4 border-[#2d241e] flex items-center justify-end pr-3">
-              <span className="mr-2 text-black/90 font-black text-[10px] md:text-xs uppercase truncate text-right leading-none">{match.teams.away.name}</span>
-              <img src={match.teams.away.logo} className="w-5 h-5 object-contain flex-shrink-0" alt="Away" />
-            </div>
-          </div>
-        </div>
+        <TacticalHUD
+          homeTeam={{
+            name: match.teams.home.name,
+            logo: match.teams.home.logo,
+            score: match.goals.home
+          }}
+          awayTeam={{
+            name: match.teams.away.name,
+            logo: match.teams.away.logo,
+            score: match.goals.away
+          }}
+          status={match.fixture.status.short}
+          elapsed={match.fixture.status.elapsed}
+          date={match.fixture.date}
+        />
       )}
 
-      {/* Card Selection Shelf */}
-      {matchPhase !== 'POST' && (
+      {/* Card Selection Shelf - Active States Only (PRE-MATCH / LIVE) */}
+      {(matchPhase === 'PRE' || matchPhase === 'LIVE') && (
         <div className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
           <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
           <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 pointer-events-auto">
@@ -210,8 +221,11 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* SELECTION POPUPS */}
-      {flowState === 'selection' && match && odds && selectedCard && (
+      {/* Match Termination Terminal - Terminated State (FINISHED) */}
+      {matchPhase === 'POST' && <MatchTerminationTerminal />}
+
+      {/* SELECTION POPUPS - Block on Finished Matches */}
+      {flowState === 'selection' && match && odds && selectedCard && matchPhase !== 'POST' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
           <button onClick={handleReset} className="absolute top-8 right-8 text-white/50 hover:text-white"><X className="w-8 h-8" /></button>
 
@@ -305,8 +319,8 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* STAGING PANEL */}
-      {flowState === 'staging' && stagedBet && (
+      {/* STAGING PANEL - Block on Finished Matches */}
+      {flowState === 'staging' && stagedBet && matchPhase !== 'POST' && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
             <div className="flex justify-between items-start mb-8">
