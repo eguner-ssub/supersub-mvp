@@ -82,26 +82,27 @@ const TacticalHUD = ({ homeTeam, awayTeam, status, elapsed, date }) => {
                     {/* Glass Overlay */}
                     <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-[12px] border border-[#1a1a1a]" />
 
-                    {/* Content Grid */}
-                    <div className="relative z-10 grid grid-cols-[1fr_auto_1fr] items-center gap-0 p-3">
+                    {/* Content Grid - Score-Centric Horizontal Layout */}
+                    <div className="relative z-10 grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-3 px-4">
 
-                        {/* Home Team */}
-                        <div className="flex items-center gap-2 min-w-0 pr-2">
-                            <img
-                                src={homeTeam.logo}
-                                className="w-6 h-6 object-contain flex-shrink-0"
-                                alt="Home Team Logo"
-                            />
-                            <span className="text-white/90 font-black text-[10px] uppercase tracking-widest truncate leading-none">
+                        {/* Home Team - Right Aligned towards Center */}
+                        <div className="flex items-center justify-end gap-2 min-w-0">
+                            <span className="text-white/90 font-black text-xs uppercase tracking-wider truncate text-right leading-tight">
                                 {homeTeam.name}
                             </span>
+                            <img
+                                src={homeTeam.logo}
+                                className="w-5 h-5 object-contain flex-shrink-0"
+                                alt="Home Team Logo"
+                            />
                         </div>
 
-                        {/* Score / Time Display */}
+                        {/* Central Score Container - Dominant Anchor */}
                         <div className="flex flex-col items-center gap-1 px-4">
+                            {/* Score Display */}
                             <div
                                 className={`
-                  text-2xl font-black font-mono tracking-wider
+                  text-xl font-black font-mono tracking-wide min-w-[60px] text-center
                   ${status === 'NS' ? 'text-white/80' : 'text-[#39ff14]'}
                   transition-all duration-300
                   ${goalAlert ? 'scale-110 text-[#fbbf24]' : ''}
@@ -110,13 +111,13 @@ const TacticalHUD = ({ homeTeam, awayTeam, status, elapsed, date }) => {
                                 {getDisplayContent()}
                             </div>
 
-                            {/* Status Badge */}
+                            {/* Time/Status Badge - Small Pill Below Score */}
                             <div
                                 className={`
                   px-2 py-0.5 rounded 
                   border ${statusConfig.border} ${statusConfig.glow}
                   ${statusConfig.color}
-                  text-[8px] font-black uppercase tracking-widest
+                  text-[7px] font-black uppercase tracking-widest
                   transition-all duration-300
                 `}
                             >
@@ -124,16 +125,16 @@ const TacticalHUD = ({ homeTeam, awayTeam, status, elapsed, date }) => {
                             </div>
                         </div>
 
-                        {/* Away Team */}
-                        <div className="flex items-center justify-end gap-2 min-w-0 pl-2">
-                            <span className="text-white/90 font-black text-[10px] uppercase tracking-widest truncate text-right leading-none">
-                                {awayTeam.name}
-                            </span>
+                        {/* Away Team - Left Aligned away from Center */}
+                        <div className="flex items-center gap-2 min-w-0">
                             <img
                                 src={awayTeam.logo}
-                                className="w-6 h-6 object-contain flex-shrink-0"
+                                className="w-5 h-5 object-contain flex-shrink-0"
                                 alt="Away Team Logo"
                             />
+                            <span className="text-white/90 font-black text-xs uppercase tracking-wider truncate leading-tight">
+                                {awayTeam.name}
+                            </span>
                         </div>
                     </div>
 

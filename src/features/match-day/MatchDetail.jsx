@@ -176,23 +176,54 @@ const MatchDetail = () => {
         </div>
       </div>
 
-      {/* Tactical HUD - CSS-Driven Scoreboard */}
+      {/* Scoreboard - Strict Flex Model (Mobile Optimized) */}
       {match && (
-        <TacticalHUD
-          homeTeam={{
-            name: match.teams.home.name,
-            logo: match.teams.home.logo,
-            score: match.goals.home
-          }}
-          awayTeam={{
-            name: match.teams.away.name,
-            logo: match.teams.away.logo,
-            score: match.goals.away
-          }}
-          status={match.fixture.status.short}
-          elapsed={match.fixture.status.elapsed}
-          date={match.fixture.date}
-        />
+        <div className="absolute top-16 w-full z-40">
+          <div className="w-full h-16 flex items-center justify-between px-3 bg-black/80 backdrop-blur-md border-b border-white/10 relative">
+
+            {/* Left Block - Home (flex-1 with shrink-0 logo, flexible name) */}
+            <div className="flex-1 flex items-center justify-start min-w-0 mr-2">
+              <img
+                src={match.teams.home.logo}
+                className="w-8 h-8 object-contain mr-2 flex-shrink-0"
+                alt="Home"
+              />
+              <span className="text-xs font-bold text-white uppercase truncate text-left flex-grow">
+                {match.teams.home.name}
+              </span>
+            </div>
+
+            {/* Center Block - Anchor (Fixed/Shrinkwrapped) */}
+            <div className="w-auto flex-shrink-0 mx-2 flex flex-col items-center justify-center z-10">
+              {/* Top: Status/Date */}
+              <span className={`text-[9px] font-bold tracking-widest uppercase mb-[2px] leading-none ${['1H', '2H', 'HT', 'ET', 'P'].includes(match.fixture.status.short)
+                  ? 'text-[#39ff14]'
+                  : 'text-zinc-400'
+                }`}>
+                {match.fixture.status.short === 'NS'
+                  ? new Date(match.fixture.date).toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()
+                  : match.fixture.status.short
+                }
+              </span>
+              {/* Bottom: Score */}
+              <div className="text-lg font-black text-white font-mono leading-none">
+                {match.goals.home} - {match.goals.away}
+              </div>
+            </div>
+
+            {/* Right Block - Away (flex-1 with flexible name, shrink-0 logo) */}
+            <div className="flex-1 flex items-center justify-end min-w-0 ml-2">
+              <span className="text-xs font-bold text-white uppercase truncate text-right flex-grow">
+                {match.teams.away.name}
+              </span>
+              <img
+                src={match.teams.away.logo}
+                className="w-8 h-8 object-contain ml-2 flex-shrink-0"
+                alt="Away"
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Card Selection Shelf - Active States Only (PRE-MATCH / LIVE) */}
@@ -209,9 +240,9 @@ const MatchDetail = () => {
                   disabled={count === 0}
                   className={`relative transition-all duration-300 ${selectedCard === card.id ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl' : count > 0 ? 'hover:translate-y-[-8px]' : 'opacity-40 grayscale'}`}
                 >
-                  <div className="w-20 h-32 relative">
-                    <div className="absolute inset-0 bg-[url('/frame-standard.webp')] bg-cover bg-center rounded-lg shadow-lg"></div>
-                    <div className="absolute inset-0 flex items-center justify-center p-2 z-10"><CardBase type={card.id} label={card.label} status="generic" variant="transparent" /></div>
+                  <div className="w-[5.5rem] h-[8.25rem] relative">
+                    {/* CardBase already renders frame-standard.webp internally, no need for duplicate */}
+                    <div className="absolute inset-0 flex items-center justify-center z-10"><CardBase type={card.id} label={card.label} status="generic" variant="transparent" /></div>
                     {count > 0 && <div className="absolute -top-2 -right-2 bg-zinc-900 text-yellow-500 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border border-yellow-500 shadow-lg z-50">x{count}</div>}
                   </div>
                 </button>

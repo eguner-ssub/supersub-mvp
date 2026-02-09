@@ -40,20 +40,26 @@ export default function CardBase({
     displaySelection = `${selection} to Score`;
   }
 
-  // 4-State Glow Logic (Applied to Root Container)
-  let glowClass = ''; // State 0 (Inventory): No glow
-  if (status === 'pending' || status === 'active') {
-    glowClass = 'shadow-[0_0_20px_rgba(234,179,8,0.5)]';
+  // Docking Underglow Logic (Bottom-focused light source)
+  let glowClass = ''; // State 0 (Inventory): No underglow
+  if (status === 'active') {
+    // Toxic Green underglow for active cards
+    glowClass = 'shadow-[0_10px_20px_-5px_rgba(57,255,20,0.5)]';
+  } else if (status === 'pending') {
+    // Warning Yellow underglow for pending cards
+    glowClass = 'shadow-[0_10px_20px_-5px_rgba(251,191,36,0.5)]';
   } else if (status === 'won') {
-    glowClass = 'shadow-[0_0_20px_rgba(34,197,94,0.5)]';
+    // Green underglow for won cards
+    glowClass = 'shadow-[0_10px_20px_-5px_rgba(34,197,94,0.5)]';
   } else if (status === 'lost') {
-    glowClass = 'shadow-[0_0_20px_rgba(220,38,38,0.5)]';
+    // Red underglow for lost cards
+    glowClass = 'shadow-[0_10px_20px_-5px_rgba(220,38,38,0.5)]';
   }
 
   return (
     <div
       onClick={onClick}
-      className={`relative aspect-[2/3] w-full overflow-hidden cursor-pointer active:scale-95 transition-transform duration-200 select-none ${glowClass} ${className}`}
+      className={`relative aspect-[2/3] w-full overflow-hidden cursor-pointer active:scale-95 transition-transform duration-200 select-none rounded-lg ring-1 ring-white/20 border-t border-white/30 ${glowClass} ${className}`}
     >
 
       {/* LAYER 1: Background Frame */}
