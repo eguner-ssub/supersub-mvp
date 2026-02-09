@@ -46,9 +46,14 @@ Deno.serve(async (req) => {
   }
 
   // --- 2. MAIN SYNC LOGIC ---
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const datesToSync = [yesterday.toISOString().split('T')[0], todayStr];
+  // Only fetch yesterday's fixtures during late-night settlement window (00:00-03:00)
+  // to catch delayed match completions while conserving API credits
+  const currentHour = now.getHours();
+  const shouldFetchYesterday = currentHour >= 0 && currentHour < 3;
+  
+  const datesToSync = shouldFetchYesterday 
+    ? [new Date(now.getTime() - 24 * 60 * 60000).toISOString().split('T')[0], todayStr]
+    : [todayStr];
 
   let totalSynced = 0;
 
@@ -68,6 +73,24 @@ Deno.serve(async (req) => {
 
       if (filteredMatches.length === 0) continue;
 
+      // PRE-FETCH EXISTING MATCH DATA TO AVOID REDUNDANT API CALLS
+      const matchIds = filteredMatches.map((item: any) => item.fixture.id);
+      const { data: existingMatches } = await supabase
+        .from('matches')
+        .select('id, lineups, events, last_updated, finished_at')
+        .in('id', matchIds);
+
+      // Create a lookup map for O(1) access
+      const existingMatchMap = new Map<number, {
+        id: number;
+        lineups: any;
+        events: any;
+        last_updated: string | null;
+        finished_at: string | null;
+      }>(
+        existingMatches?.map((m: any) => [m.id, m]) || []
+      );
+
       const updates = [];
 
       // Loop through matches to check for narrative data (Lineups/Events)
@@ -77,33 +100,85 @@ Deno.serve(async (req) => {
 
         const matchId = item.fixture.id;
         const status = item.fixture.status.short;
+        const kickoffTime = new Date(item.fixture.date);
+        const timeUntilKickoff = kickoffTime.getTime() - now.getTime();
+        const timeSinceKickoff = now.getTime() - kickoffTime.getTime();
 
-        // A. FETCH LINEUPS
-        // Fetch when match is in First Half (1H) or Half Time (HT) for engagement
-        if (['1H', 'HT'].includes(status)) {
-            try {
-                const lineupRes = await fetch(`https://v3.football.api-sports.io/fixtures/lineups?fixture=${matchId}`, {
-                    headers: { 'x-apisports-key': API_KEY || '' }
-                });
-                const lineupJson = await lineupRes.json();
-                lineupsData = lineupJson.response || [];
-            } catch (e) {
-                console.error(`Failed to fetch lineups for ${matchId}`);
-            }
+        const existingMatch = existingMatchMap.get(matchId);
+        const hasLineups = existingMatch?.lineups && 
+                          Array.isArray(existingMatch.lineups) && 
+                          existingMatch.lineups.length > 0;
+
+        // A. STATE-AWARE LINEUP FETCHING
+        // Time Window: T-60m to T+30m
+        const inLineupWindow = timeUntilKickoff <= 60 * 60000 && timeSinceKickoff <= 30 * 60000;
+
+        let shouldFetchLineups = false;
+        if (inLineupWindow) {
+          if (!hasLineups) {
+            // No lineups in DB - fetch immediately
+            shouldFetchLineups = true;
+          } else if (existingMatch?.last_updated) {
+            // Lineups exist - only re-fetch if stale (>30min old)
+            const lastUpdate = new Date(existingMatch.last_updated);
+            const minutesSinceUpdate = (now.getTime() - lastUpdate.getTime()) / 60000;
+            shouldFetchLineups = minutesSinceUpdate > 30;
+          }
         }
 
-        // B. FETCH EVENTS
-        // Fetch only when finished (FT) to settle Anytime Goalscorer and Supersub markets
-        if (['FT', 'AET', 'PEN'].includes(status)) {
-           try {
-             const eventRes = await fetch(`https://v3.football.api-sports.io/fixtures/events?fixture=${matchId}`, {
-               headers: { 'x-apisports-key': API_KEY || '' }
-             });
-             const eventJson = await eventRes.json();
-             eventsData = eventJson.response || [];
-           } catch (e) {
-             console.error(`Failed to fetch events for ${matchId}`);
-           }
+        if (shouldFetchLineups) {
+          try {
+            const lineupRes = await fetch(`https://v3.football.api-sports.io/fixtures/lineups?fixture=${matchId}`, {
+              headers: { 'x-apisports-key': API_KEY || '' }
+            });
+            const lineupJson = await lineupRes.json();
+            lineupsData = lineupJson.response || [];
+            console.log(`[LINEUP] Fetched for match ${matchId} (${!hasLineups ? 'new' : 'refresh'})`);
+          } catch (e) {
+            console.error(`Failed to fetch lineups for ${matchId}`);
+          }
+        }
+
+        // B. STATE-AWARE EVENT FETCHING
+        // Time Window: T-15m to FT+15m
+        const inPreMatchWindow = timeUntilKickoff <= 15 * 60000 && timeUntilKickoff > 0;
+        const isFinished = ['FT', 'AET', 'PEN'].includes(status);
+
+        let shouldFetchEvents = false;
+
+        if (inPreMatchWindow || isFinished) {
+          // Check if match has been finished for > 15 minutes
+          if (isFinished && existingMatch?.finished_at) {
+            const finishedAt = new Date(existingMatch.finished_at);
+            const minutesSinceFinished = (now.getTime() - finishedAt.getTime()) / 60000;
+            
+            if (minutesSinceFinished > 15) {
+              // Match finished > 15min ago - stop fetching
+              shouldFetchEvents = false;
+            } else {
+              // Still within 15min post-finish window
+              shouldFetchEvents = true;
+            }
+          } else if (isFinished && !existingMatch?.finished_at) {
+            // Just transitioned to finished - fetch and record timestamp
+            shouldFetchEvents = true;
+          } else {
+            // Pre-match window or active match
+            shouldFetchEvents = true;
+          }
+        }
+
+        if (shouldFetchEvents) {
+          try {
+            const eventRes = await fetch(`https://v3.football.api-sports.io/fixtures/events?fixture=${matchId}`, {
+              headers: { 'x-apisports-key': API_KEY || '' }
+            });
+            const eventJson = await eventRes.json();
+            eventsData = eventJson.response || [];
+            console.log(`[EVENTS] Fetched for match ${matchId} (status: ${status})`);
+          } catch (e) {
+            console.error(`Failed to fetch events for ${matchId}`);
+          }
         }
 
         // Construct Update Payload
@@ -118,6 +193,11 @@ Deno.serve(async (req) => {
             kickoff_time: item.fixture.date,
             last_updated: new Date().toISOString()
         };
+
+        // Track when match finishes for event fetching cutoff
+        if (['FT', 'AET', 'PEN'].includes(status) && !existingMatch?.finished_at) {
+          updatePayload.finished_at = new Date().toISOString();
+        }
 
         if (eventsData !== null) updatePayload.events = eventsData;
         if (lineupsData !== null) updatePayload.lineups = lineupsData;
