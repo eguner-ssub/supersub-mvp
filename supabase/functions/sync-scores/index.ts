@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Matches from these specific league IDs will be processed
 const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94]; 
 
 Deno.serve(async (req) => {
@@ -13,7 +14,7 @@ Deno.serve(async (req) => {
   const todayStr = now.toISOString().split('T')[0];
   const twentyMinsFromNow = new Date(now.getTime() + 20 * 60000).toISOString();
 
-  // --- SMART CHECK: SHOULD WE CALL THE API? ---
+  // --- SMART GATEKEEPER: SHOULD WE CALL THE API? ---
   
   // 1. Check if we have any matches at all for today in the DB
   const { count: todayCount } = await supabase
@@ -50,6 +51,7 @@ Deno.serve(async (req) => {
 
   for (const date of datesToSync) {
     try {
+      // 1. Fetch Fixtures
       const response = await fetch(`https://v3.football.api-sports.io/fixtures?date=${date}`, {
         headers: { 'x-apisports-key': API_KEY || '', 'Content-Type': 'application/json' }
       });
@@ -63,20 +65,54 @@ Deno.serve(async (req) => {
 
       if (filteredMatches.length === 0) continue;
 
-      const updates = filteredMatches.map((item: any) => ({
-        id: item.fixture.id,
-        league_id: item.league.id,
-        home_team: item.teams.home.name,
-        away_team: item.teams.away.name,
-        status: item.fixture.status.short,
-        home_score: item.goals.home ?? 0,
-        away_score: item.goals.away ?? 0,
-        kickoff_time: item.fixture.date,
-        last_updated: new Date().toISOString()
-      }));
+      const updates = [];
 
-      const { error } = await supabase.from('matches').upsert(updates, { onConflict: 'id' });
-      if (!error) totalSynced += updates.length;
+      // 2. Process Matches & Fetch Events if Needed
+      for (const item of filteredMatches) {
+        let eventsData = null; // Default to null (don't overwrite existing events with empty)
+
+        // CRITICAL: Only fetch events if the match is Finished (FT, AET, PEN)
+        // This captures the match data exactly when it finishes, before the "Smart Sleep" kicks in next run.
+        if (['FT', 'AET', 'PEN'].includes(item.fixture.status.short)) {
+           try {
+             // We fetch events specifically for this finished match
+             const eventRes = await fetch(`https://v3.football.api-sports.io/fixtures/events?fixture=${item.fixture.id}`, {
+               headers: { 'x-apisports-key': API_KEY || '' }
+             });
+             const eventJson = await eventRes.json();
+             eventsData = eventJson.response || [];
+           } catch (e) {
+             console.error(`Failed to fetch events for match ${item.fixture.id}:`, e);
+           }
+        }
+
+        // Construct the update object
+        const updatePayload: any = {
+            id: item.fixture.id,
+            league_id: item.league.id,
+            home_team: item.teams.home.name,
+            away_team: item.teams.away.name,
+            status: item.fixture.status.short,
+            home_score: item.goals.home ?? 0,
+            away_score: item.goals.away ?? 0,
+            kickoff_time: item.fixture.date,
+            last_updated: new Date().toISOString()
+        };
+
+        // Only add events field if we actually fetched them (preserves bandwidth/data)
+        if (eventsData !== null) {
+            updatePayload.events = eventsData;
+        }
+
+        updates.push(updatePayload);
+      }
+
+      // 3. Upsert to DB
+      if (updates.length > 0) {
+        const { error } = await supabase.from('matches').upsert(updates, { onConflict: 'id' });
+        if (!error) totalSynced += updates.length;
+        else console.error(`DB Error for ${date}:`, error.message);
+      }
 
     } catch (err) {
       console.error(`Sync error for ${date}:`, err);
@@ -85,6 +121,6 @@ Deno.serve(async (req) => {
 
   return new Response(JSON.stringify({ 
     success: true,
-    message: `Sync complete. Processed ${totalSynced} matches across 2 days.` 
+    message: `Sync complete. Processed ${totalSynced} matches (with events for finished games).` 
   }), { status: 200 });
 })
