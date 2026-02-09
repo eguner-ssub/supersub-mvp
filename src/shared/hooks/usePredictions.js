@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGame } from '../context/GameContext';
 
 export const usePredictions = (statusFilter = null) => {
@@ -6,10 +6,11 @@ export const usePredictions = (statusFilter = null) => {
     const [loading, setLoading] = useState(true);
     const { userProfile, supabase } = useGame();
 
-    // Use a ref to keep track of the active channel across renders
+    // REF: Tracks the active channel to prevent stale cleanup calls
     const channelRef = useRef(null);
 
-    const fetchPredictions = async () => {
+    // WRAPPED IN USECALLBACK: Prevents infinite re-renders when used in useEffect
+    const fetchPredictions = useCallback(async () => {
         if (!userProfile?.id || !supabase) {
             setLoading(false);
             return;
@@ -18,7 +19,7 @@ export const usePredictions = (statusFilter = null) => {
         setLoading(true);
 
         try {
-            // Joined query for matches table (Scores/Status)
+            // JOIN: Linking predictions to the matches table for real-time scores
             let query = supabase
                 .from('predictions')
                 .select(`
@@ -32,7 +33,7 @@ export const usePredictions = (statusFilter = null) => {
                 .eq('user_id', userProfile.id)
                 .order('created_at', { ascending: false });
 
-            // Status Lifecycle mapping
+            // Apply filters based on the new status lifecycle
             if (statusFilter === 'SETTLED') {
                 query = query.in('status', ['SETTLED', 'WON', 'LOST', 'CANCELLED']);
             } else if (statusFilter) {
@@ -49,30 +50,31 @@ export const usePredictions = (statusFilter = null) => {
         } finally {
             setLoading(false);
         }
-    };
-
-    // 1. Initial Data Load
-    useEffect(() => {
-        fetchPredictions();
     }, [userProfile?.id, statusFilter, supabase]);
 
-    // 2. RESILIENT REAL-TIME SUBSCRIPTION
+    // 1. Initial Data Fetch
+    useEffect(() => {
+        fetchPredictions();
+    }, [fetchPredictions]);
+
+    // 2. ROBUST REAL-TIME SUBSCRIPTION
     useEffect(() => {
         if (!userProfile?.id || !supabase) return;
 
-        // Cleanup any lingering channel before establishing a new one
+        // Cleanup helper to remove existing channels safely
         const cleanupChannel = async () => {
             if (channelRef.current) {
-                await supabase.removeChannel(channelRef.current);
+                const oldChannel = channelRef.current;
                 channelRef.current = null;
+                await supabase.removeChannel(oldChannel);
             }
         };
 
         const initRealtime = async () => {
-            // Ensure we are starting fresh
+            // Ensure we start with a clean slate
             await cleanupChannel();
 
-            // Create a unique channel ID based on user and filter to prevent collisions
+            // Unique channel ID per user/filter to avoid collisions
             const channelId = `predictions-${statusFilter || 'all'}-${userProfile.id}`;
 
             const channel = supabase
@@ -80,22 +82,20 @@ export const usePredictions = (statusFilter = null) => {
                 .on(
                     'postgres_changes',
                     {
-                        event: '*',
+                        event: '*', // Listen for INSERT, UPDATE, DELETE
                         schema: 'public',
                         table: 'predictions',
                         filter: `user_id=eq.${userProfile.id}`
                     },
                     (payload) => {
-                        console.log("⚡ Real-time update detected:", payload.new.status);
+                        console.log("⚡ [Realtime] Update detected:", payload.eventType);
+                        // Refresh the data to get the new scores/status from the join
                         fetchPredictions();
                     }
                 )
                 .subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
-                        console.log(`📡 WebSocket established for ${channelId}`);
-                    }
-                    if (status === 'CHANNEL_ERROR') {
-                        console.error(`❌ WebSocket error on ${channelId}`);
+                        console.log(`📡 Connected to channel: ${channelId}`);
                     }
                 });
 
@@ -104,20 +104,20 @@ export const usePredictions = (statusFilter = null) => {
 
         initRealtime();
 
-        // Cleanup function for unmounting or dependency changes
+        // CLEANUP: Prevents "WebSocket closed" error by adding a safety check
         return () => {
             if (channelRef.current) {
-                const currentChannel = channelRef.current;
-                // We use a small timeout to allow pending connections to settle 
-                // before trying to force-close them, which stops the "closed before established" error.
+                const activeChannel = channelRef.current;
+                // Small timeout allows pending handshakes to finish before closing
+                // This fixes the "closed before established" console error
                 setTimeout(() => {
-                    if (currentChannel) {
-                        supabase.removeChannel(currentChannel);
+                    if (activeChannel) {
+                        supabase.removeChannel(activeChannel);
                     }
                 }, 100);
             }
         };
-    }, [userProfile?.id, statusFilter, supabase]);
+    }, [userProfile?.id, statusFilter, supabase, fetchPredictions]);
 
     return { predictions, loading, refetch: fetchPredictions };
-}; v
+};
