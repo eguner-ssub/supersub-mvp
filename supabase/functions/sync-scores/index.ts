@@ -26,11 +26,11 @@ Deno.serve(async (req) => {
     .select('*', { count: 'exact', head: true })
     .gte('kickoff_time', todayStr);
 
-  // B. Check for active matches or matches starting within 20 minutes
+  // B. Check for active matches, matches starting within 20 minutes, OR stuck in NS past kickoff
   const { data: activeMatches } = await supabase
     .from('matches')
     .select('id')
-    .or(`status.in.("1H","HT","2H","ET","P"),and(kickoff_time.gte.${now.toISOString()},kickoff_time.lte.${twentyMinsFromNow})`)
+    .or(`status.in.("1H","HT","2H","ET","P"),and(kickoff_time.gte.${now.toISOString()},kickoff_time.lte.${twentyMinsFromNow}),and(status.eq.NS,kickoff_time.lt.${now.toISOString()})`)
     .limit(1);
 
   const isTableEmptyForToday = todayCount === 0;
