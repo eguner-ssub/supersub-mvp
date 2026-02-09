@@ -16,6 +16,9 @@ Deno.serve(async (req) => {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
   const twentyMinsFromNow = new Date(now.getTime() + 20 * 60000).toISOString();
+  const twoHoursAgo = new Date(now.getTime() - 120 * 60000).toISOString();
+
+  console.log(`[DEBUG] Current time: ${now.toISOString()}`);
 
   // --- 1. SMART GATEKEEPER ---
   // We check the DB first to see if we even need to talk to the API.
@@ -27,22 +30,37 @@ Deno.serve(async (req) => {
     .gte('kickoff_time', todayStr);
 
   // B. Check for active matches, matches starting within 20 minutes, OR stuck in NS past kickoff
+  // Safety window: Allow up to 120 minutes past kickoff for delayed starts
   const { data: activeMatches } = await supabase
     .from('matches')
-    .select('id')
-    .or(`status.in.("1H","HT","2H","ET","P"),and(kickoff_time.gte.${now.toISOString()},kickoff_time.lte.${twentyMinsFromNow}),and(status.eq.NS,kickoff_time.lt.${now.toISOString()})`)
-    .limit(1);
+    .select('id, status, kickoff_time')
+    .or(`status.in.("1H","HT","2H","ET","P"),and(kickoff_time.gte.${now.toISOString()},kickoff_time.lte.${twentyMinsFromNow}),and(status.eq.NS,kickoff_time.gte.${twoHoursAgo},kickoff_time.lt.${now.toISOString()})`)
+    .limit(5);
+
+  console.log(`[DEBUG] Active matches found: ${activeMatches?.length || 0}`);
+  if (activeMatches && activeMatches.length > 0) {
+    activeMatches.forEach(m => {
+      console.log(`[DEBUG] Match ${m.id}: status=${m.status}, kickoff=${m.kickoff_time}`);
+    });
+  }
 
   const isTableEmptyForToday = todayCount === 0;
   const hasActiveAction = activeMatches && activeMatches.length > 0;
 
   // HIBERNATION: If schedule exists and no games are live/starting soon, exit.
   if (!isTableEmptyForToday && !hasActiveAction) {
-    console.log("Smart Skip: No live or imminent matches. Hibernating to save credits.");
+    console.log(`[SMART SKIP] No live or imminent matches. Schedule exists (${todayCount} matches today). Hibernating to save credits.`);
     return new Response(JSON.stringify({ 
       skipped: true, 
-      message: "Hibernating: No active matches." 
+      timestamp: now.toISOString(),
+      reason: 'No active or imminent matches',
+      todayMatchCount: todayCount
     }), { status: 200 });
+  }
+
+  console.log(`[GATEKEEPER] Proceeding with sync - ${hasActiveAction ? 'Active matches detected' : 'Table empty, need initial load'}`);
+  if (hasActiveAction && activeMatches) {
+    console.log(`[GATEKEEPER] Syncing due to ${activeMatches.length} active match(es)`);
   }
 
   // --- 2. MAIN SYNC LOGIC ---
