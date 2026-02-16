@@ -69,19 +69,19 @@ export default function CardBase({
   // ---- Softened Underglow for Docking ----
   let glowClass = '';
   if (status === 'active') {
-    glowClass = 'shadow-[0_12px_28px_-4px_rgba(57,255,20,0.35)]';
+    glowClass = 'shadow-[0_8px_20px_-6px_rgba(57,255,20,0.25)]';
   } else if (status === 'pending') {
-    glowClass = 'shadow-[0_12px_28px_-4px_rgba(251,191,36,0.35)]';
+    glowClass = 'shadow-[0_8px_20px_-6px_rgba(251,191,36,0.25)]';
   } else if (status === 'won') {
-    glowClass = 'shadow-[0_12px_28px_-4px_rgba(34,197,94,0.35)]';
+    glowClass = 'shadow-[0_8px_20px_-6px_rgba(34,197,94,0.25)]';
   } else if (status === 'lost') {
-    glowClass = 'shadow-[0_12px_28px_-4px_rgba(220,38,38,0.35)]';
+    glowClass = 'shadow-[0_8px_20px_-6px_rgba(220,38,38,0.25)]';
   }
 
   return (
     <div
       onClick={onClick}
-      className={`group relative w-[4.5rem] h-[6.75rem] overflow-hidden cursor-pointer active:scale-95 transition-transform duration-200 select-none rounded-lg ${glowClass} ${className}`}
+      className={`group relative w-[6.5rem] h-[10rem] overflow-hidden cursor-pointer active:scale-95 transition-transform duration-200 select-none rounded-lg ${glowClass} ${className}`}
     >
       {/* ========== Z-0: Paper-Texture Base ========== */}
       <img
@@ -101,13 +101,13 @@ export default function CardBase({
             <img
               src={iconSrc}
               alt="icon"
-              className="w-[60%] h-auto object-contain"
+              className="w-[85%] h-auto object-contain"
               style={{ mixBlendMode: 'multiply', opacity: 0.95 }}
               draggable={false}
             />
             {/* Label — Montserrat Bold, ink-black */}
             <span
-              className="mt-1.5 text-[7px] leading-tight uppercase tracking-widest text-center"
+              className="mt-1.5 text-[10px] leading-tight uppercase tracking-widest text-center"
               style={{
                 fontFamily: "'Montserrat', sans-serif",
                 fontWeight: 700,
@@ -126,7 +126,7 @@ export default function CardBase({
             <div className="px-1.5 pt-1.5">
               {matchDate && (
                 <p
-                  className="text-[6px] leading-none uppercase tracking-wide"
+                  className="text-[8px] leading-tight uppercase tracking-wide"
                   style={{
                     fontFamily: "'Montserrat', 'JetBrains Mono', monospace",
                     fontWeight: 700,
@@ -138,7 +138,7 @@ export default function CardBase({
               )}
               {matchName && (
                 <p
-                  className="text-[5.5px] leading-tight mt-0.5 truncate"
+                  className="text-[8px] leading-tight mt-0.5 truncate"
                   style={{
                     fontFamily: "'Montserrat', 'JetBrains Mono', monospace",
                     fontWeight: 700,
@@ -163,7 +163,7 @@ export default function CardBase({
               {/* Prediction / Selection — large, prominent */}
               {displaySelection && (
                 <span
-                  className="mt-1 text-[8px] leading-tight uppercase text-center break-words max-w-full"
+                  className="mt-1 text-[11px] leading-tight uppercase text-center break-words max-w-full"
                   style={{
                     fontFamily: "'Inter', 'Roboto Condensed', sans-serif",
                     fontWeight: 900,
@@ -176,9 +176,9 @@ export default function CardBase({
             </div>
 
             {/* Footer Bar — Card Type Label */}
-            <div className={`${footerColor} py-0.5 px-1 flex items-center justify-center`}>
+            <div className={`${footerColor} py-1 px-1.5 flex items-center justify-center`}>
               <span
-                className="text-[6px] leading-none uppercase tracking-widest text-white text-center"
+                className="text-[9px] leading-none uppercase tracking-widest text-white text-center"
                 style={{
                   fontFamily: "'Montserrat', sans-serif",
                   fontWeight: 700,
@@ -194,7 +194,7 @@ export default function CardBase({
       {/* ========== Z-30: Badges — "Official Print" Stamps (top-right) ========== */}
       {status === 'active' && (
         <div
-          className="absolute top-1 right-1 z-30 bg-yellow-400 text-[5px] font-black uppercase px-1 py-[1px] rounded-sm border border-yellow-600 animate-pulse"
+          className="absolute top-1.5 right-1.5 z-30 bg-yellow-400 text-[6px] font-black uppercase px-1.5 py-[2px] rounded-sm border border-yellow-600 animate-pulse"
           style={{
             fontFamily: "'Montserrat', sans-serif",
             color: '#121212',
@@ -206,7 +206,7 @@ export default function CardBase({
       )}
       {status === 'won' && (
         <div
-          className="absolute top-1 right-1 z-30 bg-green-100 text-[5px] font-black uppercase px-1 py-[1px] rounded-sm border-2 border-green-700"
+          className="absolute top-1.5 right-1.5 z-30 bg-green-100 text-[6px] font-black uppercase px-1.5 py-[2px] rounded-sm border-2 border-green-700"
           style={{
             fontFamily: "'Montserrat', sans-serif",
             color: '#166534',
@@ -218,7 +218,7 @@ export default function CardBase({
       )}
       {status === 'lost' && (
         <div
-          className="absolute top-1 right-1 z-30 bg-red-100 text-[5px] font-black uppercase px-1 py-[1px] rounded-sm border-2 border-red-700"
+          className="absolute top-1.5 right-1.5 z-30 bg-red-100 text-[6px] font-black uppercase px-1.5 py-[2px] rounded-sm border-2 border-red-700"
           style={{
             fontFamily: "'Montserrat', sans-serif",
             color: '#991b1b',
