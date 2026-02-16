@@ -12,7 +12,7 @@ const BASE_MAP = {
 
 const ICON_MAP = {
   c_match_result: '/assets/stadium_icon.webp',
-  c_total_goals: '/assets/goal_icon.webp',
+  c_total_goals: '/assets/goal_icon.png',
   c_player_score: '/assets/player_icon.webp',
   c_supersub: '/assets/supersub_icon.webp',
 };
