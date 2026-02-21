@@ -171,17 +171,19 @@ async function sync(
 
       console.log(`[${pulseLabel}] [DEBUG] Total fixtures found before filtering: ${result.response.length}`);
 
-      // Filter to supported leagues
-      const filteredMatches = result.response.filter(
-        (item: any) => SUPPORTED_LEAGUE_IDS.includes(item.league.id)
-      );
+      // ⚠️ TESTING MODE: League filter disabled — processing ALL fixtures
+      // To re-enable, uncomment the filter below and use filteredMatches
+      // const filteredMatches = result.response.filter(
+      //   (item: any) => SUPPORTED_LEAGUE_IDS.includes(item.league.id)
+      // );
+      const filteredMatches = result.response;
 
       if (filteredMatches.length === 0) {
-        console.log(`[${pulseLabel}] No supported-league matches for ${date}`);
+        console.log(`[${pulseLabel}] No matches for ${date}`);
         continue;
       }
 
-      console.log(`[${pulseLabel}] ${date}: ${filteredMatches.length} matches in supported leagues`);
+      console.log(`[${pulseLabel}] ${date}: processing ALL ${filteredMatches.length} fixtures (league filter disabled)`);
 
       // For full_sync, bulk-fetch existing DB state for these matches
       if (isFullSync) {
