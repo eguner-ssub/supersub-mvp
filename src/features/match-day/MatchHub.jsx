@@ -40,7 +40,7 @@ const MatchHub = () => {
   const isFinished = (status) => ['FT', 'AET', 'PEN'].includes(status);
 
   const displayedMatches = showLiveOnly
-    ? matches.filter(m => isLive(m.fixture.status.short))
+    ? matches.filter(m => isLive(m.status || m.raw_data?.fixture?.status?.short))
     : matches;
 
   return (
@@ -94,58 +94,69 @@ const MatchHub = () => {
           </div>
         ) : displayedMatches.length > 0 ? (
           displayedMatches.map((match) => {
-            const status = match.fixture.status.short;
+            const status = match.status || match.raw_data?.fixture?.status?.short || 'NS';
+            const matchId = match.id || match.raw_data?.fixture?.id;
             const isMatchLive = isLive(status);
             const isMatchFinished = isFinished(status);
 
+            const homeLogo = match.home_logo || match.raw_data?.teams?.home?.logo;
+            const awayLogo = match.away_logo || match.raw_data?.teams?.away?.logo;
+            const homeName = match.home_team || match.raw_data?.teams?.home?.name || 'Home';
+            const awayName = match.away_team || match.raw_data?.teams?.away?.name || 'Away';
+            const leagueName = match.league_name || match.raw_data?.league?.name || '';
+            const homeScore = match.home_score ?? match.raw_data?.goals?.home ?? 0;
+            const awayScore = match.away_score ?? match.raw_data?.goals?.away ?? 0;
+            const kickoff = match.kickoff_time || match.raw_data?.fixture?.date;
+            const elapsed = match.raw_data?.fixture?.status?.elapsed;
+
             return (
               <div
-                key={match.fixture.id}
-                onClick={() => navigate(`/match/${match.fixture.id}`)}
+                key={matchId}
+                onClick={() => navigate(`/match/${matchId}`)}
                 className="bg-zinc-900 border border-white/10 rounded-xl p-4 active:scale-95 transition-all cursor-pointer hover:bg-zinc-800"
               >
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                    {match.league.name}
+                    {leagueName}
                   </span>
                   <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border ${isMatchLive ? 'text-red-500 border-red-500/20 bg-red-500/10' : 'text-zinc-500 border-zinc-700 bg-zinc-800'
                     }`}>
                     {isMatchLive && <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
                     <span className="text-[9px] font-black">
-                      {status === 'NS'
-                        ? new Date(match.fixture.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      {status === 'NS' && kickoff
+                        ? new Date(kickoff).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         : status}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between gap-1">
-                  {/* Home Team - Width increased by adjusting flex value */}
+                  {/* Home Team */}
                   <div className="flex flex-col items-center flex-[1.2] min-w-0">
-                    <img src={match.teams.home.logo} className="w-10 h-10 object-contain mb-1" alt="home" />
+                    {homeLogo && <img src={homeLogo} className="w-10 h-10 object-contain mb-1" alt="home" />}
                     <span className="text-[11px] font-bold text-center truncate w-full uppercase">
-                      {match.teams.home.name}
+                      {homeName}
                     </span>
                   </div>
 
-                  {/* Score - Padding reduced to give teams more room */}
+                  {/* Score */}
                   <div className="px-2 flex flex-col items-center justify-center min-w-[60px]">
                     <div className="text-2xl font-black font-mono tracking-tighter">
-                      {status === 'NS' ? 'VS' : `${match.goals.home} - ${match.goals.away}`}
+                      {status === 'NS' ? 'VS' : `${homeScore} - ${awayScore}`}
                     </div>
-                    {isMatchLive && match.fixture.status.elapsed && (
+                    {isMatchLive && elapsed && (
                       <span className="text-[10px] text-red-500 font-bold mt-1 animate-pulse">
-                        {match.fixture.status.elapsed}'
+                        {elapsed}'
                       </span>
                     )}
                     {isMatchFinished && <span className="text-[8px] text-zinc-500 font-bold uppercase mt-1">Final</span>}
                   </div>
 
-                  {/* Away Team - Width increased by adjusting flex value */}
+                  {/* Away Team */}
                   <div className="flex flex-col items-center flex-[1.2] min-w-0">
-                    <img src={match.teams.away.logo} className="w-10 h-10 object-contain mb-1" alt="away" />
+                    {awayLogo && <img src={awayLogo} className="w-10 h-10 object-contain mb-1" alt="away" />}
                     <span className="text-[11px] font-bold text-center truncate w-full uppercase">
-                      {match.teams.away.name}
+                      {awayName}
                     </span>
                   </div>
                 </div>
