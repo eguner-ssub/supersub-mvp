@@ -319,6 +319,7 @@ async function sync(
             away_score: item.goals.away ?? 0,
             kickoff_time: item.fixture.date,
             last_updated: now.toISOString(),
+            raw_data: item,
           };
 
           // Stamp finished_at on first transition to final status
