@@ -324,6 +324,7 @@ async function sync(
             home_score: item.goals.home ?? 0,
             away_score: item.goals.away ?? 0,
             kickoff_time: item.fixture.date,
+            date: item.fixture.date.split('T')[0],
             last_updated: now.toISOString(),
             raw_data: item,
           };

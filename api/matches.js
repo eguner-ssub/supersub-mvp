@@ -29,16 +29,11 @@ export default async function handler(req, res) {
     // Default to today if no date provided
     const date = dateParam || new Date().toISOString().split('T')[0];
 
-    // Query matches where kickoff_time falls on the requested date
-    // kickoff_time is stored as an ISO timestamp, so we filter with range
-    const dayStart = `${date}T00:00:00.000Z`;
-    const dayEnd = `${date}T23:59:59.999Z`;
-
+    // Query matches by the flat date column (YYYY-MM-DD)
     const { data, error } = await supabase
       .from('matches')
       .select('*')
-      .gte('kickoff_time', dayStart)
-      .lte('kickoff_time', dayEnd)
+      .eq('date', date)
       .order('kickoff_time', { ascending: true });
 
     if (error) {
