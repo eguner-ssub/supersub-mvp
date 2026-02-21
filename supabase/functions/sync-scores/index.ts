@@ -103,17 +103,16 @@ async function sync(
   // ── 1. DETERMINE DATES TO FETCH ──────────────────
   const datesToSync: string[] = [todayStr];
 
-  if (isFullSync && currentHour >= 0 && currentHour < 3) {
+  // Full-sync (Scheduler): ALWAYS include yesterday for hard reset
+  if (isFullSync) {
     const yesterday = new Date(now.getTime() - 24 * 60 * 60_000)
       .toISOString()
       .split('T')[0];
     datesToSync.unshift(yesterday);
-    console.log(`[${pulseLabel}] Full-sync: including yesterday (${yesterday}) — hour=${currentHour}`);
+    console.log(`[${pulseLabel}] Full-sync (Safety Scheduler): hard reset for ${yesterday} + ${todayStr}`);
   }
 
   // ── 2. PRE-FLIGHT: Get existing DB state ─────────
-  // Sniper mode: only fetch matches that are active (not UPCOMING/COMPLETED)
-  // Full-sync: fetch everything (the Scheduler path)
   let existingMatchMap = new Map<number, {
     id: number;
     status: string | null;
@@ -125,18 +124,32 @@ async function sync(
   }>();
 
   if (!isFullSync) {
+    // Proactive Sniper: include active matches AND upcoming matches near kickoff
+    const sniperCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW).toISOString();
+
+    // Query 1: All active (non-UPCOMING, non-COMPLETED) matches
     const { data: activeMatches } = await supabase
       .from('matches')
       .select('id, status, custom_status, lineups, events, last_updated, finished_at')
       .not('custom_status', 'in', '("COMPLETED","UPCOMING")');
 
-    if (activeMatches) {
-      existingMatchMap = new Map(activeMatches.map((m: any) => [m.id, m]));
-    }
+    // Query 2: UPCOMING matches within 60 minutes of kickoff
+    const { data: upcomingNearKickoff } = await supabase
+      .from('matches')
+      .select('id, status, custom_status, lineups, events, last_updated, finished_at')
+      .eq('custom_status', 'UPCOMING')
+      .lte('kickoff_time', sniperCutoff);
 
-    // If no active matches in DB, nothing to snipe
+    // Merge both sets into the map
+    const allSniperMatches = [...(activeMatches || []), ...(upcomingNearKickoff || [])];
+    existingMatchMap = new Map(allSniperMatches.map((m: any) => [m.id, m]));
+
+    const upcomingCount = upcomingNearKickoff?.length || 0;
+    console.log(`[${pulseLabel}] [SNIPER] Monitoring ${existingMatchMap.size} matches (including ${upcomingCount} about to start)`);
+
+    // If nothing to monitor, exit early
     if (existingMatchMap.size === 0) {
-      console.log(`[${pulseLabel}] No active matches in DB — nothing to snipe.`);
+      console.log(`[${pulseLabel}] No active or near-kickoff matches — nothing to snipe.`);
       return counters;
     }
   }
