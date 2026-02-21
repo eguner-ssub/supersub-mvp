@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 /**
  * LEAGUE COVERAGE — Central source of truth for league IDs.
  */
-const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
+const SUPPORTED_LEAGUE_IDS = [1, 2, 3, 39, 40, 41, 42, 45, 48, 61, 71, 78, 79, 88, 94, 135, 140, 144, 179, 180, 203, 253, 262, 301];
 
 /**
  * STATUS GROUPS
@@ -155,6 +155,8 @@ async function sync(
         console.log(`[${pulseLabel}] No API response for date ${date}`);
         continue;
       }
+
+      console.log(`[${pulseLabel}] [DEBUG] Total fixtures found before filtering: ${result.response.length}`);
 
       // Filter to supported leagues
       const filteredMatches = result.response.filter(
@@ -313,6 +315,10 @@ async function sync(
             league_id: item.league.id,
             home_team: item.teams.home.name,
             away_team: item.teams.away.name,
+            home_logo: item.teams.home.logo,
+            away_logo: item.teams.away.logo,
+            league_name: item.league.name,
+            league_logo: item.league.logo,
             status: apiStatus,
             custom_status: customStatus,
             home_score: item.goals.home ?? 0,

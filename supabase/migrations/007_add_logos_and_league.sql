@@ -1,0 +1,6 @@
+-- Add logo and league columns for direct frontend access
+ALTER TABLE matches
+ADD COLUMN IF NOT EXISTS home_logo TEXT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS away_logo TEXT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS league_name TEXT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS league_logo TEXT DEFAULT NULL;
