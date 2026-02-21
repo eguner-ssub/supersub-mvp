@@ -244,7 +244,17 @@ const TeamHalf = ({ positioned, teamLogo, teamName, isAway }) => (
    MAIN COMPONENT
    ───────────────────────────────────────────────────────────── */
 
-const MatchLineup = ({ fixtureId, matchPhase, fixtureDate }) => {
+const getAssistantGreeting = (tab) => {
+    switch (tab) {
+        case 'SUBS': return 'Hi Boss. The bench is deep today. If you\'re going to use the card, now\'s the time.';
+        case 'EVENTS': return 'Hi Boss. It\'s getting heated out there. Hopefully the ref keeps his cards in his pocket.';
+        case 'STATS': return 'Hi Boss. The numbers don\'t lie. Let\'s see what the data says.';
+        case 'LINEUP':
+        default: return 'Hi Boss. Here is the tactical setup. Home team looks strong today.';
+    }
+};
+
+const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP' }) => {
     const [lineups, setLineups] = useState(null);
     const [lineupStatus, setLineupStatus] = useState(null); // 'probable' | 'confirmed'
     const [loading, setLoading] = useState(true);
@@ -314,59 +324,6 @@ const MatchLineup = ({ fixtureId, matchPhase, fixtureDate }) => {
 
     return (
         <div style={{ padding: '0 12px', marginBottom: '16px' }}>
-            {/* ── ASSISTANT DIALOGUE BOX — physical memo on tactical board ── */}
-            <div
-                style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px',
-                    marginBottom: '14px',
-                    padding: '10px 14px',
-                    background: '#f5f0e8',
-                    borderRadius: '14px',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
-                }}
-            >
-                <img
-                    src="/assets/assistant-head.png"
-                    alt="Tactical Expert"
-                    style={{
-                        width: '44px',
-                        height: '44px',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        flexShrink: 0,
-                        border: '2px solid rgba(0,0,0,0.08)',
-                    }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <span
-                        style={{
-                            fontFamily: "'Montserrat', sans-serif",
-                            fontWeight: 700,
-                            fontSize: '9px',
-                            color: '#888',
-                            textTransform: 'uppercase',
-                            letterSpacing: '1px',
-                        }}
-                    >
-                        Tactical Expert
-                    </span>
-                    <p
-                        style={{
-                            fontFamily: "'Montserrat', sans-serif",
-                            fontWeight: 700,
-                            fontSize: '12px',
-                            color: '#121212',
-                            margin: '3px 0 0',
-                            lineHeight: 1.35,
-                        }}
-                    >
-                        Hi Boss. Here is the tactical setup. Home team looks strong today.
-                    </p>
-                </div>
-            </div>
-
             {/* ── STATUS BADGE — Electric Cyan on Ink-Black when confirmed ── */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
                 <span

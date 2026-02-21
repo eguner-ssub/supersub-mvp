@@ -19,6 +19,20 @@ const POST_MATCH_STALE_MS = 3 * 60_000;   // 3 minutes
 const POST_MATCH_WINDOW   = 60 * 60_000;  // 60 minutes after finished_at
 const PRE_LIVE_WINDOW     = 60 * 60_000;  // 60 minutes before kickoff
 
+/**
+ * STATISTICS KEYS — Only extract these from the API response
+ */
+const STATS_KEYS = [
+  'Ball Possession',
+  'Expected Goals',
+  'Passes %',
+  'Shots on Goal',
+  'Total Shots',
+  'Corner Kicks',
+  'Fouls',
+  'Dangerous Attacks',
+];
+
 // ────────────────────────────────────────────────────
 // STATUS DERIVATION — Pure function, no side-effects
 // ────────────────────────────────────────────────────
@@ -58,6 +72,7 @@ interface SyncCounters {
   fixtureApiCalls: number;
   lineupApiCalls: number;
   eventApiCalls: number;
+  statsApiCalls: number;
   skippedMatches: number;
   processedMatches: number;
   syncedToDb: number;
@@ -73,6 +88,7 @@ async function sync(
     fixtureApiCalls: 0,
     lineupApiCalls: 0,
     eventApiCalls: 0,
+    statsApiCalls: 0,
     skippedMatches: 0,
     processedMatches: 0,
     syncedToDb: 0,
@@ -195,6 +211,7 @@ async function sync(
         try {
           let lineupsData: any = null;
           let eventsData: any  = null;
+          let statsData: any   = null;
 
           const lastUpdated = existingMatch?.last_updated
             ? new Date(existingMatch.last_updated)
@@ -250,7 +267,44 @@ async function sync(
             }
           }
 
-          // ── D. Full-sync path: always fetch for UPCOMING/COMPLETED too ──
+          // ── D. STATISTICS — LIVE every pulse, POST-MATCH every 3 min ──
+          if (customStatus === 'LIVE' || (customStatus === 'POST-MATCH' && msSinceUpdate > POST_MATCH_STALE_MS)) {
+            try {
+              counters.statsApiCalls++;
+              const statsRes = await fetch(
+                `https://v3.football.api-sports.io/fixtures/statistics?fixture=${matchId}`,
+                { headers: { 'x-apisports-key': apiKey } }
+              );
+              const statsJson = await statsRes.json();
+              const rawStats = statsJson.response || [];
+
+              if (rawStats.length >= 2) {
+                // Transform: extract allowed keys into { home, away } shape
+                const extractKeys = (teamStats: any[]) => {
+                  const out: Record<string, any> = {};
+                  for (const s of teamStats) {
+                    if (STATS_KEYS.includes(s.type)) {
+                      out[s.type] = s.value;
+                    }
+                  }
+                  return out;
+                };
+
+                statsData = {
+                  home: extractKeys(rawStats[0].statistics || []),
+                  away: extractKeys(rawStats[1].statistics || []),
+                };
+                console.log(`[${pulseLabel}] [STATS] Match ${matchId} (${customStatus}): fetched ${Object.keys(statsData.home).length} stat keys`);
+              } else {
+                console.log(`[${pulseLabel}] [STATS] Match ${matchId}: API returned empty statistics`);
+              }
+            } catch (statsErr) {
+              console.error(`[${pulseLabel}] [STATS ERROR] Match ${matchId}:`, statsErr);
+              // Non-blocking: continue with the rest of the sync
+            }
+          }
+
+          // ── E. Full-sync path: always fetch for UPCOMING/COMPLETED too ──
           // (fixture data is already in `item`, no extra API call needed)
 
           // ── BUILD UPDATE PAYLOAD ────────────────────
@@ -275,6 +329,8 @@ async function sync(
           // Anti-overwrite: never replace existing events with an empty array
           if (eventsData !== null && eventsData.length > 0) updatePayload.events = eventsData;
           if (lineupsData !== null) updatePayload.lineups = lineupsData;
+          // Anti-overwrite: only write stats if the API actually returned data
+          if (statsData !== null) updatePayload.statistics = statsData;
 
           updates.push(updatePayload);
           counters.processedMatches++;
@@ -305,7 +361,8 @@ async function sync(
   console.log(
     `[${pulseLabel}] Done — processed=${counters.processedMatches} ` +
     `skipped=${counters.skippedMatches} fixture_api=${counters.fixtureApiCalls} ` +
-    `lineup_api=${counters.lineupApiCalls} event_api=${counters.eventApiCalls}`
+    `lineup_api=${counters.lineupApiCalls} event_api=${counters.eventApiCalls} ` +
+    `stats_api=${counters.statsApiCalls}`
   );
 
   return counters;
@@ -340,6 +397,7 @@ Deno.serve(async (req) => {
     fixtures: pulse1.fixtureApiCalls + pulse2.fixtureApiCalls,
     lineups:  pulse1.lineupApiCalls  + pulse2.lineupApiCalls,
     events:   pulse1.eventApiCalls   + pulse2.eventApiCalls,
+    stats:    pulse1.statsApiCalls   + pulse2.statsApiCalls,
     processed: pulse1.processedMatches + pulse2.processedMatches,
     skipped:  pulse1.skippedMatches  + pulse2.skippedMatches,
     synced:   pulse1.syncedToDb      + pulse2.syncedToDb,
@@ -347,7 +405,7 @@ Deno.serve(async (req) => {
 
   console.log(
     `[SYNC] ══════ Complete — ${totals.synced} matches synced across 2 pulses ══════\n` +
-    `  API calls → fixtures=${totals.fixtures} lineups=${totals.lineups} events=${totals.events}\n` +
+    `  API calls → fixtures=${totals.fixtures} lineups=${totals.lineups} events=${totals.events} stats=${totals.stats}\n` +
     `  processed=${totals.processed} skipped=${totals.skipped}`
   );
 
@@ -359,6 +417,7 @@ Deno.serve(async (req) => {
       fixtures: totals.fixtures,
       lineups: totals.lineups,
       events: totals.events,
+      stats: totals.stats,
     },
     processed: totals.processed,
     skipped: totals.skipped,
