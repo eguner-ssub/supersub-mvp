@@ -40,7 +40,7 @@ export default function GenericLab() {
                 </div>
 
                 <div className="w-32 md:w-40">
-                    <CardBase type="c_supersub" label="SUPER SUB" status="generic" />
+                    <CardBase type="c_supersub" label="SUPERSUB" status="generic" />
                 </div>
 
             </div>

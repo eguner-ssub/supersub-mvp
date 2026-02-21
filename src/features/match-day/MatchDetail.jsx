@@ -6,6 +6,7 @@ import CardBase from '../../shared/ui/CardBase';
 import { getHybridOdds } from '../../shared/services/oddsService';
 import TacticalHUD from '../../shared/ui/TacticalHUD';
 import MatchTerminationTerminal from '../../shared/ui/MatchTerminationTerminal';
+import MatchLineup from './MatchLineup';
 
 const ODDS_API_KEY = import.meta.env.VITE_ODDS_API_KEY;
 
@@ -197,8 +198,8 @@ const MatchDetail = () => {
             <div className="w-auto flex-shrink-0 mx-2 flex flex-col items-center justify-center z-10">
               {/* Top: Status/Date */}
               <span className={`text-[9px] font-bold tracking-widest uppercase mb-[2px] leading-none ${['1H', '2H', 'HT', 'ET', 'P'].includes(match.fixture.status.short)
-                  ? 'text-[#39ff14]'
-                  : 'text-zinc-400'
+                ? 'text-[#39ff14]'
+                : 'text-zinc-400'
                 }`}>
                 {match.fixture.status.short === 'NS'
                   ? new Date(match.fixture.date).toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()
@@ -222,6 +223,26 @@ const MatchDetail = () => {
                 alt="Away"
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SCROLLABLE LINEUP SECTION ── */}
+      {match && (matchPhase === 'PRE' || matchPhase === 'LIVE') && (
+        <div
+          className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
+          style={{
+            top: '132px',        /* below scoreboard */
+            bottom: '256px',     /* above shelf console */
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          <div className="pt-4 pb-4">
+            <MatchLineup
+              fixtureId={id}
+              matchPhase={matchPhase}
+              fixtureDate={match.fixture?.date}
+            />
           </div>
         </div>
       )}

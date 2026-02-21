@@ -29,7 +29,7 @@ export default function CardLab() {
                     <div className="w-32 md:w-40"><CardBase type="c_match_result" label="MATCH RESULT" status="generic" /></div>
                     <div className="w-32 md:w-40"><CardBase type="c_total_goals" label="TOTAL GOALS" status="generic" /></div>
                     <div className="w-32 md:w-40"><CardBase type="c_player_score" label="GOALSCORER" status="generic" /></div>
-                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPER SUB" status="generic" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPERSUB" status="generic" /></div>
                 </div>
             </div>
 
@@ -43,7 +43,7 @@ export default function CardLab() {
                     <div className="w-32 md:w-40"><CardBase type="c_match_result" label="MATCH RESULT" selection="Arsenal Win" status="pending" /></div>
                     <div className="w-32 md:w-40"><CardBase type="c_total_goals" label="TOTAL GOALS" selection="Over 2.5" status="pending" /></div>
                     <div className="w-32 md:w-40"><CardBase type="c_player_score" label="GOALSCORER" selection="Woltemade" status="pending" /></div>
-                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPER SUB" selection="SUPER SUB" status="pending" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPERSUB" selection="SUPERSUB" status="pending" /></div>
                 </div>
             </div>
 
@@ -57,7 +57,7 @@ export default function CardLab() {
                     <div className="w-32 md:w-40"><CardBase type="c_match_result" label="MATCH RESULT" selection="Arsenal Win" status="active" /></div>
                     <div className="w-32 md:w-40"><CardBase type="c_total_goals" label="TOTAL GOALS" selection="Over 2.5" status="active" /></div>
                     <div className="w-32 md:w-40"><CardBase type="c_player_score" label="GOALSCORER" selection="Saka" status="active" /></div>
-                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPER SUB" selection="SUPER SUB" status="active" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPERSUB" selection="SUPERSUB" status="active" /></div>
                 </div>
             </div>
 
@@ -71,7 +71,7 @@ export default function CardLab() {
                     <div className="w-32 md:w-40"><CardBase type="c_match_result" label="MATCH RESULT" selection="Man City Win" status="won" /></div>
                     <div className="w-32 md:w-40"><CardBase type="c_total_goals" label="TOTAL GOALS" selection="Under 1.5" status="lost" /></div>
                     <div className="w-32 md:w-40"><CardBase type="c_player_score" label="GOALSCORER" selection="Haaland" status="won" /></div>
-                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPER SUB" selection="SUPER SUB" status="lost" /></div>
+                    <div className="w-32 md:w-40"><CardBase type="c_supersub" label="SUPERSUB" selection="SUPERSUB" status="lost" /></div>
                 </div>
             </div>
 

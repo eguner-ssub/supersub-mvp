@@ -12,7 +12,7 @@ const BASE_MAP = {
 
 const ICON_MAP = {
   c_match_result: '/assets/stadium_icon.webp',
-  c_total_goals: '/assets/goal_icon.png',
+  c_total_goals: '/assets/goal_icon.webp',
   c_player_score: '/assets/player_icon.webp',
   c_supersub: '/assets/supersub_icon.webp',
 };
@@ -21,7 +21,7 @@ const LABEL_MAP = {
   c_match_result: 'MATCH RESULT',
   c_total_goals: 'TOTAL GOALS',
   c_player_score: 'PLAYER SCORE',
-  c_supersub: 'SUPER SUB',
+  c_supersub: 'SUPERSUB',
 };
 
 // Footer bar accent colours per card type
@@ -46,7 +46,7 @@ export default function CardBase({
   // ---- Asset Resolution ----
   const bgSrc = BASE_MAP[type] || BASE_MAP.c_supersub;
   const iconSrc = ICON_MAP[type] || ICON_MAP.c_supersub;
-  const title = LABEL_MAP[type] || 'SUPER SUB';
+  const title = LABEL_MAP[type] || 'SUPERSUB';
   const footerColor = FOOTER_COLOR_MAP[type] || 'bg-slate-600';
   const isGeneric = status === 'generic';
 
@@ -102,7 +102,7 @@ export default function CardBase({
               src={iconSrc}
               alt="icon"
               className="w-[85%] h-auto object-contain"
-              style={{ mixBlendMode: 'multiply', opacity: 0.95 }}
+              style={{ mixBlendMode: 'multiply', opacity: 0.98 }}
               draggable={false}
             />
             {/* Label — Montserrat Bold, ink-black */}
@@ -156,8 +156,8 @@ export default function CardBase({
               <img
                 src={iconSrc}
                 alt="icon"
-                className="w-[40%] h-auto object-contain opacity-30"
-                style={{ mixBlendMode: 'multiply' }}
+                className="w-[40%] h-auto object-contain"
+                style={{ mixBlendMode: 'multiply', opacity: 0.3 }}
                 draggable={false}
               />
               {/* Prediction / Selection — large, prominent */}

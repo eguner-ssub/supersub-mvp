@@ -36,7 +36,7 @@ const ViewPendingGrid = () => {
             'c_match_result': 'MATCH RESULT',
             'c_total_goals': 'TOTAL GOALS',
             'c_player_score': 'GOALSCORER',
-            'c_supersub': 'SUPER SUB',
+            'c_supersub': 'SUPERSUB',
         };
         return labelMap[type] || 'BET';
     };
