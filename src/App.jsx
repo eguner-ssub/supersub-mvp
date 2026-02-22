@@ -26,6 +26,7 @@ import CardTest from './pages/CardTest';
 import CardLab from './pages/CardLab';
 import GenericLab from './features/inventory/GenericLab';
 import ComingSoon from './pages/ComingSoon';
+import FPLMarket from './pages/FPLMarket';
 import APIDebugger from './features/debug/APIDebugger';
 
 // Pages - Lazy Loading
@@ -118,7 +119,7 @@ export const AppRoutes = () => {
         }
       />
 
-      <Route path="/stats" element={<ProtectedRoute><ComingSoon title="Season Stats" message="Advanced player analytics coming in v1.1" /></ProtectedRoute>} />
+      <Route path="/stats" element={<ProtectedRoute><FPLMarket /></ProtectedRoute>} />
       <Route path="/inbox" element={<ProtectedRoute><ComingSoon title="Manager Inbox" message="Social features are currently locked." /></ProtectedRoute>} />
       <Route path="/leaderboard" element={<ProtectedRoute><ComingSoon title="Global Rankings" message="Competition season hasn't started yet." /></ProtectedRoute>} />
 

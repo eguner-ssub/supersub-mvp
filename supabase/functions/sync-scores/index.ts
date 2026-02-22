@@ -14,10 +14,8 @@ const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
 /**
  * FREQUENCY GATES (milliseconds)
  */
-const LINEUP_STALE_MS     = 5 * 60_000;   // 5 minutes
-const POST_MATCH_STALE_MS = 3 * 60_000;   // 3 minutes
-const POST_MATCH_WINDOW   = 60 * 60_000;  // 60 minutes after finished_at
-const PRE_LIVE_WINDOW     = 60 * 60_000;  // 60 minutes before kickoff
+const LINEUP_STALE_MS = 5 * 60_000;   // 5 minutes
+const PRE_LIVE_WINDOW = 60 * 60_000;  // 60 minutes before kickoff
 
 /**
  * STATISTICS KEYS — Only extract these from the API response
@@ -35,27 +33,21 @@ const STATS_KEYS = [
 
 // ────────────────────────────────────────────────────
 // STATUS DERIVATION — Pure function, no side-effects
+// Instant Finality: FT/AET/PEN → COMPLETED immediately
 // ────────────────────────────────────────────────────
-type CustomStatus = 'UPCOMING' | 'PRE-LIVE' | 'LIVE' | 'POST-MATCH' | 'COMPLETED';
+type CustomStatus = 'UPCOMING' | 'PRE-LIVE' | 'LIVE' | 'COMPLETED';
 
 function deriveCustomStatus(
   apiStatus: string,
   kickoffTime: Date,
-  finishedAt: Date | null,
+  _finishedAt: Date | null,
   now: Date
 ): CustomStatus {
   // 1. LIVE — API says match is actively playing
   if (LIVE_STATUSES.includes(apiStatus)) return 'LIVE';
 
-  // 2. FINISHED states — split into POST-MATCH vs COMPLETED
-  if (FINAL_STATUSES.includes(apiStatus)) {
-    if (finishedAt) {
-      const msSinceFinished = now.getTime() - finishedAt.getTime();
-      return msSinceFinished < POST_MATCH_WINDOW ? 'POST-MATCH' : 'COMPLETED';
-    }
-    // Just finished, no finished_at stamp yet → treat as POST-MATCH
-    return 'POST-MATCH';
-  }
+  // 2. FINISHED — instant finality, no POST-MATCH window
+  if (FINAL_STATUSES.includes(apiStatus)) return 'COMPLETED';
 
   // 3. PRE-LIVE — kickoff is within 60 minutes from now
   const msUntilKickoff = kickoffTime.getTime() - now.getTime();
@@ -239,8 +231,9 @@ async function sync(
             Array.isArray(existingMatch.lineups) &&
             existingMatch.lineups.length > 0;
 
-          // ── A. LIVE — fetch events every pulse ──────
+          // ── A. LIVE — fetch events + stats every sync ──────
           if (customStatus === 'LIVE') {
+            // Events
             counters.eventApiCalls++;
             const eventRes = await fetch(
               `https://v3.football.api-sports.io/fixtures/events?fixture=${matchId}`,
@@ -248,42 +241,9 @@ async function sync(
             );
             const eventJson = await eventRes.json();
             eventsData = eventJson.response || [];
-            console.log(`[${pulseLabel}] [EVENTS] Fetching live events for Match ${matchId} (LIVE — ${apiStatus}, got ${eventsData.length} events)`);
-          }
+            console.log(`[${pulseLabel}] [EVENTS] Match ${matchId} (LIVE — ${apiStatus}, got ${eventsData.length} events)`);
 
-          // ── B. PRE-LIVE — fetch lineups if empty & stale ──
-          if (customStatus === 'PRE-LIVE' && !hasLineups && msSinceUpdate > LINEUP_STALE_MS) {
-            counters.lineupApiCalls++;
-            const lineupRes = await fetch(
-              `https://v3.football.api-sports.io/fixtures/lineups?fixture=${matchId}`,
-              { headers: { 'x-apisports-key': apiKey } }
-            );
-            const lineupJson = await lineupRes.json();
-            lineupsData = lineupJson.response || [];
-            console.log(`[${pulseLabel}] [LINEUP] Match ${matchId} (PRE-LIVE — no lineups, ${Math.round(msSinceUpdate / 60_000)}m stale)`);
-          } else if (customStatus === 'PRE-LIVE' && !hasLineups) {
-            console.log(`[${pulseLabel}] [SKIP] Lineups for Match ${matchId}: PRE-LIVE but checked ${Math.round(msSinceUpdate / 60_000)}m ago (gate: 5m)`);
-          }
-
-          // ── C. POST-MATCH — fetch fixture+events every 3 min ──
-          if (customStatus === 'POST-MATCH') {
-            if (msSinceUpdate > POST_MATCH_STALE_MS) {
-              // Fetch events
-              counters.eventApiCalls++;
-              const eventRes = await fetch(
-                `https://v3.football.api-sports.io/fixtures/events?fixture=${matchId}`,
-                { headers: { 'x-apisports-key': apiKey } }
-              );
-              const eventJson = await eventRes.json();
-              eventsData = eventJson.response || [];
-              console.log(`[${pulseLabel}] [EVENTS] Fetching post-match events for Match ${matchId} (POST-MATCH — ${Math.round(msSinceUpdate / 60_000)}m since last update, got ${eventsData.length} events)`);
-            } else {
-              console.log(`[${pulseLabel}] [SKIP] Match ${matchId}: POST-MATCH, last updated ${Math.round(msSinceUpdate / 60_000)}m ago (gate: 3m)`);
-            }
-          }
-
-          // ── D. STATISTICS — LIVE every pulse, POST-MATCH every 3 min ──
-          if (customStatus === 'LIVE' || (customStatus === 'POST-MATCH' && msSinceUpdate > POST_MATCH_STALE_MS)) {
+            // Statistics — LIVE only
             try {
               counters.statsApiCalls++;
               const statsRes = await fetch(
@@ -294,33 +254,78 @@ async function sync(
               const rawStats = statsJson.response || [];
 
               if (rawStats.length >= 2) {
-                // Transform: extract allowed keys into { home, away } shape
                 const extractKeys = (teamStats: any[]) => {
                   const out: Record<string, any> = {};
                   for (const s of teamStats) {
-                    if (STATS_KEYS.includes(s.type)) {
-                      out[s.type] = s.value;
-                    }
+                    if (STATS_KEYS.includes(s.type)) out[s.type] = s.value;
                   }
                   return out;
                 };
-
                 statsData = {
                   home: extractKeys(rawStats[0].statistics || []),
                   away: extractKeys(rawStats[1].statistics || []),
                 };
-                console.log(`[${pulseLabel}] [STATS] Match ${matchId} (${customStatus}): fetched ${Object.keys(statsData.home).length} stat keys`);
-              } else {
-                console.log(`[${pulseLabel}] [STATS] Match ${matchId}: API returned empty statistics`);
+                console.log(`[${pulseLabel}] [STATS] Match ${matchId} (LIVE): ${Object.keys(statsData.home).length} stat keys`);
               }
             } catch (statsErr) {
               console.error(`[${pulseLabel}] [STATS ERROR] Match ${matchId}:`, statsErr);
-              // Non-blocking: continue with the rest of the sync
             }
           }
 
-          // ── E. Full-sync path: always fetch for UPCOMING/COMPLETED too ──
-          // (fixture data is already in `item`, no extra API call needed)
+          // ── B. PRE-LIVE — lazy lineups (skip if already populated) ──
+          if (customStatus === 'PRE-LIVE' && !hasLineups && msSinceUpdate > LINEUP_STALE_MS) {
+            counters.lineupApiCalls++;
+            const lineupRes = await fetch(
+              `https://v3.football.api-sports.io/fixtures/lineups?fixture=${matchId}`,
+              { headers: { 'x-apisports-key': apiKey } }
+            );
+            const lineupJson = await lineupRes.json();
+            lineupsData = lineupJson.response || [];
+            console.log(`[${pulseLabel}] [LINEUP] Match ${matchId} (PRE-LIVE — no lineups, ${Math.round(msSinceUpdate / 60_000)}m stale)`);
+          } else if (customStatus === 'PRE-LIVE' && hasLineups) {
+            console.log(`[${pulseLabel}] [SKIP] Lineups for Match ${matchId}: already populated`);
+          } else if (customStatus === 'PRE-LIVE' && !hasLineups) {
+            console.log(`[${pulseLabel}] [SKIP] Lineups for Match ${matchId}: checked ${Math.round(msSinceUpdate / 60_000)}m ago (gate: 5m)`);
+          }
+
+          // ── C. COMPLETED — one final fetch of events + stats, then eject ──
+          if (customStatus === 'COMPLETED' && !existingMatch?.finished_at) {
+            // First time seeing FT — do one final harvest
+            counters.eventApiCalls++;
+            const eventRes = await fetch(
+              `https://v3.football.api-sports.io/fixtures/events?fixture=${matchId}`,
+              { headers: { 'x-apisports-key': apiKey } }
+            );
+            const eventJson = await eventRes.json();
+            eventsData = eventJson.response || [];
+            console.log(`[${pulseLabel}] [FINAL] Match ${matchId}: harvesting events (${eventsData.length}) on COMPLETED transition`);
+
+            try {
+              counters.statsApiCalls++;
+              const statsRes = await fetch(
+                `https://v3.football.api-sports.io/fixtures/statistics?fixture=${matchId}`,
+                { headers: { 'x-apisports-key': apiKey } }
+              );
+              const statsJson = await statsRes.json();
+              const rawStats = statsJson.response || [];
+              if (rawStats.length >= 2) {
+                const extractKeys = (teamStats: any[]) => {
+                  const out: Record<string, any> = {};
+                  for (const s of teamStats) {
+                    if (STATS_KEYS.includes(s.type)) out[s.type] = s.value;
+                  }
+                  return out;
+                };
+                statsData = {
+                  home: extractKeys(rawStats[0].statistics || []),
+                  away: extractKeys(rawStats[1].statistics || []),
+                };
+                console.log(`[${pulseLabel}] [FINAL] Match ${matchId}: harvesting stats on COMPLETED transition`);
+              }
+            } catch (statsErr) {
+              console.error(`[${pulseLabel}] [STATS ERROR] Match ${matchId} (FINAL):`, statsErr);
+            }
+          }
 
           // ── BUILD UPDATE PAYLOAD ────────────────────
           const updatePayload: any = {
@@ -339,6 +344,7 @@ async function sync(
             kickoff_time: item.fixture.date,
             date: item.fixture.date.split('T')[0],
             last_updated: now.toISOString(),
+            updated_at: now.toISOString(),
             raw_data: item,
           };
 
@@ -390,7 +396,7 @@ async function sync(
 }
 
 // ────────────────────────────────────────────────────
-// HANDLER — Double-Pulse Wrapper
+// HANDLER — Single-Shot (no double pulse)
 // ────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   const supabase = createClient(
@@ -403,45 +409,26 @@ Deno.serve(async (req) => {
 
   console.log(`[SYNC] ══════ Invocation start — mode=${isFullSync ? 'SCHEDULER' : 'SNIPER'} ══════`);
 
-  // ── PULSE 1 ──────────────────────────────────────
-  const pulse1 = await sync(supabase, apiKey, isFullSync, 'PULSE 1/2');
-
-  // ── 30-second delay ──────────────────────────────
-  console.log('[SYNC] Waiting 30s before second pulse…');
-  await new Promise(res => setTimeout(res, 30_000));
-
-  // ── PULSE 2 ──────────────────────────────────────
-  const pulse2 = await sync(supabase, apiKey, isFullSync, 'PULSE 2/2');
-
-  // ── AGGREGATE COUNTERS ───────────────────────────
-  const totals = {
-    fixtures: pulse1.fixtureApiCalls + pulse2.fixtureApiCalls,
-    lineups:  pulse1.lineupApiCalls  + pulse2.lineupApiCalls,
-    events:   pulse1.eventApiCalls   + pulse2.eventApiCalls,
-    stats:    pulse1.statsApiCalls   + pulse2.statsApiCalls,
-    processed: pulse1.processedMatches + pulse2.processedMatches,
-    skipped:  pulse1.skippedMatches  + pulse2.skippedMatches,
-    synced:   pulse1.syncedToDb      + pulse2.syncedToDb,
-  };
+  const result = await sync(supabase, apiKey, isFullSync, 'SYNC');
 
   console.log(
-    `[SYNC] ══════ Complete — ${totals.synced} matches synced across 2 pulses ══════\n` +
-    `  API calls → fixtures=${totals.fixtures} lineups=${totals.lineups} events=${totals.events} stats=${totals.stats}\n` +
-    `  processed=${totals.processed} skipped=${totals.skipped}`
+    `[SYNC] ══════ Complete — ${result.syncedToDb} matches synced ══════\n` +
+    `  API calls → fixtures=${result.fixtureApiCalls} lineups=${result.lineupApiCalls} events=${result.eventApiCalls} stats=${result.statsApiCalls}\n` +
+    `  processed=${result.processedMatches} skipped=${result.skippedMatches}`
   );
 
   return new Response(JSON.stringify({
     success: true,
     mode: isFullSync ? 'SCHEDULER' : 'SNIPER',
-    message: `Sync complete. ${totals.synced} matches synced across 2 pulses.`,
+    message: `Sync complete. ${result.syncedToDb} matches synced.`,
     apiCalls: {
-      fixtures: totals.fixtures,
-      lineups: totals.lineups,
-      events: totals.events,
-      stats: totals.stats,
+      fixtures: result.fixtureApiCalls,
+      lineups: result.lineupApiCalls,
+      events: result.eventApiCalls,
+      stats: result.statsApiCalls,
     },
-    processed: totals.processed,
-    skipped: totals.skipped,
+    processed: result.processedMatches,
+    skipped: result.skippedMatches,
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
