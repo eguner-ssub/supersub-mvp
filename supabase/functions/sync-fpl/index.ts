@@ -26,15 +26,23 @@ Deno.serve(async (_req) => {
   // ── 1. Fetch FPL bootstrap data ─────────────────
   let fplData: any;
   try {
-    const res = await fetch(FPL_API_URL);
+    const res = await fetch(FPL_API_URL, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
     if (!res.ok) {
+      const body = await res.text().catch(() => '(unreadable)');
+      console.error(`[sync-fpl] FPL API returned HTTP ${res.status}: ${body}`);
       throw new Error(`FPL API returned ${res.status}`);
     }
     fplData = await res.json();
   } catch (err) {
     console.error('[sync-fpl] Failed to fetch FPL API:', err);
     return new Response(
-      JSON.stringify({ success: false, error: 'FPL API fetch failed' }),
+      JSON.stringify({ success: false, error: String(err) }),
       { status: 502, headers: { 'Content-Type': 'application/json' } }
     );
   }
