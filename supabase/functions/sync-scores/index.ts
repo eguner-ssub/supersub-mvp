@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 /**
  * LEAGUE COVERAGE — Central source of truth for league IDs.
  */
-const SUPPORTED_LEAGUE_IDS = [1, 2, 3, 39, 40, 41, 42, 45, 48, 61, 71, 78, 79, 88, 94, 135, 140, 144, 179, 180, 203, 253, 262, 301];
+const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
 
 /**
  * STATUS GROUPS
@@ -171,19 +171,17 @@ async function sync(
 
       console.log(`[${pulseLabel}] [DEBUG] Total fixtures found before filtering: ${result.response.length}`);
 
-      // ⚠️ TESTING MODE: League filter disabled — processing ALL fixtures
-      // To re-enable, uncomment the filter below and use filteredMatches
-      // const filteredMatches = result.response.filter(
-      //   (item: any) => SUPPORTED_LEAGUE_IDS.includes(item.league.id)
-      // );
-      const filteredMatches = result.response;
+      // Filter to supported leagues
+      const filteredMatches = result.response.filter(
+        (item: any) => SUPPORTED_LEAGUE_IDS.includes(item.league.id)
+      );
 
       if (filteredMatches.length === 0) {
-        console.log(`[${pulseLabel}] No matches for ${date}`);
+        console.log(`[${pulseLabel}] No supported-league matches for ${date}`);
         continue;
       }
 
-      console.log(`[${pulseLabel}] ${date}: processing ALL ${filteredMatches.length} fixtures (league filter disabled)`);
+      console.log(`[${pulseLabel}] ${date}: ${filteredMatches.length} matches in supported leagues`);
 
       // For full_sync, bulk-fetch existing DB state for these matches
       if (isFullSync) {
