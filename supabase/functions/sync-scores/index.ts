@@ -68,6 +68,7 @@ interface SyncCounters {
   skippedMatches: number;
   processedMatches: number;
   syncedToDb: number;
+  dbErrors: string[];
 }
 
 async function sync(
@@ -84,6 +85,7 @@ async function sync(
     skippedMatches: 0,
     processedMatches: 0,
     syncedToDb: 0,
+    dbErrors: [],
   };
 
   const now = new Date();
@@ -209,9 +211,14 @@ async function sync(
         );
 
         // ── SNIPER GATE: Skip UPCOMING / COMPLETED unless full_sync ──
-        if (!isFullSync && (customStatus === 'UPCOMING' || customStatus === 'COMPLETED')) {
+        // Exception: if API says FT but DB still has UPCOMING, let it through
+        //            so the COMPLETED branch can do a final harvest.
+        const dbStatus = existingMatch?.custom_status;
+        const isNewlyCompleted = customStatus === 'COMPLETED' && dbStatus !== 'COMPLETED';
+
+        if (!isFullSync && !isNewlyCompleted && (customStatus === 'UPCOMING' || customStatus === 'COMPLETED')) {
           counters.skippedMatches++;
-          console.log(`[${pulseLabel}] [SKIP] Match ${matchId}: ${customStatus}`);
+          console.log(`[${pulseLabel}] [SKIP] Match ${matchId}: ${customStatus} (db: ${dbStatus ?? 'N/A'})`);
           continue;
         }
 
@@ -344,7 +351,6 @@ async function sync(
             kickoff_time: item.fixture.date,
             date: item.fixture.date.split('T')[0],
             last_updated: now.toISOString(),
-            updated_at: now.toISOString(),
             raw_data: item,
           };
 
@@ -376,7 +382,9 @@ async function sync(
         if (!error) {
           counters.syncedToDb += updates.length;
         } else {
-          console.error(`[${pulseLabel}] [DB ERROR] Upsert failed for ${date}:`, error.message);
+          const errMsg = `[${date}] ${error.message} (code: ${error.code}, details: ${error.details})`;
+          console.error(`[${pulseLabel}] [DB ERROR] ${errMsg}`);
+          counters.dbErrors.push(errMsg);
         }
       }
 
@@ -418,7 +426,7 @@ Deno.serve(async (req) => {
   );
 
   return new Response(JSON.stringify({
-    success: true,
+    success: result.dbErrors.length === 0,
     mode: isFullSync ? 'SCHEDULER' : 'SNIPER',
     message: `Sync complete. ${result.syncedToDb} matches synced.`,
     apiCalls: {
@@ -429,8 +437,10 @@ Deno.serve(async (req) => {
     },
     processed: result.processedMatches,
     skipped: result.skippedMatches,
+    synced: result.syncedToDb,
+    dbErrors: result.dbErrors,
   }), {
-    status: 200,
+    status: result.dbErrors.length === 0 ? 200 : 207,
     headers: { 'Content-Type': 'application/json' },
   });
 });
