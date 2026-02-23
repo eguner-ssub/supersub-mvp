@@ -1,21 +1,35 @@
+import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
-import { SUPPORTED_LEAGUE_IDS } from '../src/shared/config/coverage.js';
 
-export default async function handler(req, res) {
-  // ── Environment Guard Rails ──
-  const missing = [];
-  if (!process.env.SUPABASE_URL) missing.push('SUPABASE_URL');
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
-  if (missing.length) {
-    return res.status(500).json({ error: 'Missing Environment Variables', missing });
+// ── Inline league IDs to avoid pathing issues in Vercel's function runtime ──
+// Mirrors: src/shared/config/coverage.js → SUPPORTED_LEAGUE_IDS
+const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
+
+// ── Lazy Supabase Client ──────────────────────────────────────────────────────
+// Only created when the handler actually needs it, so a missing env var at
+// module-load time can never crash the entire serverless function.
+let _client = null;
+
+function getSupabaseClient() {
+  if (_client) return _client;
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error(
+      `Missing env vars – SUPABASE_URL: ${url ? '✓' : '✗'}, SUPABASE_SERVICE_ROLE_KEY: ${key ? '✓' : '✗'}`
+    );
   }
 
+  _client = createClient(url, key);
+  return _client;
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
+export default async function handler(req, res) {
   try {
-    // Lazy init — created per-request inside try/catch
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    const supabase = getSupabaseClient();
 
     const { id, date: dateParam } = req.query;
 
@@ -37,6 +51,8 @@ export default async function handler(req, res) {
     // ── SCENARIO 2: Date-based feed ──
     const date = dateParam || new Date().toISOString().split('T')[0];
 
+    console.log(`[Matches API] Querying date=${date}`);
+
     const { data, error } = await supabase
       .from('matches')
       .select('*')
@@ -48,15 +64,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ response: [], error: error.message });
     }
 
-    console.log(`🌍 [Matches API] date=${date}, found=${data?.length || 0} matches`);
-
     return res.status(200).json({
       response: data || [],
       date_queried: date,
       source: 'supabase',
     });
-
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    // Guarantee a JSON response — never return HTML error pages.
+    return res.status(500).json({
+      error: 'API_INIT_FAILED',
+      message: err.message || 'Environment variables missing on server.',
+    });
   }
 }

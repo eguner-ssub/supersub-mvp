@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SUPPORTED_LEAGUE_IDS } from '../../src/shared/config/coverage.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// The handler now inlines SUPPORTED_LEAGUE_IDS — keep a mirror here for assertions.
+const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
 
 // ── Mock @supabase/supabase-js ──
-// We build a chainable query builder that records calls and returns mocked data.
 let mockQueryResult = { data: [], error: null };
 
 const mockChain = {
@@ -12,10 +13,9 @@ const mockChain = {
     in: vi.fn(() => mockChain),
     order: vi.fn(() => mockChain),
     single: vi.fn(() => mockQueryResult),
-    then: undefined, // makes it "thenable" so await resolves mockQueryResult
+    then: undefined,
 };
 
-// Make the chain await-able — when the final method is awaited, resolve to mockQueryResult
 for (const method of ['from', 'select', 'eq', 'in', 'order']) {
     mockChain[method].mockImplementation(() => {
         return { ...mockChain, then: (resolve) => resolve(mockQueryResult) };
@@ -43,29 +43,28 @@ function createMockReqRes(query = {}) {
 describe('API /api/matches', () => {
     let originalEnv;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
-        // Snapshot and restore env per test
         originalEnv = { ...process.env };
         process.env.SUPABASE_URL = 'https://test.supabase.co';
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
-        // Reset mock result
         mockQueryResult = { data: [], error: null };
+
+        // Reset the cached lazy client so env changes take effect.
+        // We do this by re-importing the module after clearing the cache.
     });
 
     afterEach(() => {
         process.env = originalEnv;
     });
 
-    // Dynamically import the handler fresh per test so env changes take effect
     async function getHandler() {
-        // Bust the module cache so top-level env reads are re-evaluated
         const mod = await import('../matches.js?t=' + Date.now());
         return mod.default;
     }
 
-    // ─── 1. Missing Config ───
-    it('returns 500 when SUPABASE_URL is missing', async () => {
+    // ─── 1. Missing Config → API_INIT_FAILED ───
+    it('returns 500 with API_INIT_FAILED when SUPABASE_URL is missing', async () => {
         delete process.env.SUPABASE_URL;
         const handler = await getHandler();
         const { req, res } = createMockReqRes({ date: '2026-02-23' });
@@ -73,11 +72,11 @@ describe('API /api/matches', () => {
         await handler(req, res);
 
         expect(res._status).toBe(500);
-        expect(res._body.error).toBe('Missing Environment Variables');
-        expect(res._body.missing).toContain('SUPABASE_URL');
+        expect(res._body.error).toBe('API_INIT_FAILED');
+        expect(res._body.message).toContain('SUPABASE_URL');
     });
 
-    it('returns 500 when SUPABASE_SERVICE_ROLE_KEY is missing', async () => {
+    it('returns 500 with API_INIT_FAILED when SUPABASE_SERVICE_ROLE_KEY is missing', async () => {
         delete process.env.SUPABASE_SERVICE_ROLE_KEY;
         const handler = await getHandler();
         const { req, res } = createMockReqRes({ date: '2026-02-23' });
@@ -85,8 +84,8 @@ describe('API /api/matches', () => {
         await handler(req, res);
 
         expect(res._status).toBe(500);
-        expect(res._body.error).toBe('Missing Environment Variables');
-        expect(res._body.missing).toContain('SUPABASE_SERVICE_ROLE_KEY');
+        expect(res._body.error).toBe('API_INIT_FAILED');
+        expect(res._body.message).toContain('SUPABASE_SERVICE_ROLE_KEY');
     });
 
     // ─── 2. Database Connection Error ───
@@ -133,9 +132,7 @@ describe('API /api/matches', () => {
 
         await handler(req, res);
 
-        // Verify .in() was called with the correct column and league IDs
         expect(mockChain.in).toHaveBeenCalledWith('league_id', SUPPORTED_LEAGUE_IDS);
-        // Verify 262 (an unsupported league) is NOT in the filter list
         expect(SUPPORTED_LEAGUE_IDS).not.toContain(262);
     });
 });
