@@ -1,14 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
-);
+import { SUPPORTED_LEAGUE_IDS } from '../src/shared/config/coverage.js';
 
 export default async function handler(req, res) {
-  const { id, date: dateParam } = req.query;
+  // ── Environment Guard Rails ──
+  const missing = [];
+  if (!process.env.SUPABASE_URL) missing.push('SUPABASE_URL');
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (missing.length) {
+    return res.status(500).json({ error: 'Missing Environment Variables', missing });
+  }
 
   try {
+    // Lazy init — created per-request inside try/catch
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    const { id, date: dateParam } = req.query;
+
     // ── SCENARIO 1: Single Match by ID ──
     if (id) {
       const { data, error } = await supabase
@@ -18,30 +28,27 @@ export default async function handler(req, res) {
         .single();
 
       if (error || !data) {
-        console.error('❌ [Matches API] DB error:', error?.message);
-        return res.status(200).json({ response: [] });
+        return res.status(200).json({ response: [], error: error?.message });
       }
 
       return res.status(200).json({ response: [data] });
     }
 
     // ── SCENARIO 2: Date-based feed ──
-    // Default to today if no date provided
     const date = dateParam || new Date().toISOString().split('T')[0];
 
-    // Query matches by the flat date column (YYYY-MM-DD)
     const { data, error } = await supabase
       .from('matches')
       .select('*')
       .eq('date', date)
+      .in('league_id', SUPPORTED_LEAGUE_IDS)
       .order('kickoff_time', { ascending: true });
 
     if (error) {
-      console.error('❌ [Matches API] DB error:', error.message);
-      return res.status(200).json({ response: [], error: 'DB_ERROR' });
+      return res.status(200).json({ response: [], error: error.message });
     }
 
-    console.log(`🌍 [Matches API] Supabase feed — date=${date}, found=${data?.length || 0} matches`);
+    console.log(`🌍 [Matches API] date=${date}, found=${data?.length || 0} matches`);
 
     return res.status(200).json({
       response: data || [],
@@ -49,8 +56,7 @@ export default async function handler(req, res) {
       source: 'supabase',
     });
 
-  } catch (error) {
-    console.error('❌ [Matches API] Error:', error.message);
-    return res.status(200).json({ response: [], error: 'INTERNAL_ERROR' });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 }
