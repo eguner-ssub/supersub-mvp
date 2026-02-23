@@ -210,15 +210,18 @@ async function sync(
           apiStatus, kickoffTime, existingFinishedAt, now
         );
 
-        // ── SNIPER GATE: Skip UPCOMING / COMPLETED unless full_sync ──
-        // Exception: if API says FT but DB still has UPCOMING, let it through
-        //            so the COMPLETED branch can do a final harvest.
+        // ── SNIPER GATE: Skip safely dormant matches ────────────
+        // • COMPLETED + already harvested → skip (ejected forever)
+        // • UPCOMING + kickoff still in future → skip (nothing to do yet)
+        // • UPCOMING + kickoff <= now → process! (auto-defibrillation)
+        // • Newly COMPLETED (db ≠ COMPLETED) → process (final harvest)
         const dbStatus = existingMatch?.custom_status;
         const isNewlyCompleted = customStatus === 'COMPLETED' && dbStatus !== 'COMPLETED';
+        const isTrulyUpcoming  = customStatus === 'UPCOMING' && kickoffTime > now;
 
-        if (!isFullSync && !isNewlyCompleted && (customStatus === 'UPCOMING' || customStatus === 'COMPLETED')) {
+        if (!isFullSync && !isNewlyCompleted && (customStatus === 'COMPLETED' || isTrulyUpcoming)) {
           counters.skippedMatches++;
-          console.log(`[${pulseLabel}] [SKIP] Match ${matchId}: ${customStatus} (db: ${dbStatus ?? 'N/A'})`);
+          console.log(`[${pulseLabel}] [SKIP] Match ${matchId}: ${customStatus} (db: ${dbStatus ?? 'N/A'}, kickoff: ${kickoffTime.toISOString()})`);
           continue;
         }
 
