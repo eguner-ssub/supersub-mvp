@@ -108,14 +108,15 @@ export const GameProvider = ({ children }) => {
   const placeBet = async (match, selection, potentialReward, cardType, odds, displayLabel) => {
     if (!userProfile) return { success: false, error: 'No user' };
     try {
-      const homeTeam = match.teams.home.name;
-      const awayTeam = match.teams.away.name;
+      const homeTeam = match.teams?.home?.name || match.home_team || 'Home';
+      const awayTeam = match.teams?.away?.name || match.away_team || 'Away';
+      const matchId = match.fixture?.id || match.id;
 
       const { data, error } = await supabase
         .from('predictions')
         .insert([{
           user_id: userProfile.id,
-          match_id: match.fixture.id,
+          match_id: matchId,
           selection,
           team_name: displayLabel, // Stores "Over 2.5 Goals", Player Name, etc.
           potential_reward: potentialReward,

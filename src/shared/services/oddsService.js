@@ -9,25 +9,34 @@ const normalizeName = (name) => {
 const THE_ODDS_API_BASE = 'https://api.the-odds-api.com/v4/sports';
 
 export const getHybridOdds = async (match, apiKey) => {
-    if (!match || !match.fixture) return null;
+    if (!match) return null;
 
-    const matchDate = new Date(match.fixture.date);
+    // Support both nested (API-Football) and flat (Supabase) match shapes
+    const fixtureId = match.fixture?.id || match.id;
+    const fixtureDate = match.fixture?.date || match.kickoff_time || match.date;
+    const statusShort = match.fixture?.status?.short || match.status || 'NS';
+
+    if (!fixtureDate) return null;
+
+    const matchDate = new Date(fixtureDate);
     const today = new Date();
     const isMatchDay = matchDate.toDateString() === today.toDateString();
 
     if (isMatchDay) {
         try {
-            const res = await fetch(`/api/odds?fixture=${match.fixture.id}`);
+            const res = await fetch(`/api/odds?fixture=${fixtureId}`);
             const data = await res.json();
-            return parseApiFootball(data, match.fixture.status.short === 'LIVE');
+            return parseApiFootball(data, statusShort === 'LIVE');
         } catch (err) {
             console.error("API-Football Failed:", err);
             return null;
         }
     } else {
-        const leagueId = match.league?.id;
+        const leagueId = match.league?.id || match.league_id;
         const sportKey = getOddsApiKey(leagueId);
         if (!sportKey) return null;
+
+        const homeName = match.teams?.home?.name || match.home_team || 'Home';
 
         try {
             const url = `${THE_ODDS_API_BASE}/${sportKey}/odds?apiKey=${apiKey}&regions=uk,eu&markets=h2h,totals`;
@@ -37,7 +46,7 @@ export const getHybridOdds = async (match, apiKey) => {
 
             const foundEvent = data.find(event => {
                 const apiHome = normalizeName(event.home_team);
-                const localHome = normalizeName(match.teams.home.name);
+                const localHome = normalizeName(homeName);
                 return apiHome.includes(localHome) || localHome.includes(apiHome);
             });
 

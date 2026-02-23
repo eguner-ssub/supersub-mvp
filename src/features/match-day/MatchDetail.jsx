@@ -7,6 +7,7 @@ import { getHybridOdds } from '../../shared/services/oddsService';
 import TacticalHUD from '../../shared/ui/TacticalHUD';
 import MatchTerminationTerminal from '../../shared/ui/MatchTerminationTerminal';
 import MatchLineup from './MatchLineup';
+import { normalizeMatch } from '../../shared/utils/normalizeMatch';
 
 const ODDS_API_KEY = import.meta.env.VITE_ODDS_API_KEY;
 
@@ -531,7 +532,7 @@ const MatchDetail = () => {
         const data = await res.json();
         if (!data.response?.length) throw new Error("Match unavailable");
 
-        const matchInfo = data.response[0];
+        const matchInfo = normalizeMatch(data.response[0]);
         setMatch(matchInfo);
 
         const status = matchInfo.fixture.status.short;

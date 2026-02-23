@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp, Zap, Coins } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
+import { normalizeMatch } from '../../shared/utils/normalizeMatch';
 
 const ManagerOffice = () => {
     const navigate = useNavigate();
@@ -31,9 +32,10 @@ const ManagerOffice = () => {
                     const liveStatuses = ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'];
 
                     // Check if at least one match is currently active
-                    const isAnyMatchLive = data.response.some(match =>
-                        liveStatuses.includes(match.fixture.status.short)
-                    );
+                    const isAnyMatchLive = data.response.some(raw => {
+                        const match = normalizeMatch(raw);
+                        return liveStatuses.includes(match?.fixture?.status?.short);
+                    });
 
                     setAnyLiveMatches(isAnyMatchLive);
                 }
