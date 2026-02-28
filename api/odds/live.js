@@ -1,3 +1,26 @@
+import 'dotenv/config';
+import { createClient } from '@supabase/supabase-js';
+
+// ── Lazy Supabase Client ──────────────────────────────────────────────────────
+let _client = null;
+
+function getSupabaseClient() {
+    if (_client) return _client;
+
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !key) {
+        throw new Error(
+            `Missing env vars – SUPABASE_URL: ${url ? '✓' : '✗'}, SUPABASE_SERVICE_ROLE_KEY: ${key ? '✓' : '✗'}`
+        );
+    }
+
+    _client = createClient(url, key);
+    return _client;
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
     const { fixture } = req.query;
 
@@ -20,47 +43,27 @@ export default async function handler(req, res) {
         }
     });
 
-    const apiKey = process.env.VITE_API_FOOTBALL_KEY || process.env.FOOTBALL_API_KEY || "";
-
-    console.log('🔑 [LIVE ODDS API] API Key check:', apiKey ? '✅ Present' : '❌ Missing');
-
-    // If no API key, return simulation immediately
-    if (!apiKey) {
-        console.error("⚠️ [LIVE ODDS API] CRITICAL: No API Key found - Using simulation");
-        return res.status(200).json(createSimulationResponse());
-    }
-
-    const baseUrl = "https://v3.football.api-sports.io";
-    const headers = {
-        "x-apisports-key": apiKey,
-        "Content-Type": "application/json"
-    };
-
     try {
-        const endpoint = `${baseUrl}/odds/live?fixture=${fixture}`;
-        console.log('📡 [LIVE ODDS API] Fetching from upstream:', endpoint);
+        const supabase = getSupabaseClient();
 
-        // Fetch LIVE odds from API-Football
-        const response = await fetch(endpoint, { headers });
+        const { data: dbRow, error } = await supabase
+            .from('matches')
+            .select('odds')
+            .eq('id', Number(fixture))
+            .single();
 
-        console.log('📊 [LIVE ODDS API] Upstream status:', response.status);
-
-        if (!response.ok) {
-            console.warn(`⚠️ [LIVE ODDS API] Upstream returned ${response.status} - Using simulation`);
+        // If Supabase error or no odds cached, fall back to simulation
+        if (error || !dbRow?.odds || (Array.isArray(dbRow.odds) && dbRow.odds.length === 0)) {
+            console.warn('⚠️ [LIVE ODDS API] No cached odds available - Using simulation');
             return res.status(200).json(createSimulationResponse());
         }
 
-        const data = await response.json();
-
-        console.log('📦 [LIVE ODDS API] Upstream results count:', data.results || 0);
-        console.log('📦 [LIVE ODDS API] Response array length:', data.response?.length || 0);
+        // Feed the cached odds through the existing parsing logic
+        const data = { response: dbRow.odds };
 
         // Check if we got valid odds data
         if (!data.response || data.response.length === 0) {
             console.warn("⚠️ [LIVE ODDS API] No live odds available (common for minor leagues)");
-            if (data.errors) {
-                console.warn("⚠️ [LIVE ODDS API] API Errors:", JSON.stringify(data.errors));
-            }
             return res.status(200).json(createSimulationResponse());
         }
 
@@ -75,7 +78,6 @@ export default async function handler(req, res) {
         // Try flat structure first (response[0].odds[])
         if (oddsData.odds && Array.isArray(oddsData.odds)) {
             console.log('📊 [LIVE ODDS API] Using FLAT structure - odds array found');
-            console.log('📊 [LIVE ODDS API] Available markets:', oddsData.odds.length);
 
             // Target "Match Winner" (ID 1)
             matchWinnerMarket = oddsData.odds.find(
@@ -86,7 +88,6 @@ export default async function handler(req, res) {
         else if (oddsData.bookmakers && oddsData.bookmakers.length > 0) {
             console.log('📊 [LIVE ODDS API] Using NESTED structure (bookmakers)');
             const bookmaker = oddsData.bookmakers[0];
-            console.log('📚 [LIVE ODDS API] Bookmaker:', bookmaker.name);
 
             matchWinnerMarket = bookmaker.bets?.find(
                 bet => bet.name === "Match Winner" || bet.id === 1
@@ -95,33 +96,21 @@ export default async function handler(req, res) {
 
         if (!matchWinnerMarket || !matchWinnerMarket.values) {
             console.warn("⚠️ [LIVE ODDS API] Match Winner market not found - Using simulation");
-            console.log('🔍 [LIVE ODDS API] Available markets:',
-                oddsData.odds?.map(m => `${m.name} (ID: ${m.id})`) ||
-                oddsData.bookmakers?.[0]?.bets?.map(b => b.name) ||
-                'None'
-            );
             return res.status(200).json(createSimulationResponse());
         }
 
         console.log('✅ [LIVE ODDS API] Found Match Winner market');
-        console.log('📊 [LIVE ODDS API] Market values:', matchWinnerMarket.values.length);
 
         // Extract Home, Draw, Away odds
         const homeOdds = matchWinnerMarket.values.find(v => v.value === "Home");
         const drawOdds = matchWinnerMarket.values.find(v => v.value === "Draw");
         const awayOdds = matchWinnerMarket.values.find(v => v.value === "Away");
 
-        console.log('📊 [LIVE ODDS API] Parsed Data:', {
-            home: homeOdds?.odd || 'N/A',
-            draw: drawOdds?.odd || 'N/A',
-            away: awayOdds?.odd || 'N/A'
-        });
-
         // Return simplified format as per spec
         const parsedResponse = {
             fixtureId: parseInt(fixture),
             isLive: true,
-            source: "API-FOOTBALL",
+            source: "CACHED-DB",
             odds: {
                 home: parseFloat(homeOdds?.odd || 2.5),
                 draw: parseFloat(drawOdds?.odd || 3.2),
@@ -129,12 +118,11 @@ export default async function handler(req, res) {
             }
         };
 
-        console.log('✅ [LIVE ODDS API] Returning live odds:', parsedResponse);
+        console.log('✅ [LIVE ODDS API] Returning cached live odds:', parsedResponse);
         return res.status(200).json(parsedResponse);
 
-    } catch (error) {
-        console.error("❌ [LIVE ODDS API] Exception caught:", error.message);
-        console.error("❌ [LIVE ODDS API] Stack trace:", error.stack);
+    } catch (err) {
+        console.error("❌ [LIVE ODDS API] Error:", err.message);
         // Always return simulation on error to prevent UI crashes
         return res.status(200).json(createSimulationResponse());
     }

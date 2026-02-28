@@ -65,6 +65,7 @@ interface SyncCounters {
   lineupApiCalls: number;
   eventApiCalls: number;
   statsApiCalls: number;
+  oddsApiCalls: number;
   skippedMatches: number;
   processedMatches: number;
   syncedToDb: number;
@@ -82,6 +83,7 @@ async function sync(
     lineupApiCalls: 0,
     eventApiCalls: 0,
     statsApiCalls: 0,
+    oddsApiCalls: 0,
     skippedMatches: 0,
     processedMatches: 0,
     syncedToDb: 0,
@@ -241,6 +243,7 @@ async function sync(
           let lineupsData: any = null;
           let eventsData: any  = null;
           let statsData: any   = null;
+          let oddsData: any    = null;
 
           const lastUpdated = existingMatch?.last_updated
             ? new Date(existingMatch.last_updated)
@@ -292,6 +295,20 @@ async function sync(
             } catch (statsErr) {
               console.error(`[${pulseLabel}] [STATS ERROR] Match ${matchId}:`, statsErr);
             }
+
+            // Odds — LIVE
+            try {
+              counters.oddsApiCalls++;
+              const oddsRes = await fetch(
+                `https://v3.football.api-sports.io/odds/live?fixture=${matchId}`,
+                { headers: { 'x-apisports-key': apiKey } }
+              );
+              const oddsJson = await oddsRes.json();
+              oddsData = oddsJson.response || [];
+              console.log(`[${pulseLabel}] [ODDS] Match ${matchId} (LIVE): ${oddsData.length} bookmakers`);
+            } catch (oddsErr) {
+              console.error(`[${pulseLabel}] [ODDS ERROR] Match ${matchId} (LIVE):`, oddsErr);
+            }
           }
 
           // ── B. PRE-LIVE — lazy lineups (skip if already populated) ──
@@ -308,6 +325,22 @@ async function sync(
             console.log(`[${pulseLabel}] [SKIP] Lineups for Match ${matchId}: already populated`);
           } else if (customStatus === 'PRE-LIVE' && !hasLineups) {
             console.log(`[${pulseLabel}] [SKIP] Lineups for Match ${matchId}: checked ${Math.round(msSinceUpdate / 60_000)}m ago (gate: 5m)`);
+          }
+
+          // ── B2. PRE-LIVE — odds (Bet365 filter) ──────────
+          if (customStatus === 'PRE-LIVE') {
+            try {
+              counters.oddsApiCalls++;
+              const oddsRes = await fetch(
+                `https://v3.football.api-sports.io/odds?fixture=${matchId}&bookmaker=8`,
+                { headers: { 'x-apisports-key': apiKey } }
+              );
+              const oddsJson = await oddsRes.json();
+              oddsData = oddsJson.response || [];
+              console.log(`[${pulseLabel}] [ODDS] Match ${matchId} (PRE-LIVE): ${oddsData.length} bookmakers`);
+            } catch (oddsErr) {
+              console.error(`[${pulseLabel}] [ODDS ERROR] Match ${matchId} (PRE-LIVE):`, oddsErr);
+            }
           }
 
           // ── C. COMPLETED — one final fetch of events + stats, then eject ──
@@ -379,6 +412,7 @@ async function sync(
           if (lineupsData !== null) updatePayload.lineups = lineupsData;
           // Anti-overwrite: only write stats if the API actually returned data
           if (statsData !== null) updatePayload.statistics = statsData;
+          if (oddsData !== null) updatePayload.odds = oddsData;
 
           updates.push(updatePayload);
           counters.processedMatches++;
@@ -412,7 +446,7 @@ async function sync(
     `[${pulseLabel}] Done — processed=${counters.processedMatches} ` +
     `skipped=${counters.skippedMatches} fixture_api=${counters.fixtureApiCalls} ` +
     `lineup_api=${counters.lineupApiCalls} event_api=${counters.eventApiCalls} ` +
-    `stats_api=${counters.statsApiCalls}`
+    `stats_api=${counters.statsApiCalls} odds_api=${counters.oddsApiCalls}`
   );
 
   return counters;
@@ -449,6 +483,7 @@ Deno.serve(async (req) => {
       lineups: result.lineupApiCalls,
       events: result.eventApiCalls,
       stats: result.statsApiCalls,
+      odds: result.oddsApiCalls,
     },
     processed: result.processedMatches,
     skipped: result.skippedMatches,
