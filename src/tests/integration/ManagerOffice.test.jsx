@@ -50,7 +50,7 @@ describe('ManagerOffice Simulation Drill', () => {
     // ============================================================================
     // SCENARIO B: Navigation Tests (The Hitboxes)
     // ============================================================================
-    it('navigates to Dashboard when Laptop (Workstation) is clicked', () => {
+    it('navigates to Scouting when Laptop (Workstation) is clicked', () => {
         mockUseGame.mockReturnValue({
             userProfile: { energy: 3, max_energy: 5, coins: 100 }
         });
@@ -61,23 +61,23 @@ describe('ManagerOffice Simulation Drill', () => {
         const laptopHotspot = screen.getByTestId('hotspot-laptop');
         fireEvent.click(laptopHotspot);
 
-        expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+        expect(mockNavigate).toHaveBeenCalledWith('/scouting');
     });
 
-    it('navigates to View Pending when Tablet (Live Ops) is clicked', () => {
+    it('navigates to Leaderboard when Tablet (Live Ops) is clicked', () => {
         mockUseGame.mockReturnValue({
             userProfile: { energy: 3, max_energy: 5, coins: 100 }
         });
 
         render(<ManagerOffice />);
 
-        const tabletHotspot = screen.getByTestId('hotspot-tablet');
+        const tabletHotspot = screen.getByTestId('hotspot-tablet-office');
         fireEvent.click(tabletHotspot);
 
-        expect(mockNavigate).toHaveBeenCalledWith('/view-pending');
+        expect(mockNavigate).toHaveBeenCalledWith('/leaderboard');
     });
 
-    it('navigates to Messages when Phone (Intel) is clicked', () => {
+    it('navigates to Inbox when Phone (Intel) is clicked', () => {
         mockUseGame.mockReturnValue({
             userProfile: { energy: 3, max_energy: 5, coins: 100 }
         });
@@ -87,7 +87,7 @@ describe('ManagerOffice Simulation Drill', () => {
         const phoneHotspot = screen.getByTestId('hotspot-phone');
         fireEvent.click(phoneHotspot);
 
-        expect(mockNavigate).toHaveBeenCalledWith('/messages');
+        expect(mockNavigate).toHaveBeenCalledWith('/inbox');
     });
 
     it('navigates to History when Bookcase (Archives) is clicked', () => {
@@ -100,7 +100,7 @@ describe('ManagerOffice Simulation Drill', () => {
         const bookcaseHotspot = screen.getByTestId('hotspot-bookcase');
         fireEvent.click(bookcaseHotspot);
 
-        expect(mockNavigate).toHaveBeenCalledWith('/inventory?tab=ledger');
+        expect(mockNavigate).toHaveBeenCalledWith('/history');
     });
 
     // ============================================================================

@@ -1,3 +1,26 @@
+import 'dotenv/config';
+import { createClient } from '@supabase/supabase-js';
+
+// ── Lazy Supabase Client ──────────────────────────────────────────────────────
+let _client = null;
+
+function getSupabaseClient() {
+    if (_client) return _client;
+
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !key) {
+        throw new Error(
+            `Missing env vars – SUPABASE_URL: ${url ? '✓' : '✗'}, SUPABASE_SERVICE_ROLE_KEY: ${key ? '✓' : '✗'}`
+        );
+    }
+
+    _client = createClient(url, key);
+    return _client;
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
     const { fixture } = req.query;
 
@@ -5,32 +28,26 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Missing 'fixture' query parameter" });
     }
 
-    const apiKey = process.env.VITE_API_FOOTBALL_KEY || process.env.FOOTBALL_API_KEY || "";
-
-    if (!apiKey) {
-        console.error("❌ [Lineups API] No API Key found.");
-        return res.status(500).json({ error: "Server Configuration Error: Missing API Key" });
-    }
-
-    const baseUrl = "https://v3.football.api-sports.io";
-
     try {
-        const response = await fetch(`${baseUrl}/fixtures/lineups?fixture=${fixture}`, {
-            headers: {
-                "x-apisports-key": apiKey,
-                "Content-Type": "application/json",
-            },
-        });
+        const supabase = getSupabaseClient();
 
-        if (!response.ok) {
-            console.error(`❌ [Lineups API] Upstream error: ${response.status}`);
-            return res.status(200).json({ response: [], error: "UPSTREAM_ERROR" });
+        const { data, error } = await supabase
+            .from('matches')
+            .select('lineups')
+            .eq('id', Number(fixture))
+            .single();
+
+        if (error) {
+            console.error(`❌ [Lineups API] Supabase error:`, error.message);
+            return res.status(500).json({ response: [], error: error.message });
         }
 
-        const data = await response.json();
-        return res.status(200).json(data);
-    } catch (error) {
-        console.error("❌ [Lineups API] Error:", error.message);
-        return res.status(200).json({ response: [], error: "API_UNAVAILABLE" });
+        return res.status(200).json({ response: data?.lineups || [] });
+    } catch (err) {
+        console.error('❌ [Lineups API] Error:', err.message);
+        return res.status(500).json({
+            error: 'API_INIT_FAILED',
+            message: err.message || 'Environment variables missing on server.',
+        });
     }
 }

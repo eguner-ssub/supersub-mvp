@@ -14,21 +14,75 @@
 
   /* Subtle Levitate Animation - Slow floating micro-HUD */
   @keyframes levitate {
-
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-
-    50% {
-      transform: translateY(-4px);
-    }
-
-    /* Subtle float */
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
   }
 
   .animate-float {
     animation: levitate 3s ease-in-out infinite;
-    /* Slow 3s cycle */
+  }
+
+  /* ─── PERSPECTIVE CONTAINERS ─── */
+  .perspective-tunnel {
+    perspective: 1200px;
+    perspective-origin: 50% 45%;
+  }
+
+  .perspective-office {
+    perspective: 900px;
+    perspective-origin: 40% 55%;
+  }
+
+  /* ─── WALL / FLOOR TRANSFORMS ─── */
+  .wall-left {
+    transform: rotateY(8deg);
+    transform-origin: left center;
+    transform-style: preserve-3d;
+  }
+
+  .wall-right {
+    transform: rotateY(-8deg);
+    transform-origin: right center;
+    transform-style: preserve-3d;
+  }
+
+  .ground-plane {
+    transform: rotateX(15deg);
+    transform-origin: bottom center;
+    transform-style: preserve-3d;
+  }
+
+  /* ─── GLASS-DARK MATERIALITY ─── */
+  .glass-dark {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .diegetic-screen {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      inset 0 0 30px rgba(16, 185, 129, 0.05),
+      0 8px 25px rgba(0, 0, 0, 0.5);
+  }
+
+  /* ─── DIRECTIONAL SHADOWS ─── */
+  /* Tunnel: ceiling lights → shadows cast downward */
+  .shadow-tunnel {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Office: desk lamp from left → warm shadow cast right */
+  .shadow-office {
+    box-shadow: 4px 6px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .shadow-office-warm {
+    box-shadow: 4px 6px 20px rgba(0, 0, 0, 0.5);
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.04) 0%, transparent 60%);
   }
 }

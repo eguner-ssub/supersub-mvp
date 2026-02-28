@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp, Zap, Coins } from 'lucide-react';
+import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp, Zap, Coins, ArrowLeft } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 import { normalizeMatch } from '../../shared/utils/normalizeMatch';
 
@@ -12,26 +12,22 @@ const ManagerOffice = () => {
     const [anyLiveMatches, setAnyLiveMatches] = useState(false);
 
     const energy = userProfile?.energy || 0;
-    const maxEnergy = userProfile?.max_energy || 5;
+    const maxEnergy = userProfile?.max_energy || 3;
     const coins = userProfile?.coins || 0;
-    const clubName = userProfile?.club_name || "Manager";
+    const clubName = userProfile?.club_name || userProfile?.name || "Manager";
 
     /**
      * EFFECT: Global Live Match Check
-     * Hits the match API to check for live statuses across supported leagues
      */
     useEffect(() => {
         const checkGlobalLiveStatus = async () => {
             try {
-                // Fetch today's matches (defaults to current date if no param provided)
                 const res = await fetch('/api/matches');
                 const data = await res.json();
 
                 if (data.response && Array.isArray(data.response)) {
-                    // Define live statuses based on MatchHub logic
                     const liveStatuses = ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'];
 
-                    // Check if at least one match is currently active
                     const isAnyMatchLive = data.response.some(raw => {
                         const match = normalizeMatch(raw);
                         return liveStatuses.includes(match?.fixture?.status?.short);
@@ -46,7 +42,6 @@ const ManagerOffice = () => {
 
         checkGlobalLiveStatus();
 
-        // Optional: Refresh every 5 minutes to stay updated with real-time match shifts
         const interval = setInterval(checkGlobalLiveStatus, 300000);
         return () => clearInterval(interval);
     }, []);
@@ -60,74 +55,109 @@ const ManagerOffice = () => {
         <div className="w-full h-[100dvh] bg-black flex items-center justify-center overflow-hidden font-sans select-none">
             <div className="relative aspect-[9/16] h-full max-h-[100dvh] w-auto shadow-2xl overflow-hidden bg-gray-900">
 
-                {/* BACKGROUND IMAGE - Swaps based on global live state */}
+                {/* BACKGROUND IMAGE */}
                 <img
                     src={roomBackground}
                     alt="Manager Office"
                     className="absolute inset-0 w-full h-full object-fill z-0 transition-opacity duration-700"
                 />
 
-                {/* --- HITBOXES --- */}
-                <div
-                    data-testid="hotspot-window"
-                    onClick={() => navigate('/match-hub')}
-                    className="absolute top-[10%] left-[45%] w-[55%] h-[40%] z-10 cursor-pointer active:scale-95 transition-transform"
-                >
-                    <div className={`absolute top-[40%] right-[30%] bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10 shadow-xl ${anyLiveMatches ? 'animate-pulse' : ''}`}>
-                        <Trophy className={`w-4 h-4 ${anyLiveMatches ? 'text-yellow-400' : 'text-white'}`} />
+                {/* ── PERSPECTIVE SCENE ── */}
+                <div className="absolute inset-0 perspective-office">
+
+                    {/* A. STADIUM WINDOW (Match Hub) — Upper-right, flat against window */}
+                    <div
+                        data-testid="hotspot-window"
+                        onClick={() => navigate('/match-hub')}
+                        className="absolute top-[8%] left-[42%] w-[58%] h-[42%] z-10 cursor-pointer active:scale-[0.98] transition-all duration-100"
+                    >
+                        <div className={`absolute top-[40%] right-[30%] glass-dark p-2 rounded-full shadow-office ${anyLiveMatches ? 'animate-pulse' : ''}`}>
+                            <Trophy className={`w-4 h-4 ${anyLiveMatches ? 'text-yellow-400' : 'text-white'}`} />
+                        </div>
                     </div>
+
+                    {/* B. BOOKCASE (History) — Left wall, no perspective warp */}
+                    <div
+                        data-testid="hotspot-bookcase"
+                        onClick={() => navigate('/history')}
+                        className="absolute top-[12%] left-0 w-[32%] h-[50%] z-10 cursor-pointer active:scale-[0.98] transition-all duration-100"
+                    >
+                        <div className="absolute top-[50%] left-[40%] glass-dark shadow-office-warm p-2 rounded-full">
+                            <BookOpen className="w-4 h-4 text-purple-400" />
+                        </div>
+                    </div>
+
+                    {/* C. LAPTOP SCREEN (Scouting) — Desk center, skewed to match camera angle */}
+                    <div
+                        data-testid="hotspot-laptop"
+                        onClick={() => navigate('/scouting')}
+                        className="absolute top-[58%] left-[28%] w-[38%] h-[18%] z-20 cursor-pointer active:scale-[0.98] transition-all duration-100"
+                        style={{
+                            transform: 'skewX(-2deg) skewY(1deg)',
+                            transformOrigin: 'bottom left',
+                        }}
+                    >
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 diegetic-screen p-2 rounded-full shadow-office">
+                            <Monitor className="w-4 h-4 text-blue-400" />
+                        </div>
+                    </div>
+
+                    {/* D. TABLET STAND (Leaderboard) — Desk right, slight skew */}
+                    <div
+                        data-testid="hotspot-tablet-office"
+                        onClick={() => navigate('/leaderboard')}
+                        className="absolute top-[58%] left-[72%] w-[20%] h-[18%] z-20 cursor-pointer active:scale-[0.98] transition-all duration-100"
+                        style={{
+                            transform: 'skewY(-3deg)',
+                            transformOrigin: 'bottom right',
+                        }}
+                    >
+                        <div className="absolute top-0 right-[30%] diegetic-screen p-2 rounded-full shadow-office">
+                            <TrendingUp className="w-4 h-4 text-green-400" />
+                        </div>
+                    </div>
+
+                    {/* E. PHONE ON PAPERS (Inbox) — Desk bottom-left, warm lighting */}
+                    <div
+                        data-testid="hotspot-phone"
+                        onClick={() => navigate('/inbox')}
+                        className="absolute top-[72%] left-[5%] w-[22%] h-[15%] z-20 cursor-pointer active:scale-[0.98] transition-all duration-100"
+                        style={{
+                            transform: 'skewX(5deg)',
+                            transformOrigin: 'bottom left',
+                        }}
+                    >
+                        <div className="absolute top-[-10%] right-[20%] diegetic-screen shadow-office-warm p-2 rounded-full">
+                            <Smartphone className="w-4 h-4 text-yellow-400" />
+                        </div>
+                    </div>
+
                 </div>
 
-                <div
-                    data-testid="hotspot-bookcase"
-                    onClick={() => navigate('/inventory?tab=ledger')}
-                    className="absolute top-[15%] left-0 w-[30%] h-[55%] z-10 cursor-pointer active:scale-95 transition-transform"
-                >
-                    <div className="absolute top-[50%] left-[40%] bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10 shadow-xl">
-                        <BookOpen className="w-4 h-4 text-purple-400" />
-                    </div>
-                </div>
-
-                <div
-                    data-testid="hotspot-laptop"
-                    onClick={() => navigate('/stats')}
-                    className="absolute top-[60%] left-[28%] w-[44%] h-[25%] z-20 cursor-pointer active:scale-95 transition-transform"
-                >
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10 shadow-xl">
-                        <Monitor className="w-4 h-4 text-blue-400" />
-                    </div>
-                </div>
-
-                <div
-                    data-testid="hotspot-tablet"
-                    onClick={() => navigate('/leaderboard')}
-                    className="absolute top-[62%] left-[75%] w-[25%] h-[25%] z-20 cursor-pointer active:scale-95 transition-transform"
-                >
-                    <div className="absolute top-0 right-[30%] bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10 shadow-xl">
-                        <TrendingUp className="w-4 h-4 text-green-400" />
-                    </div>
-                </div>
-
-                <div
-                    data-testid="hotspot-phone"
-                    onClick={() => navigate('/inbox')}
-                    className="absolute top-[75%] left-[5%] w-[25%] h-[15%] z-20 cursor-pointer active:scale-95 transition-transform"
-                >
-                    <div className="absolute top-[-10%] right-[20%] bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10 shadow-xl">
-                        <Smartphone className="w-4 h-4 text-yellow-400" />
-                    </div>
-                </div>
-
-                {/* --- HUD --- */}
+                {/* ── HUD ── */}
                 <div className="absolute top-0 left-0 w-full p-4 pt-6 flex justify-between items-center z-50 pointer-events-none">
-                    <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
-                        <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                        <span className="text-white font-bold text-sm font-mono pt-0.5">{energy}/{maxEnergy}</span>
+                    {/* Back Button + Energy */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            data-testid="nav-dressing-room"
+                            onClick={() => navigate('/dashboard')}
+                            className="pointer-events-auto glass-dark shadow-office p-2 rounded-full active:scale-95 transition-transform"
+                        >
+                            <ArrowLeft className="w-4 h-4 text-white" />
+                        </button>
+                        <div className="pointer-events-auto flex items-center gap-2 glass-dark px-4 py-2 rounded-full shadow-office">
+                            <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                            <span className="text-white font-bold text-sm font-mono pt-0.5">{energy}/{maxEnergy}</span>
+                        </div>
                     </div>
+
+                    {/* Club Name */}
                     <div className="absolute left-1/2 -translate-x-1/2 text-white text-lg font-black uppercase tracking-widest drop-shadow-lg truncate max-w-[150px] text-center">
                         {clubName}
                     </div>
-                    <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
+
+                    {/* Coins */}
+                    <div className="pointer-events-auto flex items-center gap-2 glass-dark px-4 py-2 rounded-full shadow-office">
                         <Coins className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                         <span className="text-white font-bold text-sm font-mono pt-0.5">{coins}</span>
                     </div>
