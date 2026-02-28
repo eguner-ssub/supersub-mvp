@@ -94,23 +94,14 @@ async function sync(
 
   console.log(`[${pulseLabel}] Sync started at ${now.toISOString()}`);
 
-  // ── 1. DETERMINE DATES TO FETCH ──────────────────
-  const datesToSync: string[] = [todayStr];
-
-  // Full-sync (Scheduler): ALWAYS include yesterday for hard reset
-  if (isFullSync) {
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60_000)
-      .toISOString()
-      .split('T')[0];
-    datesToSync.unshift(yesterday);
-    console.log(`[${pulseLabel}] Full-sync (Safety Scheduler): hard reset for ${yesterday} + ${todayStr}`);
-  }
+  // ── 1. DETERMINE DATES TO FETCH (built after existingMatchMap) ──
 
   // ── 2. PRE-FLIGHT: Get existing DB state ─────────
   let existingMatchMap = new Map<number, {
     id: number;
     status: string | null;
     custom_status: string | null;
+    kickoff_time: string | null;
     lineups: any;
     events: any;
     last_updated: string | null;
@@ -124,13 +115,13 @@ async function sync(
     // Query 1: All active (non-UPCOMING, non-COMPLETED) matches
     const { data: activeMatches } = await supabase
       .from('matches')
-      .select('id, status, custom_status, lineups, events, last_updated, finished_at')
+      .select('id, status, custom_status, kickoff_time, lineups, events, last_updated, finished_at')
       .not('custom_status', 'in', '("COMPLETED","UPCOMING")');
 
     // Query 2: UPCOMING matches within 60 minutes of kickoff
     const { data: upcomingNearKickoff } = await supabase
       .from('matches')
-      .select('id, status, custom_status, lineups, events, last_updated, finished_at')
+      .select('id, status, custom_status, kickoff_time, lineups, events, last_updated, finished_at')
       .eq('custom_status', 'UPCOMING')
       .lte('kickoff_time', sniperCutoff);
 
@@ -146,6 +137,27 @@ async function sync(
       console.log(`[${pulseLabel}] No active or near-kickoff matches — nothing to snipe.`);
       return counters;
     }
+  }
+
+  // ── 1b. BUILD datesToSync dynamically ──────────────
+  // Always include today; also include dates from active match kickoff times
+  // so cross-midnight matches aren't abandoned.
+  const activeDates = new Set<string>([todayStr]);
+  for (const m of existingMatchMap.values()) {
+    if (m.kickoff_time) activeDates.add(m.kickoff_time.split('T')[0]);
+  }
+  let datesToSync = Array.from(activeDates);
+
+  // Full-sync (Scheduler): cover yesterday → next 7 days for future sight
+  if (isFullSync) {
+    datesToSync = [];
+    for (let i = -1; i <= 7; i++) {
+      const d = new Date(now.getTime() + i * 24 * 60 * 60_000).toISOString().split('T')[0];
+      datesToSync.push(d);
+    }
+    console.log(`[${pulseLabel}] Full-sync (Scheduler): syncing ${datesToSync.length} days [${datesToSync[0]} → ${datesToSync[datesToSync.length - 1]}]`);
+  } else {
+    console.log(`[${pulseLabel}] Sniper dates: [${datesToSync.join(', ')}]`);
   }
 
   // ── 3. FETCH FIXTURES FROM API ──────────────────
