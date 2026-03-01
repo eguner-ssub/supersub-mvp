@@ -118,14 +118,16 @@ async function sync(
     const { data: activeMatches } = await supabase
       .from('matches')
       .select('id, status, custom_status, kickoff_time, lineups, events, last_updated, finished_at')
-      .not('custom_status', 'in', '("COMPLETED","UPCOMING")');
+      .not('custom_status', 'in', '("COMPLETED","UPCOMING")')
+      .gte('kickoff_time', new Date(now.getTime() - 12 * 60 * 60_000).toISOString());
 
     // Query 2: UPCOMING matches within 60 minutes of kickoff
     const { data: upcomingNearKickoff } = await supabase
       .from('matches')
       .select('id, status, custom_status, kickoff_time, lineups, events, last_updated, finished_at')
       .eq('custom_status', 'UPCOMING')
-      .lte('kickoff_time', sniperCutoff);
+      .lte('kickoff_time', sniperCutoff)
+      .gte('kickoff_time', new Date(now.getTime() - 4 * 60 * 60_000).toISOString());
 
     // Merge both sets into the map
     const allSniperMatches = [...(activeMatches || []), ...(upcomingNearKickoff || [])];
