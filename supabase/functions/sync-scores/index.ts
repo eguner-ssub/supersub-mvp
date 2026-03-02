@@ -14,7 +14,7 @@ const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
 /**
  * FREQUENCY GATES (milliseconds)
  */
-const LINEUP_STALE_MS = 5 * 60_000;   // 5 minutes
+const LINEUP_STALE_MS = 15 * 60_000;  // 15 minutes
 const PRE_LIVE_WINDOW = 60 * 60_000;  // 60 minutes before kickoff
 
 /**
@@ -91,6 +91,7 @@ async function sync(
   };
 
   const now = new Date();
+  const currentMinute = now.getMinutes();
   const todayStr = now.toISOString().split('T')[0];
   const currentHour = now.getUTCHours();
 
@@ -260,56 +261,62 @@ async function sync(
 
           // ── A. LIVE — fetch events + stats every sync ──────
           if (customStatus === 'LIVE') {
-            // Events
-            counters.eventApiCalls++;
-            const eventRes = await fetch(
-              `https://v3.football.api-sports.io/fixtures/events?fixture=${matchId}`,
-              { headers: { 'x-apisports-key': apiKey } }
-            );
-            const eventJson = await eventRes.json();
-            eventsData = eventJson.response || [];
-            console.log(`[${pulseLabel}] [EVENTS] Match ${matchId} (LIVE — ${apiStatus}, got ${eventsData.length} events)`);
-
-            // Statistics — LIVE only
-            try {
-              counters.statsApiCalls++;
-              const statsRes = await fetch(
-                `https://v3.football.api-sports.io/fixtures/statistics?fixture=${matchId}`,
+            // Events — throttled to every 3 minutes
+            if (currentMinute % 3 === 0 || isFullSync) {
+              counters.eventApiCalls++;
+              const eventRes = await fetch(
+                `https://v3.football.api-sports.io/fixtures/events?fixture=${matchId}`,
                 { headers: { 'x-apisports-key': apiKey } }
               );
-              const statsJson = await statsRes.json();
-              const rawStats = statsJson.response || [];
-
-              if (rawStats.length >= 2) {
-                const extractKeys = (teamStats: any[]) => {
-                  const out: Record<string, any> = {};
-                  for (const s of teamStats) {
-                    if (STATS_KEYS.includes(s.type)) out[s.type] = s.value;
-                  }
-                  return out;
-                };
-                statsData = {
-                  home: extractKeys(rawStats[0].statistics || []),
-                  away: extractKeys(rawStats[1].statistics || []),
-                };
-                console.log(`[${pulseLabel}] [STATS] Match ${matchId} (LIVE): ${Object.keys(statsData.home).length} stat keys`);
-              }
-            } catch (statsErr) {
-              console.error(`[${pulseLabel}] [STATS ERROR] Match ${matchId}:`, statsErr);
+              const eventJson = await eventRes.json();
+              eventsData = eventJson.response || [];
+              console.log(`[${pulseLabel}] [EVENTS] Match ${matchId} (LIVE — ${apiStatus}, got ${eventsData.length} events)`);
             }
 
-            // Odds — LIVE
-            try {
-              counters.oddsApiCalls++;
-              const oddsRes = await fetch(
-                `https://v3.football.api-sports.io/odds/live?fixture=${matchId}`,
-                { headers: { 'x-apisports-key': apiKey } }
-              );
-              const oddsJson = await oddsRes.json();
-              oddsData = oddsJson.response || [];
-              console.log(`[${pulseLabel}] [ODDS] Match ${matchId} (LIVE): ${oddsData.length} bookmakers`);
-            } catch (oddsErr) {
-              console.error(`[${pulseLabel}] [ODDS ERROR] Match ${matchId} (LIVE):`, oddsErr);
+            // Statistics — LIVE only, throttled to every 10 minutes
+            if (currentMinute % 10 === 0 || isFullSync) {
+              try {
+                counters.statsApiCalls++;
+                const statsRes = await fetch(
+                  `https://v3.football.api-sports.io/fixtures/statistics?fixture=${matchId}`,
+                  { headers: { 'x-apisports-key': apiKey } }
+                );
+                const statsJson = await statsRes.json();
+                const rawStats = statsJson.response || [];
+
+                if (rawStats.length >= 2) {
+                  const extractKeys = (teamStats: any[]) => {
+                    const out: Record<string, any> = {};
+                    for (const s of teamStats) {
+                      if (STATS_KEYS.includes(s.type)) out[s.type] = s.value;
+                    }
+                    return out;
+                  };
+                  statsData = {
+                    home: extractKeys(rawStats[0].statistics || []),
+                    away: extractKeys(rawStats[1].statistics || []),
+                  };
+                  console.log(`[${pulseLabel}] [STATS] Match ${matchId} (LIVE): ${Object.keys(statsData.home).length} stat keys`);
+                }
+              } catch (statsErr) {
+                console.error(`[${pulseLabel}] [STATS ERROR] Match ${matchId}:`, statsErr);
+              }
+            }
+
+            // Odds — LIVE, throttled to every 5 minutes
+            if (currentMinute % 5 === 0 || isFullSync) {
+              try {
+                counters.oddsApiCalls++;
+                const oddsRes = await fetch(
+                  `https://v3.football.api-sports.io/odds/live?fixture=${matchId}`,
+                  { headers: { 'x-apisports-key': apiKey } }
+                );
+                const oddsJson = await oddsRes.json();
+                oddsData = oddsJson.response || [];
+                console.log(`[${pulseLabel}] [ODDS] Match ${matchId} (LIVE): ${oddsData.length} bookmakers`);
+              } catch (oddsErr) {
+                console.error(`[${pulseLabel}] [ODDS ERROR] Match ${matchId} (LIVE):`, oddsErr);
+              }
             }
           }
 
@@ -329,19 +336,21 @@ async function sync(
             console.log(`[${pulseLabel}] [SKIP] Lineups for Match ${matchId}: checked ${Math.round(msSinceUpdate / 60_000)}m ago (gate: 5m)`);
           }
 
-          // ── B2. PRE-LIVE — odds (Bet365 filter) ──────────
+          // ── B2. PRE-LIVE — odds (Bet365 filter), throttled to every 30 minutes ──
           if (customStatus === 'PRE-LIVE') {
-            try {
-              counters.oddsApiCalls++;
-              const oddsRes = await fetch(
-                `https://v3.football.api-sports.io/odds?fixture=${matchId}&bookmaker=8`,
-                { headers: { 'x-apisports-key': apiKey } }
-              );
-              const oddsJson = await oddsRes.json();
-              oddsData = oddsJson.response || [];
-              console.log(`[${pulseLabel}] [ODDS] Match ${matchId} (PRE-LIVE): ${oddsData.length} bookmakers`);
-            } catch (oddsErr) {
-              console.error(`[${pulseLabel}] [ODDS ERROR] Match ${matchId} (PRE-LIVE):`, oddsErr);
+            if (currentMinute % 30 === 0 || isFullSync) {
+              try {
+                counters.oddsApiCalls++;
+                const oddsRes = await fetch(
+                  `https://v3.football.api-sports.io/odds?fixture=${matchId}&bookmaker=8`,
+                  { headers: { 'x-apisports-key': apiKey } }
+                );
+                const oddsJson = await oddsRes.json();
+                oddsData = oddsJson.response || [];
+                console.log(`[${pulseLabel}] [ODDS] Match ${matchId} (PRE-LIVE): ${oddsData.length} bookmakers`);
+              } catch (oddsErr) {
+                console.error(`[${pulseLabel}] [ODDS ERROR] Match ${matchId} (PRE-LIVE):`, oddsErr);
+              }
             }
           }
 
