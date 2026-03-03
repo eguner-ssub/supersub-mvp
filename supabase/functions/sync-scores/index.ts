@@ -1,64 +1,31 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-/**
- * LEAGUE COVERAGE — Central source of truth for league IDs.
- */
+// ────────────────────────────────────────────────────
+// CONFIGURATION
+// ────────────────────────────────────────────────────
 const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
-
-/** Pre-joined league IDs for the /fixtures?live= endpoint */
 const LIVE_LEAGUES_PARAM = SUPPORTED_LEAGUE_IDS.join('-');
-
-/** Max fixture IDs per API call in Prep batches */
 const BATCH_SIZE = 20;
 
-/**
- * STATUS GROUPS
- */
 const LIVE_STATUSES  = ['1H', 'HT', '2H', 'ET', 'P'];
 const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
-
-/**
- * FREQUENCY GATES (milliseconds)
- */
-const PRE_LIVE_WINDOW = 60 * 60_000;  // 60 minutes before kickoff
-
-/**
- * STATISTICS KEYS — Only extract these from the API response
- */
-const STATS_KEYS = [
-  'Ball Possession',
-  'Expected Goals',
-  'Passes %',
-  'Shots on Goal',
-  'Total Shots',
-  'Corner Kicks',
-  'Fouls',
-  'Dangerous Attacks',
-];
+const PRE_LIVE_WINDOW = 60 * 60_000; // 60 minutes before kickoff
+const ZOMBIE_THRESHOLD = 10 * 60_000; // 10 minutes without update
 
 // ────────────────────────────────────────────────────
-// STATUS DERIVATION — Pure function, no side-effects
-// Instant Finality: FT/AET/PEN → COMPLETED immediately
+// STATUS DERIVATION
 // ────────────────────────────────────────────────────
 type CustomStatus = 'UPCOMING' | 'PRE-LIVE' | 'LIVE' | 'COMPLETED';
 
 function deriveCustomStatus(
   apiStatus: string,
   kickoffTime: Date,
-  _finishedAt: Date | null,
   now: Date
 ): CustomStatus {
-  // 1. LIVE — API says match is actively playing
   if (LIVE_STATUSES.includes(apiStatus)) return 'LIVE';
-
-  // 2. FINISHED — instant finality, no POST-MATCH window
   if (FINAL_STATUSES.includes(apiStatus)) return 'COMPLETED';
-
-  // 3. PRE-LIVE — kickoff is within 60 minutes from now
   const msUntilKickoff = kickoffTime.getTime() - now.getTime();
   if (msUntilKickoff <= PRE_LIVE_WINDOW && msUntilKickoff > 0) return 'PRE-LIVE';
-
-  // 4. Everything else
   return 'UPCOMING';
 }
 
@@ -66,7 +33,6 @@ function deriveCustomStatus(
 // HELPERS
 // ────────────────────────────────────────────────────
 
-/** Split an array into chunks of at most `size` elements */
 function chunk<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -75,25 +41,15 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
-/** Extract our curated stats keys from the raw API response */
-function extractStats(rawStats: any[]): { home: Record<string, any>; away: Record<string, any> } | null {
-  if (rawStats.length < 2) return null;
-  const extractKeys = (teamStats: any[]) => {
-    const out: Record<string, any> = {};
-    for (const s of teamStats) {
-      if (STATS_KEYS.includes(s.type)) out[s.type] = s.value;
-    }
-    return out;
-  };
-  return {
-    home: extractKeys(rawStats[0].statistics || []),
-    away: extractKeys(rawStats[1].statistics || []),
-  };
-}
-
-/** Build a standard update payload from an API fixture item */
-function buildPayload(item: any, customStatus: CustomStatus, now: Date, existingFinishedAt: string | null): any {
+/**
+ * Build an upsert payload from a raw API fixture object.
+ * The /fixtures endpoint returns everything: score, events, lineups, statistics.
+ */
+function buildPayload(item: any, now: Date, existingFinishedAt: string | null): any {
   const apiStatus = item.fixture.status.short;
+  const kickoffTime = new Date(item.fixture.date);
+  const customStatus = deriveCustomStatus(apiStatus, kickoffTime, now);
+
   const payload: any = {
     id: item.fixture.id,
     league_id: item.league.id,
@@ -118,32 +74,33 @@ function buildPayload(item: any, customStatus: CustomStatus, now: Date, existing
     payload.finished_at = now.toISOString();
   }
 
-  // Include events if present in fixture response
+  // Events
   if (item.events && Array.isArray(item.events) && item.events.length > 0) {
     payload.events = item.events;
   }
 
-  // Include lineups if present in fixture response
+  // Lineups
   if (item.lineups && Array.isArray(item.lineups) && item.lineups.length > 0) {
     payload.lineups = item.lineups;
   }
 
-  // Include statistics if present
-  if (item.statistics && Array.isArray(item.statistics)) {
-    const stats = extractStats(item.statistics);
-    if (stats) payload.statistics = stats;
+  // Statistics
+  if (item.statistics && Array.isArray(item.statistics) && item.statistics.length >= 2) {
+    payload.statistics = {
+      home: item.statistics[0],
+      away: item.statistics[1],
+    };
   }
 
   return payload;
 }
 
 // ────────────────────────────────────────────────────
-// SYNC — Pulse & Prep Architecture
+// SYNC — Strict Pulse & Prep (2 mechanisms only)
 // ────────────────────────────────────────────────────
 interface SyncCounters {
   pulseApiCalls: number;
   prepApiCalls: number;
-  fullSyncApiCalls: number;
   processedMatches: number;
   syncedToDb: number;
   dbErrors: string[];
@@ -152,13 +109,11 @@ interface SyncCounters {
 async function sync(
   supabase: ReturnType<typeof createClient>,
   apiKey: string,
-  isFullSync: boolean,
   pulseLabel: string
 ): Promise<SyncCounters> {
   const counters: SyncCounters = {
     pulseApiCalls: 0,
     prepApiCalls: 0,
-    fullSyncApiCalls: 0,
     processedMatches: 0,
     syncedToDb: 0,
     dbErrors: [],
@@ -170,8 +125,8 @@ async function sync(
   console.log(`[${pulseLabel}] Sync started at ${now.toISOString()}`);
 
   // ══════════════════════════════════════════════════
-  // MECHANISM A: THE PULSE — Live Scores (every invocation)
-  // One single API call fetches all live matches across our leagues.
+  // MECHANISM A: THE PULSE — Live Scores (every minute)
+  // Single API call covers scores, events, lineups, stats for all live games.
   // ══════════════════════════════════════════════════
   try {
     counters.pulseApiCalls++;
@@ -185,44 +140,32 @@ async function sync(
     console.log(`[${pulseLabel}] [PULSE] Fetched ${liveFixtures.length} live fixtures`);
 
     if (liveFixtures.length > 0) {
-      // Look up existing DB state for these fixtures to detect first-COMPLETED transitions
+      // Look up existing DB state for finished_at checks
       const liveIds = liveFixtures.map((item: any) => item.fixture.id);
       const { data: existingLive } = await supabase
         .from('matches')
         .select('id, finished_at')
         .in('id', liveIds);
-      const existingMap = new Map((existingLive || []).map((m: any) => [m.id, m]));
+      const existingMap = new Map((existingLive || []).map((m: any) => [m.id, m.finished_at]));
 
       const pulseUpdates: any[] = [];
       for (const item of liveFixtures) {
-        const matchId = item.fixture.id;
-        const apiStatus = item.fixture.status.short;
-        const kickoffTime = new Date(item.fixture.date);
-        const existing = existingMap.get(matchId);
-
-        const customStatus = deriveCustomStatus(
-          apiStatus, kickoffTime, existing?.finished_at ? new Date(existing.finished_at) : null, now
-        );
-
-        const payload = buildPayload(item, customStatus, now, existing?.finished_at || null);
+        const payload = buildPayload(item, now, existingMap.get(item.fixture.id) || null);
         pulseUpdates.push(payload);
         counters.processedMatches++;
       }
 
-      // Upsert all live matches in one batch
-      if (pulseUpdates.length > 0) {
-        const { error } = await supabase
-          .from('matches')
-          .upsert(pulseUpdates, { onConflict: 'id' });
+      const { error } = await supabase
+        .from('matches')
+        .upsert(pulseUpdates, { onConflict: 'id' });
 
-        if (!error) {
-          counters.syncedToDb += pulseUpdates.length;
-          console.log(`[${pulseLabel}] [PULSE] Upserted ${pulseUpdates.length} live matches`);
-        } else {
-          const errMsg = `[PULSE] ${error.message} (code: ${error.code}, details: ${error.details})`;
-          console.error(`[${pulseLabel}] [DB ERROR] ${errMsg}`);
-          counters.dbErrors.push(errMsg);
-        }
+      if (!error) {
+        counters.syncedToDb += pulseUpdates.length;
+        console.log(`[${pulseLabel}] [PULSE] Upserted ${pulseUpdates.length} live matches`);
+      } else {
+        const errMsg = `[PULSE] ${error.message} (code: ${error.code})`;
+        console.error(`[${pulseLabel}] [DB ERROR] ${errMsg}`);
+        counters.dbErrors.push(errMsg);
       }
     }
   } catch (pulseErr) {
@@ -230,41 +173,51 @@ async function sync(
   }
 
   // ══════════════════════════════════════════════════
-  // MECHANISM B: THE PREP — Pre-Match Batching (every 10 min)
-  // Fetches upcoming match details (lineups, formations) by ID batches.
+  // MECHANISM B: THE PREP & CLEANUP (every 10 minutes)
+  // Target 1: PRE-LIVE matches (kickoff within 60 min) → fetch lineups
+  // Target 2: Zombie LIVE matches (no update in 10 min) → catch final whistle
   // ══════════════════════════════════════════════════
-  if (currentMinute % 10 === 0 || isFullSync) {
+  if (currentMinute % 10 === 0) {
     try {
       const prepCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW).toISOString();
+      const zombieCutoff = new Date(now.getTime() - ZOMBIE_THRESHOLD).toISOString();
 
-      // Query for "pre-live" matches: not COMPLETED or LIVE, kickoff within the next 60 minutes
-      const { data: preLiveMatches, error: queryErr } = await supabase
+      // Target 1: PRE-LIVE matches
+      const { data: preLiveMatches, error: preLiveErr } = await supabase
         .from('matches')
         .select('id, finished_at')
-        .not('custom_status', 'in', '("COMPLETED","LIVE")')
+        .eq('custom_status', 'PRE-LIVE')
         .gte('kickoff_time', now.toISOString())
         .lte('kickoff_time', prepCutoff);
 
-      if (queryErr) {
-        console.error(`[${pulseLabel}] [PREP] Query error:`, queryErr);
-      }
+      if (preLiveErr) console.error(`[${pulseLabel}] [PREP] Pre-live query error:`, preLiveErr);
 
-      const preLiveIds = (preLiveMatches || []).map((m: any) => m.id);
-      console.log(`[${pulseLabel}] [PREP] Found ${preLiveIds.length} pre-live matches to prep`);
+      // Target 2: Zombie LIVE matches (stale for > 10 min)
+      const { data: zombieMatches, error: zombieErr } = await supabase
+        .from('matches')
+        .select('id, finished_at')
+        .eq('custom_status', 'LIVE')
+        .lt('last_updated', zombieCutoff);
 
-      if (preLiveIds.length > 0) {
-        const existingFinishedMap = new Map(
-          (preLiveMatches || []).map((m: any) => [m.id, m.finished_at])
-        );
+      if (zombieErr) console.error(`[${pulseLabel}] [PREP] Zombie query error:`, zombieErr);
 
-        const idChunks = chunk(preLiveIds, BATCH_SIZE);
+      // Combine unique IDs
+      const allTargets = [...(preLiveMatches || []), ...(zombieMatches || [])];
+      const idSet = new Map(allTargets.map((m: any) => [m.id, m.finished_at]));
+      const allIds = Array.from(idSet.keys());
+
+      const preLiveCount = preLiveMatches?.length || 0;
+      const zombieCount = zombieMatches?.length || 0;
+      console.log(`[${pulseLabel}] [PREP] Targets: ${preLiveCount} pre-live + ${zombieCount} zombies = ${allIds.length} total`);
+
+      if (allIds.length > 0) {
+        const idChunks = chunk(allIds, BATCH_SIZE);
 
         for (const idChunk of idChunks) {
           try {
             counters.prepApiCalls++;
-            const idsParam = idChunk.join('-');
             const prepRes = await fetch(
-              `https://v3.football.api-sports.io/fixtures?ids=${idsParam}`,
+              `https://v3.football.api-sports.io/fixtures?ids=${idChunk.join('-')}`,
               { headers: { 'x-apisports-key': apiKey, 'Content-Type': 'application/json' } }
             );
             const prepJson = await prepRes.json();
@@ -274,15 +227,7 @@ async function sync(
 
             const prepUpdates: any[] = [];
             for (const item of prepFixtures) {
-              const apiStatus = item.fixture.status.short;
-              const kickoffTime = new Date(item.fixture.date);
-              const existingFinishedAt = existingFinishedMap.get(item.fixture.id) || null;
-
-              const customStatus = deriveCustomStatus(
-                apiStatus, kickoffTime, existingFinishedAt ? new Date(existingFinishedAt) : null, now
-              );
-
-              const payload = buildPayload(item, customStatus, now, existingFinishedAt);
+              const payload = buildPayload(item, now, idSet.get(item.fixture.id) || null);
               prepUpdates.push(payload);
               counters.processedMatches++;
             }
@@ -295,7 +240,7 @@ async function sync(
               if (!error) {
                 counters.syncedToDb += prepUpdates.length;
               } else {
-                const errMsg = `[PREP] ${error.message} (code: ${error.code}, details: ${error.details})`;
+                const errMsg = `[PREP] ${error.message} (code: ${error.code})`;
                 console.error(`[${pulseLabel}] [DB ERROR] ${errMsg}`);
                 counters.dbErrors.push(errMsg);
               }
@@ -309,133 +254,46 @@ async function sync(
       console.error(`[${pulseLabel}] [PREP ERROR]`, prepErr);
     }
   } else {
-    console.log(`[${pulseLabel}] [PREP] Skipped (minute=${currentMinute}, not a 10-min boundary)`);
-  }
-
-  // ══════════════════════════════════════════════════
-  // SAFETY NET: Full Sync (midnight scheduler only)
-  // Fetches yesterday through +7 days by date to catch anything missed.
-  // ══════════════════════════════════════════════════
-  if (isFullSync) {
-    console.log(`[${pulseLabel}] [FULL-SYNC] Running date-range safety net...`);
-
-    const datesToSync: string[] = [];
-    for (let i = -1; i <= 7; i++) {
-      const d = new Date(now.getTime() + i * 24 * 60 * 60_000).toISOString().split('T')[0];
-      datesToSync.push(d);
-    }
-
-    console.log(`[${pulseLabel}] [FULL-SYNC] Syncing ${datesToSync.length} days [${datesToSync[0]} → ${datesToSync[datesToSync.length - 1]}]`);
-
-    for (const date of datesToSync) {
-      try {
-        counters.fullSyncApiCalls++;
-        const response = await fetch(
-          `https://v3.football.api-sports.io/fixtures?date=${date}`,
-          { headers: { 'x-apisports-key': apiKey, 'Content-Type': 'application/json' } }
-        );
-        const result = await response.json();
-
-        if (!result.response) {
-          console.log(`[${pulseLabel}] [FULL-SYNC] No API response for date ${date}`);
-          continue;
-        }
-
-        // Filter to supported leagues
-        const filteredMatches = result.response.filter(
-          (item: any) => SUPPORTED_LEAGUE_IDS.includes(item.league.id)
-        );
-
-        if (filteredMatches.length === 0) {
-          console.log(`[${pulseLabel}] [FULL-SYNC] No supported-league matches for ${date}`);
-          continue;
-        }
-
-        console.log(`[${pulseLabel}] [FULL-SYNC] ${date}: ${filteredMatches.length} matches in supported leagues`);
-
-        // Bulk-fetch existing DB state for finished_at checks
-        const matchIds = filteredMatches.map((item: any) => item.fixture.id);
-        const { data: existingMatches } = await supabase
-          .from('matches')
-          .select('id, finished_at')
-          .in('id', matchIds);
-
-        const existingMap = new Map((existingMatches || []).map((m: any) => [m.id, m]));
-
-        const updates: any[] = [];
-        for (const item of filteredMatches) {
-          const apiStatus = item.fixture.status.short;
-          const kickoffTime = new Date(item.fixture.date);
-          const existing = existingMap.get(item.fixture.id);
-          const existingFinishedAt = existing?.finished_at || null;
-
-          const customStatus = deriveCustomStatus(
-            apiStatus, kickoffTime, existingFinishedAt ? new Date(existingFinishedAt) : null, now
-          );
-
-          const payload = buildPayload(item, customStatus, now, existingFinishedAt);
-          updates.push(payload);
-          counters.processedMatches++;
-        }
-
-        if (updates.length > 0) {
-          const { error } = await supabase
-            .from('matches')
-            .upsert(updates, { onConflict: 'id' });
-
-          if (!error) {
-            counters.syncedToDb += updates.length;
-          } else {
-            const errMsg = `[FULL-SYNC][${date}] ${error.message} (code: ${error.code}, details: ${error.details})`;
-            console.error(`[${pulseLabel}] [DB ERROR] ${errMsg}`);
-            counters.dbErrors.push(errMsg);
-          }
-        }
-      } catch (err) {
-        console.error(`[${pulseLabel}] [FULL-SYNC ERROR] Date ${date}:`, err);
-      }
-    }
+    console.log(`[${pulseLabel}] [PREP] Skipped (minute=${currentMinute})`);
   }
 
   console.log(
     `[${pulseLabel}] Done — processed=${counters.processedMatches} ` +
     `pulse_api=${counters.pulseApiCalls} prep_api=${counters.prepApiCalls} ` +
-    `fullsync_api=${counters.fullSyncApiCalls} synced=${counters.syncedToDb}`
+    `synced=${counters.syncedToDb}`
   );
 
   return counters;
 }
 
 // ────────────────────────────────────────────────────
-// HANDLER — Single-Shot (no double pulse)
+// HANDLER
 // ────────────────────────────────────────────────────
-Deno.serve(async (req) => {
+Deno.serve(async (_req) => {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
   const apiKey = Deno.env.get('SPORTS_API_KEY')?.trim() ?? '';
-  const isFullSync = req.url.includes('full_sync=true');
 
-  console.log(`[SYNC] ══════ Invocation start — mode=${isFullSync ? 'SCHEDULER' : 'PULSE&PREP'} ══════`);
+  console.log(`[SYNC] ══════ Invocation start — PULSE & PREP ══════`);
 
-  const result = await sync(supabase, apiKey, isFullSync, 'SYNC');
+  const result = await sync(supabase, apiKey, 'SYNC');
 
   console.log(
     `[SYNC] ══════ Complete — ${result.syncedToDb} matches synced ══════\n` +
-    `  API calls → pulse=${result.pulseApiCalls} prep=${result.prepApiCalls} fullSync=${result.fullSyncApiCalls}\n` +
+    `  API calls → pulse=${result.pulseApiCalls} prep=${result.prepApiCalls}\n` +
     `  processed=${result.processedMatches}`
   );
 
   return new Response(JSON.stringify({
     success: result.dbErrors.length === 0,
-    mode: isFullSync ? 'SCHEDULER' : 'PULSE&PREP',
+    mode: 'PULSE&PREP',
     message: `Sync complete. ${result.syncedToDb} matches synced.`,
     apiCalls: {
       pulse: result.pulseApiCalls,
       prep: result.prepApiCalls,
-      fullSync: result.fullSyncApiCalls,
     },
     processed: result.processedMatches,
     synced: result.syncedToDb,
