@@ -31,18 +31,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Missing fixture ID" });
     }
 
-    // Simplified simulation response matching the spec
-    const createSimulationResponse = () => ({
-        fixtureId: parseInt(fixture),
-        isLive: true,
-        source: "SIMULATION",
-        odds: {
-            home: 2.5,
-            draw: 3.2,
-            away: 2.8
-        }
-    });
-
     try {
         const supabase = getSupabaseClient();
 
@@ -52,23 +40,31 @@ export default async function handler(req, res) {
             .eq('id', Number(fixture))
             .single();
 
-        // If Supabase error or no odds cached, fall back to simulation
+        // If Supabase error or no odds cached, return empty — no simulation
         if (error || !dbRow?.odds || (Array.isArray(dbRow.odds) && dbRow.odds.length === 0)) {
-            console.warn('⚠️ [LIVE ODDS API] No cached odds available - Using simulation');
-            return res.status(200).json(createSimulationResponse());
+            console.warn('⚠️ [LIVE ODDS API] No cached odds available — returning empty');
+            return res.status(200).json({
+                fixtureId: parseInt(fixture),
+                isLive: true,
+                source: "NONE",
+                odds: {}
+            });
         }
 
-        // Feed the cached odds through the existing parsing logic
+        // Feed the cached odds through parsing logic
         const data = { response: dbRow.odds };
 
-        // Check if we got valid odds data
         if (!data.response || data.response.length === 0) {
-            console.warn("⚠️ [LIVE ODDS API] No live odds available (common for minor leagues)");
-            return res.status(200).json(createSimulationResponse());
+            console.warn("⚠️ [LIVE ODDS API] Odds column empty — returning empty");
+            return res.status(200).json({
+                fixtureId: parseInt(fixture),
+                isLive: true,
+                source: "NONE",
+                odds: {}
+            });
         }
 
-        // === DATA PARSING (CRITICAL) ===
-        // Live odds structure: response[0].odds[] (flat array, not nested under bookmakers)
+        // === DATA PARSING ===
         const oddsData = data.response[0];
 
         console.log('🔍 [LIVE ODDS API] Checking odds structure...');
@@ -78,8 +74,6 @@ export default async function handler(req, res) {
         // Try flat structure first (response[0].odds[])
         if (oddsData.odds && Array.isArray(oddsData.odds)) {
             console.log('📊 [LIVE ODDS API] Using FLAT structure - odds array found');
-
-            // Target "Match Winner" (ID 1)
             matchWinnerMarket = oddsData.odds.find(
                 market => market.name === "Match Winner" || market.id === 1
             );
@@ -88,15 +82,19 @@ export default async function handler(req, res) {
         else if (oddsData.bookmakers && oddsData.bookmakers.length > 0) {
             console.log('📊 [LIVE ODDS API] Using NESTED structure (bookmakers)');
             const bookmaker = oddsData.bookmakers[0];
-
             matchWinnerMarket = bookmaker.bets?.find(
                 bet => bet.name === "Match Winner" || bet.id === 1
             );
         }
 
         if (!matchWinnerMarket || !matchWinnerMarket.values) {
-            console.warn("⚠️ [LIVE ODDS API] Match Winner market not found - Using simulation");
-            return res.status(200).json(createSimulationResponse());
+            console.warn("⚠️ [LIVE ODDS API] Match Winner market not found — returning empty");
+            return res.status(200).json({
+                fixtureId: parseInt(fixture),
+                isLive: true,
+                source: "NONE",
+                odds: {}
+            });
         }
 
         console.log('✅ [LIVE ODDS API] Found Match Winner market');
@@ -106,15 +104,14 @@ export default async function handler(req, res) {
         const drawOdds = matchWinnerMarket.values.find(v => v.value === "Draw");
         const awayOdds = matchWinnerMarket.values.find(v => v.value === "Away");
 
-        // Return simplified format as per spec
         const parsedResponse = {
             fixtureId: parseInt(fixture),
             isLive: true,
             source: "CACHED-DB",
             odds: {
-                home: parseFloat(homeOdds?.odd || 2.5),
-                draw: parseFloat(drawOdds?.odd || 3.2),
-                away: parseFloat(awayOdds?.odd || 2.8)
+                home: homeOdds ? parseFloat(homeOdds.odd) : 0,
+                draw: drawOdds ? parseFloat(drawOdds.odd) : 0,
+                away: awayOdds ? parseFloat(awayOdds.odd) : 0,
             }
         };
 
@@ -123,7 +120,11 @@ export default async function handler(req, res) {
 
     } catch (err) {
         console.error("❌ [LIVE ODDS API] Error:", err.message);
-        // Always return simulation on error to prevent UI crashes
-        return res.status(200).json(createSimulationResponse());
+        return res.status(200).json({
+            fixtureId: parseInt(fixture),
+            isLive: true,
+            source: "NONE",
+            odds: {}
+        });
     }
 }

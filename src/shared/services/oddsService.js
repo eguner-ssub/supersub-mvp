@@ -9,9 +9,10 @@ const normalizeName = (name) => {
 const THE_ODDS_API_BASE = 'https://api.the-odds-api.com/v4/sports';
 
 /**
- * Get odds for a match.
- * Primary: the-odds-api.com (all dates)
- * Fallback: Supabase matches.odds column via /api/odds proxy
+ * Get odds for a match — Database-First protocol.
+ *
+ * Match Day: Supabase odds column → the-odds-api fallback
+ * Other days: the-odds-api → Supabase odds column fallback
  */
 export const getHybridOdds = async (match, apiKey) => {
     if (!match) return null;
@@ -21,31 +22,42 @@ export const getHybridOdds = async (match, apiKey) => {
 
     if (!fixtureDate) return null;
 
+    const matchDate = new Date(fixtureDate);
+    const today = new Date();
+    const isMatchDay = matchDate.toDateString() === today.toDateString();
+
     const leagueId = match.league?.id || match.league_id;
     const sportKey = getOddsApiKey(leagueId);
     const homeName = match.teams?.home?.name || match.home_team || 'Home';
 
-    // ── Primary: the-odds-api ──
-    if (sportKey) {
-        try {
-            const url = `${THE_ODDS_API_BASE}/${sportKey}/odds?apiKey=${apiKey}&regions=uk,eu&markets=h2h,totals`;
-            const res = await fetch(url);
-            const data = await res.json();
-            if (!Array.isArray(data)) throw new Error("Invalid response");
+    if (isMatchDay) {
+        // ── MATCH DAY: DB first, the-odds-api fallback ──
 
-            const foundEvent = data.find(event => {
-                const apiHome = normalizeName(event.home_team);
-                const localHome = normalizeName(homeName);
-                return apiHome.includes(localHome) || localHome.includes(apiHome);
-            });
+        // 1. Try Supabase odds column
+        const dbResult = await tryDbOdds(fixtureId);
+        if (dbResult) return dbResult;
 
-            if (foundEvent) return parseTheOddsApi(foundEvent);
-        } catch (err) {
-            console.error("[OddsService] The Odds API failed:", err);
-        }
+        // 2. Fallback to the-odds-api
+        const apiResult = await tryTheOddsApi(sportKey, apiKey, homeName);
+        if (apiResult) return apiResult;
+    } else {
+        // ── OTHER DAYS: the-odds-api first, DB fallback ──
+
+        // 1. Try the-odds-api
+        const apiResult = await tryTheOddsApi(sportKey, apiKey, homeName);
+        if (apiResult) return apiResult;
+
+        // 2. Fallback to Supabase odds column
+        const dbResult = await tryDbOdds(fixtureId);
+        if (dbResult) return dbResult;
     }
 
-    // ── Fallback: Supabase matches.odds column ──
+    return null;
+};
+
+// ── Data Sources ──────────────────────────────────────────────────────────────
+
+async function tryDbOdds(fixtureId) {
     try {
         const res = await fetch(`/api/odds?fixture=${fixtureId}`);
         const data = await res.json();
@@ -55,11 +67,34 @@ export const getHybridOdds = async (match, apiKey) => {
             return parseDbOdds(odds);
         }
     } catch (err) {
-        console.error("[OddsService] DB fallback failed:", err);
+        console.error("[OddsService] DB read failed:", err);
     }
-
     return null;
-};
+}
+
+async function tryTheOddsApi(sportKey, apiKey, homeName) {
+    if (!sportKey) return null;
+
+    try {
+        const url = `${THE_ODDS_API_BASE}/${sportKey}/odds?apiKey=${apiKey}&regions=uk,eu&markets=h2h,totals`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error("Invalid response");
+
+        const foundEvent = data.find(event => {
+            const apiHome = normalizeName(event.home_team);
+            const localHome = normalizeName(homeName);
+            return apiHome.includes(localHome) || localHome.includes(apiHome);
+        });
+
+        if (foundEvent) return parseTheOddsApi(foundEvent);
+    } catch (err) {
+        console.error("[OddsService] The Odds API failed:", err);
+    }
+    return null;
+}
+
+// ── Parsers ───────────────────────────────────────────────────────────────────
 
 const parseTheOddsApi = (event) => {
     const bookmakers = event.bookmakers || [];
@@ -88,7 +123,7 @@ const parseTheOddsApi = (event) => {
 
 /**
  * Parse odds stored in the Supabase matches.odds JSONB column.
- * Handles both raw bookmaker arrays and pre-parsed objects.
+ * Handles both pre-parsed normalized objects and raw bookmaker arrays.
  */
 const parseDbOdds = (odds) => {
     // If already in our normalized shape
