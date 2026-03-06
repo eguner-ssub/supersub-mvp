@@ -22,35 +22,16 @@ export const getHybridOdds = async (match, apiKey) => {
 
     if (!fixtureDate) return null;
 
-    const matchDate = new Date(fixtureDate);
-    const today = new Date();
-    const isMatchDay = matchDate.toDateString() === today.toDateString();
-
     const leagueId = match.league?.id || match.league_id;
     const sportKey = getOddsApiKey(leagueId);
     const homeName = match.teams?.home?.name || match.home_team || 'Home';
 
-    if (isMatchDay) {
-        // ── MATCH DAY: DB first, the-odds-api fallback ──
+    // ── Flat flow: the-odds-api → Supabase DB fallback ──
+    const apiResult = await tryTheOddsApi(sportKey, apiKey, homeName);
+    if (apiResult) return apiResult;
 
-        // 1. Try Supabase odds column
-        const dbResult = await tryDbOdds(fixtureId);
-        if (dbResult) return dbResult;
-
-        // 2. Fallback to the-odds-api
-        const apiResult = await tryTheOddsApi(sportKey, apiKey, homeName);
-        if (apiResult) return apiResult;
-    } else {
-        // ── OTHER DAYS: the-odds-api first, DB fallback ──
-
-        // 1. Try the-odds-api
-        const apiResult = await tryTheOddsApi(sportKey, apiKey, homeName);
-        if (apiResult) return apiResult;
-
-        // 2. Fallback to Supabase odds column
-        const dbResult = await tryDbOdds(fixtureId);
-        if (dbResult) return dbResult;
-    }
+    const dbResult = await tryDbOdds(fixtureId);
+    if (dbResult) return dbResult;
 
     return null;
 };
