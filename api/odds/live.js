@@ -31,6 +31,18 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Missing fixture ID" });
     }
 
+    // Simulation response — no external API calls, just safe defaults
+    const createSimulationResponse = () => ({
+        fixtureId: parseInt(fixture),
+        isLive: true,
+        source: "SIMULATION",
+        odds: {
+            home: 2.5,
+            draw: 3.2,
+            away: 2.8
+        }
+    });
+
     try {
         const supabase = getSupabaseClient();
 
@@ -40,28 +52,18 @@ export default async function handler(req, res) {
             .eq('id', Number(fixture))
             .single();
 
-        // If Supabase error or no odds cached, return empty — no simulation
+        // If Supabase error or no odds cached, return simulation immediately
         if (error || !dbRow?.odds || (Array.isArray(dbRow.odds) && dbRow.odds.length === 0)) {
-            console.warn('⚠️ [LIVE ODDS API] No cached odds available — returning empty');
-            return res.status(200).json({
-                fixtureId: parseInt(fixture),
-                isLive: true,
-                source: "NONE",
-                odds: {}
-            });
+            console.warn('⚠️ [LIVE ODDS API] No cached odds available — returning simulation');
+            return res.status(200).json(createSimulationResponse());
         }
 
         // Feed the cached odds through parsing logic
         const data = { response: dbRow.odds };
 
         if (!data.response || data.response.length === 0) {
-            console.warn("⚠️ [LIVE ODDS API] Odds column empty — returning empty");
-            return res.status(200).json({
-                fixtureId: parseInt(fixture),
-                isLive: true,
-                source: "NONE",
-                odds: {}
-            });
+            console.warn("⚠️ [LIVE ODDS API] Odds column empty — returning simulation");
+            return res.status(200).json(createSimulationResponse());
         }
 
         // === DATA PARSING ===
@@ -88,13 +90,8 @@ export default async function handler(req, res) {
         }
 
         if (!matchWinnerMarket || !matchWinnerMarket.values) {
-            console.warn("⚠️ [LIVE ODDS API] Match Winner market not found — returning empty");
-            return res.status(200).json({
-                fixtureId: parseInt(fixture),
-                isLive: true,
-                source: "NONE",
-                odds: {}
-            });
+            console.warn("⚠️ [LIVE ODDS API] Match Winner market not found — returning simulation");
+            return res.status(200).json(createSimulationResponse());
         }
 
         console.log('✅ [LIVE ODDS API] Found Match Winner market');
@@ -120,11 +117,6 @@ export default async function handler(req, res) {
 
     } catch (err) {
         console.error("❌ [LIVE ODDS API] Error:", err.message);
-        return res.status(200).json({
-            fixtureId: parseInt(fixture),
-            isLive: true,
-            source: "NONE",
-            odds: {}
-        });
+        return res.status(200).json(createSimulationResponse());
     }
 }
