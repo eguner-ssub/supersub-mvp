@@ -8,36 +8,25 @@ const normalizeName = (name) => {
 
 const THE_ODDS_API_BASE = 'https://api.the-odds-api.com/v4/sports';
 
+/**
+ * Get odds for a match.
+ * Primary: the-odds-api.com (all dates)
+ * Fallback: Supabase matches.odds column via /api/odds proxy
+ */
 export const getHybridOdds = async (match, apiKey) => {
     if (!match) return null;
 
-    // Support both nested (API-Football) and flat (Supabase) match shapes
     const fixtureId = match.fixture?.id || match.id;
     const fixtureDate = match.fixture?.date || match.kickoff_time || match.date;
-    const statusShort = match.fixture?.status?.short || match.status || 'NS';
 
     if (!fixtureDate) return null;
 
-    const matchDate = new Date(fixtureDate);
-    const today = new Date();
-    const isMatchDay = matchDate.toDateString() === today.toDateString();
+    const leagueId = match.league?.id || match.league_id;
+    const sportKey = getOddsApiKey(leagueId);
+    const homeName = match.teams?.home?.name || match.home_team || 'Home';
 
-    if (isMatchDay) {
-        try {
-            const res = await fetch(`/api/odds?fixture=${fixtureId}`);
-            const data = await res.json();
-            return parseApiFootball(data, statusShort === 'LIVE');
-        } catch (err) {
-            console.error("API-Football Failed:", err);
-            return null;
-        }
-    } else {
-        const leagueId = match.league?.id || match.league_id;
-        const sportKey = getOddsApiKey(leagueId);
-        if (!sportKey) return null;
-
-        const homeName = match.teams?.home?.name || match.home_team || 'Home';
-
+    // ── Primary: the-odds-api ──
+    if (sportKey) {
         try {
             const url = `${THE_ODDS_API_BASE}/${sportKey}/odds?apiKey=${apiKey}&regions=uk,eu&markets=h2h,totals`;
             const res = await fetch(url);
@@ -50,12 +39,26 @@ export const getHybridOdds = async (match, apiKey) => {
                 return apiHome.includes(localHome) || localHome.includes(apiHome);
             });
 
-            return foundEvent ? parseTheOddsApi(foundEvent) : null;
+            if (foundEvent) return parseTheOddsApi(foundEvent);
         } catch (err) {
-            console.error("The Odds API Failed:", err);
-            return null;
+            console.error("[OddsService] The Odds API failed:", err);
         }
     }
+
+    // ── Fallback: Supabase matches.odds column ──
+    try {
+        const res = await fetch(`/api/odds?fixture=${fixtureId}`);
+        const data = await res.json();
+        const odds = data.response;
+
+        if (odds && (Array.isArray(odds) ? odds.length > 0 : Object.keys(odds).length > 0)) {
+            return parseDbOdds(odds);
+        }
+    } catch (err) {
+        console.error("[OddsService] DB fallback failed:", err);
+    }
+
+    return null;
 };
 
 const parseTheOddsApi = (event) => {
@@ -83,64 +86,67 @@ const parseTheOddsApi = (event) => {
     };
 };
 
-const parseApiFootball = (data, isLive) => {
-    let markets = [];
-    let bookmakerName = isLive ? "LIVE" : "Official Odds";
-
-    if (isLive) {
-        markets = data.response?.[0]?.odds || [];
-    } else {
-        const bookmakers = data.response?.[0]?.bookmakers || [];
-        // Prioritize Bet365 (8) or Marathonbet (1)
-        const target = bookmakers.find(b => [8, 1, 6, 10, 16, 7].includes(b.id)) || bookmakers[0];
-        if (target) {
-            markets = target.bets;
-            bookmakerName = target.name;
-        }
+/**
+ * Parse odds stored in the Supabase matches.odds JSONB column.
+ * Handles both raw bookmaker arrays and pre-parsed objects.
+ */
+const parseDbOdds = (odds) => {
+    // If already in our normalized shape
+    if (odds.home !== undefined && odds.draw !== undefined) {
+        return {
+            source: 'Database (cached)',
+            odds: {
+                home: parseFloat(odds.home) || 0,
+                draw: parseFloat(odds.draw) || 0,
+                away: parseFloat(odds.away) || 0,
+                goals_over: parseFloat(odds.goals_over) || 0,
+                goals_under: parseFloat(odds.goals_under) || 0,
+                supersub_yes: 4.50,
+                scorers: odds.scorers || []
+            }
+        };
     }
 
-    if (!markets || markets.length === 0) return null;
+    // If stored as API-Football bookmaker format (array with bookmakers)
+    if (Array.isArray(odds) && odds.length > 0) {
+        const bookmakers = odds[0]?.bookmakers || [];
+        const target = bookmakers.find(b => [8, 1, 6, 10, 16, 7].includes(b.id)) || bookmakers[0];
+        if (!target) return null;
 
-    // FIX: Flexible partial matching (case-insensitive) to catch variations
-    const findMarket = (keywords) => markets.find(m => {
-        const name = m.name.toLowerCase();
-        return keywords.some(k => name.includes(k.toLowerCase()));
-    });
-
-    const matchWinner = findMarket(["Match Winner", "1x2", "Full Time"]);
-    const goalsMarket = findMarket(["Goals Over/Under", "Total Goals", "Over/Under"]);
-
-    // FIX: Broad search for any scorer market
-    const scorers = findMarket(["Scorer", "Goalscorer", "To Score"]);
-
-    const getOdd = (market, name) => {
-        return market?.values?.find(v => v.value.toString().toLowerCase() === name.toLowerCase())?.odd;
-    };
-
-    const getGoalsOdd = (direction) => {
-        if (!goalsMarket?.values) return 0;
-        const found = goalsMarket.values.find(v => {
-            const val = v.value.toString();
-            return (val.includes(direction) || val.startsWith(direction[0])) && val.includes("2.5");
+        const markets = target.bets || [];
+        const findMarket = (keywords) => markets.find(m => {
+            const name = m.name.toLowerCase();
+            return keywords.some(k => name.includes(k.toLowerCase()));
         });
-        return found ? parseFloat(found.odd) : 0;
-    };
 
-    return {
-        source: `API-Football (${bookmakerName})`,
-        odds: {
-            home: parseFloat(getOdd(matchWinner, "Home") || 0),
-            draw: parseFloat(getOdd(matchWinner, "Draw") || 0),
-            away: parseFloat(getOdd(matchWinner, "Away") || 0),
-            goals_over: getGoalsOdd("Over"),
-            goals_under: getGoalsOdd("Under"),
-            supersub_yes: 4.50,
-            // Return top 20 scorers if found, robust mapping
-            scorers: scorers ? scorers.values.map((p, i) => ({
-                id: i,
-                name: p.value,
-                odds: parseFloat(p.odd)
-            })).slice(0, 20) : []
-        }
-    };
+        const matchWinner = findMarket(["Match Winner", "1x2", "Full Time"]);
+        const goalsMarket = findMarket(["Goals Over/Under", "Total Goals", "Over/Under"]);
+
+        const getOdd = (market, name) =>
+            market?.values?.find(v => v.value.toString().toLowerCase() === name.toLowerCase())?.odd;
+
+        const getGoalsOdd = (direction) => {
+            if (!goalsMarket?.values) return 0;
+            const found = goalsMarket.values.find(v => {
+                const val = v.value.toString();
+                return (val.includes(direction) || val.startsWith(direction[0])) && val.includes("2.5");
+            });
+            return found ? parseFloat(found.odd) : 0;
+        };
+
+        return {
+            source: `Database (${target.name})`,
+            odds: {
+                home: parseFloat(getOdd(matchWinner, "Home") || 0),
+                draw: parseFloat(getOdd(matchWinner, "Draw") || 0),
+                away: parseFloat(getOdd(matchWinner, "Away") || 0),
+                goals_over: getGoalsOdd("Over"),
+                goals_under: getGoalsOdd("Under"),
+                supersub_yes: 4.50,
+                scorers: []
+            }
+        };
+    }
+
+    return null;
 };
