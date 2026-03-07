@@ -28,7 +28,7 @@ function deriveCustomStatus(
 
   // 2. Time-based transitions
   const msUntilKickoff = kickoffTime.getTime() - now.getTime();
-  if (msUntilKickoff <= LIVE_WINDOW_MS) return 'LIVE';          // ≤5m → LIVE
+  if (msUntilKickoff <= LIVE_WINDOW_MS && msUntilKickoff > 0) return 'LIVE'; // ≤5m & >0 → LIVE
   if (msUntilKickoff <= PRE_LIVE_WINDOW_MS) return 'PRE-LIVE';  // 60m–5m → PRE-LIVE
   return 'UPCOMING';
 }
@@ -215,6 +215,7 @@ interface WatcherResult {
   apiCalls: number;
   processedMatches: number;
   syncedToDb: number;
+  preLiveSynced: number;
   errors: string[];
   mode: string;
 }
@@ -228,9 +229,12 @@ async function liveScoresService(
     apiCalls: 0,
     processedMatches: 0,
     syncedToDb: 0,
+    preLiveSynced: 0,
     errors: [],
     mode: 'NONE',
   };
+
+  const PRELIVE_THROTTLE_MS = 9 * 60_000;
 
   // ── Step 1: Identify Active Targets (PRE-LIVE + LIVE) ──
   const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
@@ -248,121 +252,178 @@ async function liveScoresService(
   }
 
   const targets = activeMatches || [];
-  const count = targets.length;
-
-  console.log(`[WATCHER] Active targets: ${count}`);
-
-  // ── Execution Constraint: early exit ──
-  if (count === 0) {
+  if (targets.length === 0) {
     console.log('[WATCHER] No active matches — exiting');
     result.mode = 'NONE';
     return result;
   }
 
-  // ── Step 2: Mode Selection & Fetch ──
-  let fetchUrl: string;
-  const uniqueLeagues = [...new Set(targets.map(t => t.league_id))];
+  // ── Step 2: Partition into LIVE and PRE-LIVE ──
+  const liveTargets: any[] = [];
+  const preLiveTargets: any[] = [];
 
-  if (count === 1) {
-    // ── Single Match Mode ──
-    const match = targets[0];
-    const kickoff = new Date(match.kickoff_time);
-    const msUntilKickoff = kickoff.getTime() - now.getTime();
-
-    result.mode = 'SINGLE';
-    fetchUrl = `${API_BASE}/fixtures?id=${match.id}`;
-
-    if (msUntilKickoff > 5 * 60_000) {
-      // Pre-Live zone (60m to 5m before kickoff): only poll if 9 min stale
-      const lastSynced = match.last_synced_at ? new Date(match.last_synced_at) : null;
-      const msSinceSync = lastSynced ? now.getTime() - lastSynced.getTime() : Infinity;
-      if (msSinceSync < 9 * 60_000) {
-        console.log(`[WATCHER] [SINGLE] Fresh — last synced ${Math.round(msSinceSync / 60_000)}m ago, skipping`);
-        result.mode = 'SINGLE_THROTTLED';
-        return result;
-      }
-      console.log(`[WATCHER] [SINGLE] Stale — polling (last synced ${Math.round(msSinceSync / 60_000)}m ago)`);
+  for (const m of targets) {
+    const kickoff = new Date(m.kickoff_time);
+    const msUntil = kickoff.getTime() - now.getTime();
+    if (msUntil <= LIVE_WINDOW_MS) {
+      liveTargets.push(m);      // ≤5min or already started
     } else {
-      console.log(`[WATCHER] [SINGLE] Hot polling — kickoff in ${Math.round(msUntilKickoff / 60_000)}m`);
+      preLiveTargets.push(m);   // 60m–5m window
     }
-  } else if (uniqueLeagues.length > 1) {
-    // ── Multi Match Mode (different leagues) ──
-    result.mode = 'MULTI';
-    const leagueParam = uniqueLeagues.join('-');
-    fetchUrl = `${API_BASE}/fixtures?live=${leagueParam}`;
-    console.log(`[WATCHER] [MULTI] Polling live for leagues: ${leagueParam}`);
-  } else {
-    // ── Multi-Single-League Mode ──
-    result.mode = 'MULTI_SINGLE_LEAGUE';
-    const leagueId = uniqueLeagues[0];
-    const season = targets[0].season;
-    const today = todayStr(now);
-    fetchUrl = `${API_BASE}/fixtures?league=${leagueId}&season=${season}&date=${today}`;
-    console.log(`[WATCHER] [MULTI_SINGLE_LEAGUE] league=${leagueId} season=${season} date=${today}`);
   }
 
-  // ── Fetch ──
-  try {
+  console.log(`[WATCHER] Targets: ${targets.length} total, ${liveTargets.length} LIVE, ${preLiveTargets.length} PRE-LIVE`);
+
+  // ── Step 3a: PRE-LIVE Track (fire first, non-blocking) ──
+  // Filter to stale matches only (last_synced_at > 9 min ago or null)
+  const stalePreLive = preLiveTargets.filter((m: any) => {
+    if (!m.last_synced_at) return true;
+    return now.getTime() - new Date(m.last_synced_at).getTime() >= PRELIVE_THROTTLE_MS;
+  });
+
+  let preLivePromise: Promise<void> | null = null;
+
+  if (stalePreLive.length > 0) {
+    const batchedIds = stalePreLive.map((m: any) => m.id).join('-');
+    const preLiveUrl = `${API_BASE}/fixtures?ids=${batchedIds}`;
+    console.log(`[WATCHER] [PRE-LIVE] Batch fetch: ${stalePreLive.length} stale matches → ?ids=${batchedIds}`);
     result.apiCalls++;
-    const res = await fetch(fetchUrl, { headers: apiHeaders(apiKey) });
-    const json = await res.json();
-    const fixtures = (json.response || []) as any[];
 
-    console.log(`[WATCHER] API returned ${fixtures.length} fixtures`);
+    preLivePromise = (async () => {
+      try {
+        const res = await fetch(preLiveUrl, { headers: apiHeaders(apiKey) });
+        const json = await res.json();
+        const fixtures = (json.response || []) as any[];
 
-    if (fixtures.length === 0) {
-      console.log('[WATCHER] No fixtures in API response');
-      return result;
-    }
+        if (fixtures.length === 0) {
+          console.log('[WATCHER] [PRE-LIVE] No fixtures in API response');
+          return;
+        }
 
-    // Look up existing DB state for finished_at checks
-    const fixtureIds = fixtures.map((f: any) => f.fixture.id);
-    const { data: existingRows } = await supabase
-      .from('matches')
-      .select('id, finished_at, kickoff_time')
-      .in('id', fixtureIds);
+        // Look up existing finished_at
+        const ids = fixtures.map((f: any) => f.fixture.id);
+        const { data: existingRows } = await supabase
+          .from('matches')
+          .select('id, finished_at')
+          .in('id', ids);
 
-    const existingMap = new Map(
-      (existingRows || []).map((m: any) => [m.id, { finished_at: m.finished_at, kickoff_time: m.kickoff_time }])
-    );
+        const existingMap = new Map(
+          (existingRows || []).map((r: any) => [r.id, r.finished_at])
+        );
 
-    // ── Step 3: Update ──
-    const payloads: any[] = [];
-    for (const item of fixtures) {
-      const fixtureId = item.fixture.id;
-      const existing = existingMap.get(fixtureId);
-      const kickoff = new Date(item.fixture.date);
-      const msUntilKickoff = kickoff.getTime() - now.getTime();
-      const isPreLive = msUntilKickoff > 0 && msUntilKickoff <= PRE_LIVE_WINDOW_MS;
+        const payloads = fixtures.map((item: any) => buildPayload(
+          item,
+          now,
+          (existingMap.get(item.fixture.id) as string) || null,
+          true // isPreLive — always true in this track
+        ));
 
-      const payload = buildPayload(
-        item,
-        now,
-        existing?.finished_at || null,
-        isPreLive
-      );
-      payloads.push(payload);
-      result.processedMatches++;
-    }
+        const { error } = await supabase
+          .from('matches')
+          .upsert(payloads, { onConflict: 'id' });
 
-    if (payloads.length > 0) {
-      const { error } = await supabase
-        .from('matches')
-        .upsert(payloads, { onConflict: 'id' });
-
-      if (error) {
-        const msg = `[WATCHER] DB upsert error: ${error.message} (code: ${error.code})`;
+        if (error) {
+          const msg = `[WATCHER] [PRE-LIVE] DB upsert error: ${error.message}`;
+          console.error(msg);
+          result.errors.push(msg);
+        } else {
+          result.preLiveSynced = payloads.length;
+          console.log(`[WATCHER] [PRE-LIVE] Upserted ${payloads.length} matches`);
+        }
+      } catch (err) {
+        const msg = `[WATCHER] [PRE-LIVE] Fetch error: ${err}`;
         console.error(msg);
         result.errors.push(msg);
-      } else {
-        result.syncedToDb = payloads.length;
-        console.log(`[WATCHER] Upserted ${payloads.length} matches`);
       }
+    })();
+  } else {
+    console.log(`[WATCHER] [PRE-LIVE] All ${preLiveTargets.length} matches fresh — skipping batch`);
+  }
+
+  // ── Step 3b: LIVE Track (priority, 3-mode selection) ──
+  if (liveTargets.length > 0) {
+    const uniqueLeagues = [...new Set(liveTargets.map((t: any) => t.league_id))];
+    let fetchUrl: string;
+
+    if (liveTargets.length === 1) {
+      // ── Single Match Mode ──
+      result.mode = 'SINGLE';
+      fetchUrl = `${API_BASE}/fixtures?id=${liveTargets[0].id}`;
+      console.log(`[WATCHER] [LIVE] Single match: id=${liveTargets[0].id}`);
+    } else if (uniqueLeagues.length > 1) {
+      // ── Multi Match Mode (different leagues) ──
+      result.mode = 'MULTI';
+      const leagueParam = uniqueLeagues.join('-');
+      fetchUrl = `${API_BASE}/fixtures?live=${leagueParam}`;
+      console.log(`[WATCHER] [LIVE] Multi-league: ${leagueParam}`);
+    } else {
+      // ── Multi-Single-League Mode ──
+      result.mode = 'MULTI_SINGLE_LEAGUE';
+      const leagueId = uniqueLeagues[0];
+      const season = liveTargets[0].season;
+      const today = todayStr(now);
+      fetchUrl = `${API_BASE}/fixtures?league=${leagueId}&season=${season}&date=${today}`;
+      console.log(`[WATCHER] [LIVE] Single-league: league=${leagueId} season=${season} date=${today}`);
     }
-  } catch (err) {
-    const msg = `[WATCHER] Fetch error: ${err}`;
-    console.error(msg);
-    result.errors.push(msg);
+
+    try {
+      result.apiCalls++;
+      const res = await fetch(fetchUrl, { headers: apiHeaders(apiKey) });
+      const json = await res.json();
+      const fixtures = (json.response || []) as any[];
+
+      console.log(`[WATCHER] [LIVE] API returned ${fixtures.length} fixtures`);
+
+      if (fixtures.length > 0) {
+        // Look up existing DB state for finished_at checks
+        const fixtureIds = fixtures.map((f: any) => f.fixture.id);
+        const { data: existingRows } = await supabase
+          .from('matches')
+          .select('id, finished_at, kickoff_time')
+          .in('id', fixtureIds);
+
+        const existingMap = new Map(
+          (existingRows || []).map((m: any) => [m.id, { finished_at: m.finished_at, kickoff_time: m.kickoff_time }])
+        );
+
+        const payloads: any[] = [];
+        for (const item of fixtures) {
+          const fixtureId = item.fixture.id;
+          const existing = existingMap.get(fixtureId);
+          const kickoff = new Date(item.fixture.date);
+          const msUntilKickoff = kickoff.getTime() - now.getTime();
+          const isPreLive = msUntilKickoff > 0 && msUntilKickoff <= PRE_LIVE_WINDOW_MS;
+
+          payloads.push(buildPayload(item, now, existing?.finished_at || null, isPreLive));
+          result.processedMatches++;
+        }
+
+        const { error } = await supabase
+          .from('matches')
+          .upsert(payloads, { onConflict: 'id' });
+
+        if (error) {
+          const msg = `[WATCHER] [LIVE] DB upsert error: ${error.message} (code: ${error.code})`;
+          console.error(msg);
+          result.errors.push(msg);
+        } else {
+          result.syncedToDb = payloads.length;
+          console.log(`[WATCHER] [LIVE] Upserted ${payloads.length} matches`);
+        }
+      }
+    } catch (err) {
+      const msg = `[WATCHER] [LIVE] Fetch error: ${err}`;
+      console.error(msg);
+      result.errors.push(msg);
+    }
+  } else {
+    result.mode = 'PRE-LIVE_ONLY';
+    console.log('[WATCHER] No LIVE targets — PRE-LIVE batch only this invocation');
+  }
+
+  // ── Step 4: Await PRE-LIVE promise (cleanup) ──
+  if (preLivePromise) {
+    await preLivePromise;
   }
 
   return result;
@@ -426,7 +487,7 @@ Deno.serve(async (req) => {
     const result = await liveScoresService(supabase, apiKey, now);
 
     console.log(
-      `[HANDLER] ══════ WATCHER complete — mode=${result.mode} synced=${result.syncedToDb} API=${result.apiCalls} ══════`
+      `[HANDLER] ══════ WATCHER complete — mode=${result.mode} synced=${result.syncedToDb} preLive=${result.preLiveSynced} API=${result.apiCalls} ══════`
     );
 
     return new Response(JSON.stringify({
@@ -435,6 +496,7 @@ Deno.serve(async (req) => {
       mode: result.mode,
       processedMatches: result.processedMatches,
       syncedToDb: result.syncedToDb,
+      preLiveSynced: result.preLiveSynced,
       apiCalls: result.apiCalls,
       errors: result.errors,
     }), {
