@@ -6,8 +6,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
 const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
 const LIVE_STATUSES  = ['1H', 'HT', '2H', 'ET', 'P'];
-const PRE_LIVE_WINDOW_MS = 60 * 60_000; // 60 minutes before kickoff
-const LIVE_WINDOW_MS     = 5 * 60_000;  // 5 minutes before kickoff → LIVE
+const PRE_LIVE_WINDOW_MS = 60 * 60_000;  // 60 minutes before kickoff
+const LIVE_WINDOW_MS     = 5 * 60_000;   // 5 minutes before kickoff → LIVE
+
+// A match can last at most ~3h (90min + extra time + penalties + broadcast delay).
+// Zombie cutoff is applied to last_synced_at, NOT kickoff_time, so a late-kicking
+// match that runs long is never dropped from tracking before it reaches FT.
+const ZOMBIE_IDLE_MS = 3 * 60 * 60_000; // 3 hours since last sync → safe to drop
 
 const API_BASE = 'https://v3.football.api-sports.io';
 
@@ -28,7 +33,7 @@ function deriveCustomStatus(
   // 2. Time-based transitions
   const msUntilKickoff = kickoffTime.getTime() - now.getTime();
   if (msUntilKickoff <= LIVE_WINDOW_MS && msUntilKickoff > 0) return 'LIVE'; // ≤5m & >0 → LIVE
-  if (msUntilKickoff <= PRE_LIVE_WINDOW_MS) return 'PRE-LIVE';  // 60m–5m → PRE-LIVE
+  if (msUntilKickoff <= PRE_LIVE_WINDOW_MS) return 'PRE-LIVE';               // 60m–5m → PRE-LIVE
   return 'UPCOMING';
 }
 
@@ -265,12 +270,10 @@ async function liveScoresService(
   };
 
   const PRELIVE_THROTTLE_MS = 9 * 60_000;
+  const today = todayStr(now);
 
   // ── Step 1: Read today's matches from watcher_nudge (set by Planner) ──
   // Fall back to querying matches directly if nudge table is empty (e.g. cold start).
-  const today = todayStr(now);
-  const zombieCutoff = new Date(now.getTime() - 12 * 60 * 60_000).toISOString();
-
   const { data: nudgedMatches, error: nudgeErr } = await supabase
     .from('watcher_nudge')
     .select('id, kickoff_time, league_id, season, status')
@@ -281,7 +284,6 @@ async function liveScoresService(
     console.error('[WATCHER] Nudge table query error:', nudgeErr);
   }
 
-  // If nudge table has today's data, use it. Otherwise fall back to matches table.
   let activeMatches: any[] | null = null;
 
   if (nudgedMatches && nudgedMatches.length > 0) {
@@ -303,16 +305,23 @@ async function liveScoresService(
       last_synced_at: syncedMap.get(m.id) ?? null,
     }));
   } else {
-    // Cold-start fallback: query matches directly (original behaviour)
+    // Cold-start fallback: query matches directly.
+    //
+    // FIX (Root Cause 1): zombie guard now checks last_synced_at, NOT kickoff_time.
+    // The old approach filtered out matches whose kickoff was >12h ago, which would
+    // silently drop in-progress matches that kicked off in the afternoon and ran long
+    // into the evening. Now a match stays tracked as long as it was synced within the
+    // last 3h — safely covering any match duration including extra time + penalties.
     console.log(`[WATCHER] No nudge data for ${today} — falling back to matches table`);
-    const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
+    const zombieCutoff    = new Date(now.getTime() - ZOMBIE_IDLE_MS).toISOString();
+    const preLiveCutoff   = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
 
     const { data: fallbackMatches, error: fallbackErr } = await supabase
       .from('matches')
       .select('id, kickoff_time, league_id, season, status, last_synced_at')
-      .gte('kickoff_time', zombieCutoff)
-      .lte('kickoff_time', preLiveCutoff)
-      .not('status', 'in', `(${FINAL_STATUSES.join(',')})`);
+      .lte('kickoff_time', preLiveCutoff)                               // within active window or past
+      .not('status', 'in', `(${FINAL_STATUSES.join(',')})`)            // not already finished
+      .or(`last_synced_at.is.null,last_synced_at.gte.${zombieCutoff}`); // synced recently or never synced yet
 
     if (fallbackErr) {
       console.error('[WATCHER] Fallback matches query error:', fallbackErr);
@@ -321,11 +330,12 @@ async function liveScoresService(
     activeMatches = fallbackMatches || [];
   }
 
-  // Filter out matches outside the active window (PRE-LIVE + LIVE only)
-  const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
+  // Keep only matches within the PRE-LIVE + LIVE window
+  const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS);
   const targets = (activeMatches || []).filter((m: any) => {
-    const kickoff = m.kickoff_time;
-    return kickoff >= zombieCutoff && kickoff <= preLiveCutoff;
+    const kickoff = new Date(m.kickoff_time);
+    // Kickoff must be in the future within the pre-live window, or already in the past
+    return kickoff <= preLiveCutoff;
   });
 
   if (targets.length === 0) {
@@ -461,6 +471,37 @@ async function liveScoresService(
       const fixtures = (json.response || []) as any[];
 
       console.log(`[WATCHER] [LIVE] API returned ${fixtures.length} fixtures`);
+
+      // ── FIX (Root Cause 2): Ghost match resolution ──
+      // The ?live= endpoint only returns matches the API considers actively in
+      // progress. A match that just reached FT disappears from that response
+      // immediately. If any liveTarget is absent from the response, fetch it
+      // individually by ID to capture its final status before moving on.
+      const returnedIds = new Set(fixtures.map((f: any) => f.fixture.id));
+      const ghostTargets = liveTargets.filter((t: any) => !returnedIds.has(t.id));
+
+      if (ghostTargets.length > 0) {
+        console.log(`[WATCHER] [LIVE] ${ghostTargets.length} ghost match(es) absent from response — resolving individually`);
+        const ghostIds = ghostTargets.map((t: any) => t.id).join('-');
+        const ghostUrl = `${API_BASE}/fixtures?ids=${ghostIds}`;
+
+        try {
+          result.apiCalls++;
+          const ghostRes = await fetch(ghostUrl, { headers: apiHeaders(apiKey) });
+          const ghostJson = await ghostRes.json();
+          const ghostFixtures = (ghostJson.response || []) as any[];
+          console.log(`[WATCHER] [LIVE] Ghost resolution returned ${ghostFixtures.length} fixture(s)`);
+
+          // Merge resolved ghost fixtures into the main set for unified processing below
+          for (const gf of ghostFixtures) {
+            fixtures.push(gf);
+          }
+        } catch (ghostErr) {
+          const msg = `[WATCHER] [LIVE] Ghost resolution fetch error: ${ghostErr}`;
+          console.error(msg);
+          result.errors.push(msg);
+        }
+      }
 
       if (fixtures.length > 0) {
         // Look up existing DB state for finished_at checks
