@@ -182,6 +182,13 @@ async function fixturesService(
       result.upserted = payloads.length;
       console.log(`[PLANNER] Upserted ${payloads.length} fixtures`);
     }
+
+    // Log this run so the Planner Guard can skip future invocations today
+    await supabase.from('sync_logs').upsert(
+      { date: today, service: 'PLANNER', result_count: result.upserted },
+      { onConflict: 'date,service' }
+    );
+    console.log(`[PLANNER] Logged sync for ${today}`);
   } catch (err) {
     const msg = `[PLANNER] Fetch error: ${err}`;
     console.error(msg);
@@ -394,6 +401,27 @@ Deno.serve(async (req) => {
   const mode = url.searchParams.get('mode');
 
   if (mode === 'fixtures') {
+    // ─── PLANNER GUARD: skip if already synced today ───
+    const { data: existingLog } = await supabase
+      .from('sync_logs')
+      .select('id')
+      .eq('date', todayStr(now))
+      .eq('service', 'PLANNER')
+      .maybeSingle();
+
+    if (existingLog) {
+      console.log(`[HANDLER] ══════ PLANNER skipped — already synced ${todayStr(now)} ══════`);
+      return new Response(JSON.stringify({
+        success: true,
+        service: 'PLANNER',
+        skipped: true,
+        reason: 'Already synced today',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // ─── PLANNER ───
     console.log(`[HANDLER] ══════ PLANNER invocation ══════`);
     const result = await fixturesService(supabase, apiKey, now);
