@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp, Zap, Coins, ArrowLeft } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
@@ -8,8 +8,10 @@ const ManagerOffice = () => {
     const navigate = useNavigate();
     const { userProfile } = useGame();
 
-    // State to track if any matches are currently live globally
     const [anyLiveMatches, setAnyLiveMatches] = useState(false);
+    // Separate loaded state for each image to enable crossfade
+    const [packedLoaded, setPackedLoaded] = useState(false);
+    const [emptyLoaded, setEmptyLoaded] = useState(false);
 
     const energy = userProfile?.energy || 0;
     const maxEnergy = userProfile?.max_energy || 3;
@@ -23,6 +25,12 @@ const ManagerOffice = () => {
         const checkGlobalLiveStatus = async () => {
             try {
                 const res = await fetch('/api/matches');
+
+                if (!res.ok) {
+                    console.error(`Live match check failed: ${res.status} ${res.statusText}`);
+                    return;
+                }
+
                 const data = await res.json();
 
                 if (data.response && Array.isArray(data.response)) {
@@ -30,7 +38,9 @@ const ManagerOffice = () => {
 
                     const isAnyMatchLive = data.response.some(raw => {
                         const match = normalizeMatch(raw);
-                        return liveStatuses.includes(match?.fixture?.status?.short);
+                        // Guard against null/undefined from normalizeMatch
+                        if (!match?.fixture?.status?.short) return false;
+                        return liveStatuses.includes(match.fixture.status.short);
                     });
 
                     setAnyLiveMatches(isAnyMatchLive);
@@ -46,20 +56,25 @@ const ManagerOffice = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Dynamic Asset Selection
-    const roomBackground = anyLiveMatches
-        ? "/assets/manager-room-packed.webp"
-        : "/assets/manager-room-empty.webp";
-
     return (
         <div className="w-full h-[100dvh] bg-black flex items-center justify-center overflow-hidden font-sans select-none">
             <div className="relative aspect-[9/16] h-full max-h-[100dvh] w-auto shadow-2xl overflow-hidden bg-gray-900">
 
-                {/* BACKGROUND IMAGE */}
+                {/* BACKGROUND IMAGES — layered for crossfade */}
                 <img
-                    src={roomBackground}
-                    alt="Manager Office"
+                    src="/assets/manager-room-empty.webp"
+                    alt=""
+                    aria-hidden="true"
+                    onLoad={() => setEmptyLoaded(true)}
                     className="absolute inset-0 w-full h-full object-fill z-0 transition-opacity duration-700"
+                    style={{ opacity: emptyLoaded && !anyLiveMatches ? 1 : 0 }}
+                />
+                <img
+                    src="/assets/manager-room-packed.webp"
+                    alt="Manager Office"
+                    onLoad={() => setPackedLoaded(true)}
+                    className="absolute inset-0 w-full h-full object-fill z-0 transition-opacity duration-700"
+                    style={{ opacity: packedLoaded && anyLiveMatches ? 1 : 0 }}
                 />
 
                 {/* ── PERSPECTIVE SCENE ── */}
@@ -76,7 +91,7 @@ const ManagerOffice = () => {
                         </div>
                     </div>
 
-                    {/* B. BOOKCASE (History) — Left wall, no perspective warp */}
+                    {/* B. BOOKCASE (History) — Left wall */}
                     <div
                         data-testid="hotspot-bookcase"
                         onClick={() => navigate('/history')}
@@ -87,7 +102,7 @@ const ManagerOffice = () => {
                         </div>
                     </div>
 
-                    {/* C. LAPTOP SCREEN (Scouting) — Desk center, skewed to match camera angle */}
+                    {/* C. LAPTOP SCREEN (Scouting) — Desk center */}
                     <div
                         data-testid="hotspot-laptop"
                         onClick={() => navigate('/scouting')}
@@ -102,7 +117,7 @@ const ManagerOffice = () => {
                         </div>
                     </div>
 
-                    {/* D. TABLET STAND (Leaderboard) — Desk right, slight skew */}
+                    {/* D. TABLET STAND (Leaderboard) — Desk right */}
                     <div
                         data-testid="hotspot-tablet-office"
                         onClick={() => navigate('/leaderboard')}
@@ -117,7 +132,7 @@ const ManagerOffice = () => {
                         </div>
                     </div>
 
-                    {/* E. PHONE ON PAPERS (Inbox) — Desk bottom-left, warm lighting */}
+                    {/* E. PHONE ON PAPERS (Inbox) — Desk bottom-left */}
                     <div
                         data-testid="hotspot-phone"
                         onClick={() => navigate('/inbox')}

@@ -16,7 +16,7 @@ export default function Dashboard() {
   const [showBagOverlay, setShowBagOverlay] = useState(false);
   const [bagStage, setBagStage] = useState('closed');
   const [newCards, setNewCards] = useState([]);
-  const [showEnergyModal, setShowEnergyModal] = useState(false); // NEW: Energy Popup
+  const [showEnergyModal, setShowEnergyModal] = useState(false);
 
   // REAL-TIME DATA
   const [liveBets, setLiveBets] = useState([]);
@@ -30,7 +30,7 @@ export default function Dashboard() {
 
   // MOCK LOGIC (Replace with real data later)
   const trainingCompletedToday = false;
-  const dailyRewardAvailable = false; // Toggle this to test the Bag Popup vs Inventory Nav
+  const dailyRewardAvailable = false;
 
   const gameData = gameDataRaw || { cardTypes: [] };
   const userData = userProfile;
@@ -79,10 +79,8 @@ export default function Dashboard() {
 
   const handleTabletClick = () => {
     if (!trainingCompletedToday) {
-      // Logic: If training isn't done, tablet shows the Brief
       navigate('/training');
     } else {
-      // Logic: Otherwise it shows messages/news
       navigate('/inbox');
     }
   };
@@ -92,8 +90,6 @@ export default function Dashboard() {
   };
 
   const handleEnergyAction = async () => {
-    // Logic: Drink or Buy
-    // For now, assume "Drink" restores 1 energy
     if (userData.energy < (userData.max_energy || 5)) {
       await gainEnergy(1);
       setShowEnergyModal(false);
@@ -101,9 +97,8 @@ export default function Dashboard() {
   };
 
   const handleBagClick = () => {
-    // Logic: Daily Reward vs Inventory
     if (dailyRewardAvailable) {
-      setBagStage('closed'); // Reset animation
+      setBagStage('closed');
       setShowBagOverlay(true);
     } else {
       navigate('/inventory?tab=deck');
@@ -114,7 +109,6 @@ export default function Dashboard() {
   const triggerBagOpening = () => {
     setBagStage('opening');
     setTimeout(() => {
-      // Simulate card draw
       const availableCards = gameData.cardTypes || [];
       const randomCards = [];
 
@@ -131,7 +125,6 @@ export default function Dashboard() {
       setNewCards(randomCards);
       setBagStage('rewards');
 
-      // Update inventory
       if (randomCards.length > 0) {
         updateInventory(randomCards);
       }
@@ -144,114 +137,114 @@ export default function Dashboard() {
     setNewCards([]);
   };
 
-  if (loading) return <div className="bg-black h-screen flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500" /></div>;
+  if (loading) return (
+    <div className="bg-black h-screen flex items-center justify-center">
+      <Loader2 className="animate-spin text-yellow-500" />
+    </div>
+  );
 
   return (
     <div className="relative w-full h-[100dvh] bg-black overflow-hidden md:max-w-[480px] md:mx-auto md:h-screen md:border-x md:border-gray-800 font-sans select-none">
 
-      {/* ============================================================================ */}
-      {/* LAYER 0: THE ROOM (Background)                                            */}
-      {/* ============================================================================ */}
+      {/* ============================================================ */}
+      {/* LAYER 0: THE ROOM (Background)                               */}
+      {/* ============================================================ */}
 
-      {/* Placeholder */}
+      {/* Placeholder while image loads */}
       <div className={`absolute inset-0 bg-gray-900 transition-opacity duration-1000 ${imageLoaded ? 'opacity-0' : 'opacity-100'}`} />
 
-      {/* FIX: Object-Cover with better anchoring to prevent cropping */}
+      {/*
+        KEY CHANGE: object-fill ensures the image always fills the
+        container exactly, making percentage-based hotspot positioning
+        reliable across all screen sizes — same approach as ManagerOffice.
+      */}
       <img
         src="/assets/bg-dressing-room.webp"
         alt="Dressing Room"
         onLoad={() => setImageLoaded(true)}
-        className={`absolute inset-0 w-full h-full object-cover object-[center_80%] transition-opacity duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 w-full h-full object-fill transition-opacity duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
       />
 
 
-      {/* ============================================================================ */}
-      {/* LAYER 1: INTERACTIVE OBJECTS (Subtle Floating Micro-HUDs)                */}
-      {/* ============================================================================ */}
+      {/* ============================================================ */}
+      {/* LAYER 1: INTERACTIVE HOTSPOTS                                */}
+      {/* All positions are top-anchored to stay consistent with       */}
+      {/* object-fill rendering across screen sizes.                   */}
+      {/* ============================================================ */}
 
-      {/* A. WHITEBOARD (Bets) - UPDATED COORDINATES */}
+      {/* A. WHITEBOARD (Bets) — upper-right wall */}
       <div
         onClick={handleWhiteboardClick}
-        className="absolute top-[28%] right-[8%] w-[42%] h-[28%] z-10 cursor-pointer bg-transparent active:scale-95 transition-transform"
+        className="absolute top-[22%] left-[48%] w-[44%] h-[22%] z-10 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-whiteboard"
       >
-        {/* MICRO-HUD: Floating Icon (Top-Right Badge) */}
-        <div className="absolute -top-3 -right-3 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+        <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
           <TrendingUp className="w-3.5 h-3.5 text-white" />
         </div>
 
-        {/* STATE: Active Bet Count - Pinned to the top right of the board */}
         {(liveBets.length + pendingBets.length) > 0 && (
-          <div className="absolute -top-2 -right-2 rotate-3 bg-yellow-400 text-black font-black text-[10px] px-2 py-0.5 shadow-lg border border-black/10 rounded-sm">
+          <div className="absolute top-0 left-0 rotate-3 bg-yellow-400 text-black font-black text-[10px] px-2 py-0.5 shadow-lg border border-black/10 rounded-sm">
             {liveBets.length + pendingBets.length} LIVE
           </div>
         )}
       </div>
 
-      {/* B. TABLET (Training/Brief) - UPDATED COORDINATES */}
-      {/* CENTERED: Positioned on device screen in foreground bench */}
+      {/* B. TABLET (Training/Brief) — center bench */}
       <div
         onClick={handleTabletClick}
-        className="absolute bottom-[32%] left-[22%] w-[40%] h-[25%] z-10 cursor-pointer active:scale-95 transition-transform"
+        className="absolute top-[60%] left-[24%] w-[34%] h-[18%] z-10 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-tablet"
       >
-        {/* MICRO-HUD: Floating Icon (Top-Center) */}
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
           <ClipboardList className={`w-3.5 h-3.5 ${!trainingCompletedToday ? 'text-yellow-400' : 'text-gray-400'}`} />
         </div>
       </div>
 
-      {/* C. ENERGY DRINKS (Shop) */}
-      {/* GROUNDED: Lowered to bottom-[26%] to match Tablet. Reduced height to prevent air-tapping. */}
+      {/* C. ENERGY DRINKS — right of tablet on bench */}
       <div
         onClick={handleDrinkClick}
-        className="absolute bottom-[26%] right-[5%] w-[20%] h-[12%] z-10 cursor-pointer active:scale-95 transition-transform"
+        className="absolute top-[62%] left-[60%] w-[30%] h-[14%] z-10 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-drinks"
       >
-        {/* MICRO-HUD: Floating Icon (Top-Center) */}
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
           <Zap className={`w-3.5 h-3.5 ${userData.energy === 0 ? 'text-red-500' : 'text-blue-400'}`} />
         </div>
 
-        {/* Low Energy Warning: Subtle red vignette only on the drinks */}
         {userData.energy === 0 && (
-          <div className="absolute inset-0 bg-red-500/20 blur-md rounded-full animate-pulse" />
+          <div className="absolute inset-0 bg-red-500/20 blur-md animate-pulse" />
         )}
       </div>
 
-      {/* D. KITBAG (Inventory/Rewards) */}
-      {/* GROUNDED: Tucked slightly lower to fit under the bench properly */}
+      {/* D. KITBAG (Inventory/Rewards) — bottom center floor */}
       <div
         onClick={handleBagClick}
         className={`
-          absolute bottom-[2%] left-[35%] w-[55%] h-[20%] z-20 cursor-pointer rounded-2xl
+          absolute top-[78%] left-[26%] w-[48%] h-[16%] z-20 cursor-pointer rounded-2xl
           active:scale-95 transition-transform duration-100
           ${(highlightBag || dailyRewardAvailable) ? 'animate-pulse ring-4 ring-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.3)]' : ''}
         `}
         data-testid="hotspot-inventory"
       >
-        {/* MICRO-HUD: Floating Icon (Top-Center) */}
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
           <ShoppingBag className={`w-3.5 h-3.5 ${dailyRewardAvailable ? 'text-yellow-400' : 'text-white'}`} />
         </div>
       </div>
 
-      {/* E. CONES (Training Mode) */}
+      {/* E. CONES (Training) — bottom-left floor */}
       <div
         onClick={() => navigate('/training')}
-        className="absolute bottom-[2%] left-[-2%] w-[28%] h-[25%] z-30 cursor-pointer active:scale-95 transition-transform"
+        className="absolute top-[70%] left-[2%] w-[22%] h-[24%] z-30 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-training"
       >
-        {/* MICRO-HUD: Floating Icon (Top-Right to avoid edge) */}
-        <div className="absolute top-0 right-4 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+        <div className="absolute -top-4 right-2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
           <Cone className="w-3.5 h-3.5 text-orange-400" />
         </div>
       </div>
 
 
-      {/* ============================================================================ */}
-      {/* LAYER 2: HUD & MODALS                                                     */}
-      {/* ============================================================================ */}
+      {/* ============================================================ */}
+      {/* LAYER 2: HUD & MODALS                                        */}
+      {/* ============================================================ */}
 
       {/* HUD (Top Bar) */}
       <div className="absolute top-0 left-0 w-full p-4 pt-6 flex justify-between items-center z-50 pointer-events-none">
