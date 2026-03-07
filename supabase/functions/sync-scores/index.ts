@@ -7,7 +7,8 @@ const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
 const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
 const LIVE_STATUSES  = ['1H', 'HT', '2H', 'ET', 'P'];
 const PRE_LIVE_WINDOW_MS = 60 * 60_000; // 60 minutes before kickoff
-const COMPLETED_COOLDOWN_MS = 2 * 60 * 60_000; // 2 hours — re-sync ceiling for finished matches
+const LIVE_WINDOW_MS     = 5 * 60_000;  // 5 minutes before kickoff → LIVE
+
 
 const API_BASE = 'https://v3.football.api-sports.io';
 
@@ -21,10 +22,14 @@ function deriveCustomStatus(
   kickoffTime: Date,
   now: Date
 ): CustomStatus {
-  if (LIVE_STATUSES.includes(apiStatus)) return 'LIVE';
+  // 1. API-authoritative statuses take priority
   if (FINAL_STATUSES.includes(apiStatus)) return 'COMPLETED';
+  if (LIVE_STATUSES.includes(apiStatus)) return 'LIVE';
+
+  // 2. Time-based transitions
   const msUntilKickoff = kickoffTime.getTime() - now.getTime();
-  if (msUntilKickoff <= PRE_LIVE_WINDOW_MS && msUntilKickoff > 0) return 'PRE-LIVE';
+  if (msUntilKickoff <= LIVE_WINDOW_MS) return 'LIVE';          // ≤5m → LIVE
+  if (msUntilKickoff <= PRE_LIVE_WINDOW_MS) return 'PRE-LIVE';  // 60m–5m → PRE-LIVE
   return 'UPCOMING';
 }
 
@@ -227,53 +232,25 @@ async function liveScoresService(
     mode: 'NONE',
   };
 
-  // ── Step 1: Identify Active Targets ──
+  // ── Step 1: Identify Active Targets (PRE-LIVE + LIVE) ──
   const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
-  const nowIso = now.toISOString();
+  const zombieCutoff  = new Date(now.getTime() - 12 * 60 * 60_000).toISOString();
 
-  // Pre-Live: kickoff within 60 minutes in the future
-  const { data: preLiveMatches, error: preLiveErr } = await supabase
+  const { data: activeMatches, error: activeErr } = await supabase
     .from('matches')
-    .select('id, kickoff_time, league_id, season, status')
-    .gte('kickoff_time', nowIso)
-    .lte('kickoff_time', preLiveCutoff);
-
-  if (preLiveErr) {
-    console.error('[WATCHER] Pre-live query error:', preLiveErr);
-  }
-
-  // In-progress: kickoff in the past AND status not final
-  const { data: inProgressMatches, error: inProgressErr } = await supabase
-    .from('matches')
-    .select('id, kickoff_time, league_id, season, status')
-    .lt('kickoff_time', nowIso)
+    .select('id, kickoff_time, league_id, season, status, last_synced_at')
+    .gte('kickoff_time', zombieCutoff)      // not older than 12h (zombie guard)
+    .lte('kickoff_time', preLiveCutoff)      // kickoff within next 60m or in the past
     .not('status', 'in', `(${FINAL_STATUSES.join(',')})`);
 
-  if (inProgressErr) {
-    console.error('[WATCHER] In-progress query error:', inProgressErr);
+  if (activeErr) {
+    console.error('[WATCHER] Active targets query error:', activeErr);
   }
 
-  // Completed matches needing re-sync (cooldown filter)
-  const cooldownCutoff = new Date(now.getTime() - COMPLETED_COOLDOWN_MS).toISOString();
-  const { data: completedNeedSync, error: completedErr } = await supabase
-    .from('matches')
-    .select('id, kickoff_time, league_id, season, status')
-    .eq('custom_status', 'COMPLETED')
-    .or(`last_synced_at.is.null,last_synced_at.lt.${cooldownCutoff}`);
-
-  if (completedErr) {
-    console.error('[WATCHER] Completed-cooldown query error:', completedErr);
-  }
-
-  // Deduplicate by id
-  const targetMap = new Map<number, any>();
-  for (const m of [...(preLiveMatches || []), ...(inProgressMatches || []), ...(completedNeedSync || [])]) {
-    targetMap.set(m.id, m);
-  }
-  const targets = Array.from(targetMap.values());
+  const targets = activeMatches || [];
   const count = targets.length;
 
-  console.log(`[WATCHER] Active targets: ${count} (pre-live=${preLiveMatches?.length ?? 0}, in-progress=${inProgressMatches?.length ?? 0}, completed-resync=${completedNeedSync?.length ?? 0})`);
+  console.log(`[WATCHER] Active targets: ${count}`);
 
   // ── Execution Constraint: early exit ──
   if (count === 0) {
@@ -296,15 +273,15 @@ async function liveScoresService(
     fetchUrl = `${API_BASE}/fixtures?id=${match.id}`;
 
     if (msUntilKickoff > 5 * 60_000) {
-      // More than 5 min to kickoff — throttled polling
-      // The cron fires every 1 min, but we skip 8 out of 9 invocations
-      const minuteOfHour = now.getMinutes();
-      if (minuteOfHour % 9 !== 0) {
-        console.log(`[WATCHER] [SINGLE] Throttled — kickoff in ${Math.round(msUntilKickoff / 60_000)}m, skipping (minute=${minuteOfHour})`);
+      // Pre-Live zone (60m to 5m before kickoff): only poll if 9 min stale
+      const lastSynced = match.last_synced_at ? new Date(match.last_synced_at) : null;
+      const msSinceSync = lastSynced ? now.getTime() - lastSynced.getTime() : Infinity;
+      if (msSinceSync < 9 * 60_000) {
+        console.log(`[WATCHER] [SINGLE] Fresh — last synced ${Math.round(msSinceSync / 60_000)}m ago, skipping`);
         result.mode = 'SINGLE_THROTTLED';
         return result;
       }
-      console.log(`[WATCHER] [SINGLE] Polling — kickoff in ${Math.round(msUntilKickoff / 60_000)}m`);
+      console.log(`[WATCHER] [SINGLE] Stale — polling (last synced ${Math.round(msSinceSync / 60_000)}m ago)`);
     } else {
       console.log(`[WATCHER] [SINGLE] Hot polling — kickoff in ${Math.round(msUntilKickoff / 60_000)}m`);
     }
