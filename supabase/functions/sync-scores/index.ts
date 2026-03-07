@@ -7,6 +7,7 @@ const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
 const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
 const LIVE_STATUSES  = ['1H', 'HT', '2H', 'ET', 'P'];
 const PRE_LIVE_WINDOW_MS = 60 * 60_000; // 60 minutes before kickoff
+const COMPLETED_COOLDOWN_MS = 2 * 60 * 60_000; // 2 hours — re-sync ceiling for finished matches
 
 const API_BASE = 'https://v3.football.api-sports.io';
 
@@ -70,6 +71,7 @@ function buildPayload(item: any, now: Date, existingFinishedAt: string | null, i
     kickoff_time: item.fixture.date,
     date: item.fixture.date.split('T')[0],
     last_updated: now.toISOString(),
+    last_synced_at: now.toISOString(),
     raw_data: item,
   };
 
@@ -239,15 +241,27 @@ async function liveScoresService(
     console.error('[WATCHER] In-progress query error:', inProgressErr);
   }
 
+  // Completed matches needing re-sync (cooldown filter)
+  const cooldownCutoff = new Date(now.getTime() - COMPLETED_COOLDOWN_MS).toISOString();
+  const { data: completedNeedSync, error: completedErr } = await supabase
+    .from('matches')
+    .select('id, kickoff_time, league_id, season, status')
+    .eq('custom_status', 'COMPLETED')
+    .or(`last_synced_at.is.null,last_synced_at.lt.${cooldownCutoff}`);
+
+  if (completedErr) {
+    console.error('[WATCHER] Completed-cooldown query error:', completedErr);
+  }
+
   // Deduplicate by id
   const targetMap = new Map<number, any>();
-  for (const m of [...(preLiveMatches || []), ...(inProgressMatches || [])]) {
+  for (const m of [...(preLiveMatches || []), ...(inProgressMatches || []), ...(completedNeedSync || [])]) {
     targetMap.set(m.id, m);
   }
   const targets = Array.from(targetMap.values());
   const count = targets.length;
 
-  console.log(`[WATCHER] Active targets: ${count} (pre-live=${preLiveMatches?.length ?? 0}, in-progress=${inProgressMatches?.length ?? 0})`);
+  console.log(`[WATCHER] Active targets: ${count} (pre-live=${preLiveMatches?.length ?? 0}, in-progress=${inProgressMatches?.length ?? 0}, completed-resync=${completedNeedSync?.length ?? 0})`);
 
   // ── Execution Constraint: early exit ──
   if (count === 0) {
