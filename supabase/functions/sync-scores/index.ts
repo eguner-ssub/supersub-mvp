@@ -9,7 +9,6 @@ const LIVE_STATUSES  = ['1H', 'HT', '2H', 'ET', 'P'];
 const PRE_LIVE_WINDOW_MS = 60 * 60_000; // 60 minutes before kickoff
 const LIVE_WINDOW_MS     = 5 * 60_000;  // 5 minutes before kickoff → LIVE
 
-
 const API_BASE = 'https://v3.football.api-sports.io';
 
 // ────────────────────────────────────────────────────
@@ -193,6 +192,37 @@ async function fixturesService(
       console.log(`[PLANNER] Upserted ${payloads.length} fixtures`);
     }
 
+    // ── NUDGE: write today's matches to watcher_nudge so the Watcher
+    //    has a direct, authoritative list of what to track today. ──
+    const todayFixtures = supported.filter(
+      (item: any) => item.fixture.date.split('T')[0] === today
+    );
+
+    if (todayFixtures.length > 0) {
+      const nudgePayloads = todayFixtures.map((item: any) => ({
+        id: item.fixture.id,
+        date: item.fixture.date.split('T')[0],
+        kickoff_time: item.fixture.date,
+        league_id: item.league.id,
+        season: item.league.season,
+        status: item.fixture.status.short,
+      }));
+
+      const { error: nudgeError } = await supabase
+        .from('watcher_nudge')
+        .upsert(nudgePayloads, { onConflict: 'id' });
+
+      if (nudgeError) {
+        const msg = `[PLANNER] Nudge upsert error: ${nudgeError.message}`;
+        console.error(msg);
+        result.errors.push(msg);
+      } else {
+        console.log(`[PLANNER] Nudged Watcher with ${nudgePayloads.length} matches for ${today}`);
+      }
+    } else {
+      console.log(`[PLANNER] No matches today (${today}) — no nudge sent`);
+    }
+
     // Log this run so the Planner Guard can skip future invocations today
     await supabase.from('sync_logs').upsert(
       { date: today, service: 'PLANNER', result_count: result.upserted },
@@ -236,22 +266,68 @@ async function liveScoresService(
 
   const PRELIVE_THROTTLE_MS = 9 * 60_000;
 
-  // ── Step 1: Identify Active Targets (PRE-LIVE + LIVE) ──
-  const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
-  const zombieCutoff  = new Date(now.getTime() - 12 * 60 * 60_000).toISOString();
+  // ── Step 1: Read today's matches from watcher_nudge (set by Planner) ──
+  // Fall back to querying matches directly if nudge table is empty (e.g. cold start).
+  const today = todayStr(now);
+  const zombieCutoff = new Date(now.getTime() - 12 * 60 * 60_000).toISOString();
 
-  const { data: activeMatches, error: activeErr } = await supabase
-    .from('matches')
-    .select('id, kickoff_time, league_id, season, status, last_synced_at')
-    .gte('kickoff_time', zombieCutoff)      // not older than 12h (zombie guard)
-    .lte('kickoff_time', preLiveCutoff)      // kickoff within next 60m or in the past
+  const { data: nudgedMatches, error: nudgeErr } = await supabase
+    .from('watcher_nudge')
+    .select('id, kickoff_time, league_id, season, status')
+    .eq('date', today)
     .not('status', 'in', `(${FINAL_STATUSES.join(',')})`);
 
-  if (activeErr) {
-    console.error('[WATCHER] Active targets query error:', activeErr);
+  if (nudgeErr) {
+    console.error('[WATCHER] Nudge table query error:', nudgeErr);
   }
 
-  const targets = activeMatches || [];
+  // If nudge table has today's data, use it. Otherwise fall back to matches table.
+  let activeMatches: any[] | null = null;
+
+  if (nudgedMatches && nudgedMatches.length > 0) {
+    console.log(`[WATCHER] Using nudge table — ${nudgedMatches.length} matches for ${today}`);
+
+    // Still need last_synced_at for PRE-LIVE throttle — join from matches
+    const nudgeIds = nudgedMatches.map((m: any) => m.id);
+    const { data: syncedRows } = await supabase
+      .from('matches')
+      .select('id, last_synced_at')
+      .in('id', nudgeIds);
+
+    const syncedMap = new Map(
+      (syncedRows || []).map((r: any) => [r.id, r.last_synced_at])
+    );
+
+    activeMatches = nudgedMatches.map((m: any) => ({
+      ...m,
+      last_synced_at: syncedMap.get(m.id) ?? null,
+    }));
+  } else {
+    // Cold-start fallback: query matches directly (original behaviour)
+    console.log(`[WATCHER] No nudge data for ${today} — falling back to matches table`);
+    const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
+
+    const { data: fallbackMatches, error: fallbackErr } = await supabase
+      .from('matches')
+      .select('id, kickoff_time, league_id, season, status, last_synced_at')
+      .gte('kickoff_time', zombieCutoff)
+      .lte('kickoff_time', preLiveCutoff)
+      .not('status', 'in', `(${FINAL_STATUSES.join(',')})`);
+
+    if (fallbackErr) {
+      console.error('[WATCHER] Fallback matches query error:', fallbackErr);
+    }
+
+    activeMatches = fallbackMatches || [];
+  }
+
+  // Filter out matches outside the active window (PRE-LIVE + LIVE only)
+  const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
+  const targets = (activeMatches || []).filter((m: any) => {
+    const kickoff = m.kickoff_time;
+    return kickoff >= zombieCutoff && kickoff <= preLiveCutoff;
+  });
+
   if (targets.length === 0) {
     console.log('[WATCHER] No active matches — exiting');
     result.mode = 'NONE';
@@ -272,7 +348,9 @@ async function liveScoresService(
     }
   }
 
-  console.log(`[WATCHER] Targets: ${targets.length} total, ${liveTargets.length} LIVE, ${preLiveTargets.length} PRE-LIVE`);
+  // Combined count drives mode selection (spec: switch based on PRE-LIVE + LIVE combined)
+  const combinedCount = liveTargets.length + preLiveTargets.length;
+  console.log(`[WATCHER] Targets: ${targets.length} total (combined=${combinedCount}), ${liveTargets.length} LIVE, ${preLiveTargets.length} PRE-LIVE`);
 
   // ── Step 3a: PRE-LIVE Track (fire first, non-blocking) ──
   // Filter to stale matches only (last_synced_at > 9 min ago or null)
@@ -329,6 +407,14 @@ async function liveScoresService(
         } else {
           result.preLiveSynced = payloads.length;
           console.log(`[WATCHER] [PRE-LIVE] Upserted ${payloads.length} matches`);
+
+          // Keep nudge table status in sync
+          await Promise.all(payloads.map((p: any) =>
+            supabase
+              .from('watcher_nudge')
+              .update({ status: p.status })
+              .eq('id', p.id)
+          ));
         }
       } catch (err) {
         const msg = `[WATCHER] [PRE-LIVE] Fetch error: ${err}`;
@@ -341,27 +427,29 @@ async function liveScoresService(
   }
 
   // ── Step 3b: LIVE Track (priority, 3-mode selection) ──
+  // Mode is determined by the COMBINED count of LIVE + PRE-LIVE targets,
+  // so that mode correctly reflects the full picture of active matches.
   if (liveTargets.length > 0) {
-    const uniqueLeagues = [...new Set(liveTargets.map((t: any) => t.league_id))];
+    const allActiveTargets = [...liveTargets, ...preLiveTargets];
+    const uniqueLeagues = [...new Set(allActiveTargets.map((t: any) => t.league_id))];
     let fetchUrl: string;
 
-    if (liveTargets.length === 1) {
-      // ── Single Match Mode ──
+    if (combinedCount === 1) {
+      // ── Single Match Mode — only one active match across all windows ──
       result.mode = 'SINGLE';
       fetchUrl = `${API_BASE}/fixtures?id=${liveTargets[0].id}`;
       console.log(`[WATCHER] [LIVE] Single match: id=${liveTargets[0].id}`);
     } else if (uniqueLeagues.length > 1) {
-      // ── Multi Match Mode (different leagues) ──
+      // ── Multi Match Mode — multiple matches across different leagues ──
       result.mode = 'MULTI';
       const leagueParam = uniqueLeagues.join('-');
       fetchUrl = `${API_BASE}/fixtures?live=${leagueParam}`;
       console.log(`[WATCHER] [LIVE] Multi-league: ${leagueParam}`);
     } else {
-      // ── Multi-Single-League Mode ──
+      // ── Multi-Single-League Mode — multiple matches, same league ──
       result.mode = 'MULTI_SINGLE_LEAGUE';
       const leagueId = uniqueLeagues[0];
       const season = liveTargets[0].season;
-      const today = todayStr(now);
       fetchUrl = `${API_BASE}/fixtures?league=${leagueId}&season=${season}&date=${today}`;
       console.log(`[WATCHER] [LIVE] Single-league: league=${leagueId} season=${season} date=${today}`);
     }
@@ -409,6 +497,15 @@ async function liveScoresService(
         } else {
           result.syncedToDb = payloads.length;
           console.log(`[WATCHER] [LIVE] Upserted ${payloads.length} matches`);
+
+          // Keep nudge table status in sync so finished matches drop out of
+          // future Watcher invocations without waiting for the next Planner run
+          await Promise.all(payloads.map((p: any) =>
+            supabase
+              .from('watcher_nudge')
+              .update({ status: p.status })
+              .eq('id', p.id)
+          ));
         }
       }
     } catch (err) {
