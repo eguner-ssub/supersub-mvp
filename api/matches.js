@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // ── Inline league IDs to avoid pathing issues in Vercel's function runtime ──
 // Mirrors: src/shared/config/coverage.js → SUPPORTED_LEAGUE_IDS
-const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
+const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
 
 // ── Lazy Supabase Client ──────────────────────────────────────────────────────
 // Only created when the handler actually needs it, so a missing env var at

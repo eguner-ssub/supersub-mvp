@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // ────────────────────────────────────────────────────
 // CONFIGURATION
 // ────────────────────────────────────────────────────
-const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
+const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
 const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
 const LIVE_STATUSES  = ['1H', 'HT', '2H', 'ET', 'P'];
 const PRE_LIVE_WINDOW_MS = 60 * 60_000; // 60 minutes before kickoff
@@ -143,6 +143,11 @@ async function fixturesService(
 
     if (supported.length === 0) {
       console.log('[PLANNER] No supported fixtures found — nothing to upsert');
+      // Still log the sync so the Planner Guard skips future invocations today
+      await supabase.from('sync_logs').upsert(
+        { date: today, service: 'PLANNER', result_count: 0 },
+        { onConflict: 'date,service' }
+      );
       return result;
     }
 

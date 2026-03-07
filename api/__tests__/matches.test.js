@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // The handler now inlines SUPPORTED_LEAGUE_IDS — keep a mirror here for assertions.
-const SUPPORTED_LEAGUE_IDS = [39, 40, 71, 78, 135, 94];
+const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
 
 // ── Mock @supabase/supabase-js ──
 let mockQueryResult = { data: [], error: null };

@@ -32,13 +32,7 @@ export const LEAGUE_COVERAGE = {
         theOddsApiKey: 'soccer_portugal_primeira_liga',
         seasonType: 'european',
     },
-    SERIE_A_BRAZIL: {
-        id: 71,
-        name: 'Série A',
-        country: 'Brazil',
-        theOddsApiKey: 'soccer_brazil_campeonato',
-        seasonType: 'calendar',
-    },
+
     BUNDESLIGA: {
         id: 78,
         name: 'Bundesliga',
