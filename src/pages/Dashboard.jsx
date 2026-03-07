@@ -172,10 +172,10 @@ export default function Dashboard() {
       {/* object-fill rendering across screen sizes.                   */}
       {/* ============================================================ */}
 
-      {/* A. WHITEBOARD (Bets) — upper-right wall */}
+      {/* A. WHITEBOARD (Bets) — center back wall */}
       <div
         onClick={handleWhiteboardClick}
-        className="absolute top-[22%] left-[48%] w-[44%] h-[22%] z-10 cursor-pointer active:scale-95 transition-transform"
+        className="absolute top-[28%] left-[28%] w-[48%] h-[22%] z-10 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-whiteboard"
       >
         <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
@@ -189,13 +189,13 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* B. TABLET (Training/Brief) — center bench */}
+      {/* B. TABLET (Training/Brief) — center bench, icon sits on screen face */}
       <div
         onClick={handleTabletClick}
-        className="absolute top-[60%] left-[24%] w-[34%] h-[18%] z-10 cursor-pointer active:scale-95 transition-transform"
+        className="absolute top-[57%] left-[26%] w-[32%] h-[20%] z-10 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-tablet"
       >
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
           <ClipboardList className={`w-3.5 h-3.5 ${!trainingCompletedToday ? 'text-yellow-400' : 'text-gray-400'}`} />
         </div>
       </div>
@@ -203,10 +203,10 @@ export default function Dashboard() {
       {/* C. ENERGY DRINKS — right of tablet on bench */}
       <div
         onClick={handleDrinkClick}
-        className="absolute top-[62%] left-[60%] w-[30%] h-[14%] z-10 cursor-pointer active:scale-95 transition-transform"
+        className="absolute top-[58%] left-[58%] w-[32%] h-[16%] z-10 cursor-pointer active:scale-95 transition-transform"
         data-testid="hotspot-drinks"
       >
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
           <Zap className={`w-3.5 h-3.5 ${userData.energy === 0 ? 'text-red-500' : 'text-blue-400'}`} />
         </div>
 
