@@ -15,19 +15,13 @@ const IN_PLAY_STATUSES = ['1H', 'HT', '2H', 'ET', 'BT', 'P'];
 // Statuses that mean the match is definitively over in any form
 const TERMINAL_STATUSES = ['FT', 'AET', 'PEN', 'SUSP', 'INT', 'PST', 'CANC', 'ABD', 'AWD', 'WO'];
 
-// Legacy alias kept for DB filter compatibility (subset of TERMINAL_STATUSES)
-const FINAL_STATUSES = TERMINAL_STATUSES;
-
-const PRE_LIVE_WINDOW_MS  = 60 * 60_000;  // 60 minutes before kickoff → PRE-LIVE
-const LIVE_WINDOW_MS      = 5 * 60_000;   // 5 minutes before kickoff → LIVE
+const PRE_LIVE_WINDOW_MS      = 60 * 60_000;  // 60 minutes before kickoff → PRE-LIVE
+const LIVE_WINDOW_MS          =  5 * 60_000;  // 5 minutes before kickoff → LIVE
 
 // Finish-guard: 105 minutes after started_at, poll every minute for up to 30 minutes
 // to ensure we capture FT/terminal status even if the regular live feed missed it.
-const FINISH_GUARD_OFFSET_MS  = 105 * 60_000; // T+105min → start finish-guard polling
-const FINISH_GUARD_WINDOW_MS  =  30 * 60_000; // poll for 30 minutes after that
-
-// Zombie: a match with no sync activity for 3h is considered safe to drop.
-const ZOMBIE_IDLE_MS = 3 * 60 * 60_000;
+const FINISH_GUARD_OFFSET_MS  = 105 * 60_000;
+const FINISH_GUARD_WINDOW_MS  =  30 * 60_000;
 
 const API_BASE = 'https://v3.football.api-sports.io';
 
@@ -70,10 +64,9 @@ function addDays(date: Date, days: number): Date {
 /**
  * Build a full upsert payload from a raw API fixture object.
  *
- * NEW: stamps started_at on the first invocation where the API status
- * transitions into an in-play status (1H, HT, 2H, ET, BT, P).
- * This timestamp is later used by the finish-guard to begin polling
- * at T+105min regardless of whether the regular live feed is still active.
+ * Stamps started_at on the first invocation where the API status transitions
+ * into an in-play status (1H, HT, 2H, ET, BT, P). This timestamp is used by
+ * the finish-guard to begin polling at T+105min.
  */
 function buildPayload(
   item: any,
@@ -83,8 +76,8 @@ function buildPayload(
   existingLineups: any,
   isPreLive: boolean
 ): any {
-  const apiStatus   = item.fixture.status.short;
-  const kickoffTime = new Date(item.fixture.date);
+  const apiStatus    = item.fixture.status.short;
+  const kickoffTime  = new Date(item.fixture.date);
   const customStatus = deriveCustomStatus(apiStatus, kickoffTime, now);
 
   const payload: any = {
@@ -126,8 +119,8 @@ function buildPayload(
   // Lineups — write fresh lineups from API if available and we're in pre-live,
   // otherwise carry forward whatever is already stored so upsert never wipes them.
   if (isPreLive && item.lineups && Array.isArray(item.lineups) && item.lineups.length > 0) {
-    payload.lineups          = item.lineups;
-    payload.pre_live_synced_at = now.toISOString();
+    payload.lineups             = item.lineups;
+    payload.pre_live_synced_at  = now.toISOString();
   } else if (existingLineups) {
     payload.lineups = existingLineups;
   }
@@ -144,7 +137,7 @@ function buildPayload(
 }
 
 // ────────────────────────────────────────────────────
-// SHARED: upsert fixtures + sync nudge table
+// SHARED: upsert fixtures into matches table
 // ────────────────────────────────────────────────────
 async function upsertFixtures(
   supabase: ReturnType<typeof createClient>,
@@ -175,12 +168,11 @@ async function upsertFixtures(
 
   const payloads: any[] = [];
   for (const item of fixtures) {
-    const existing = existingMap.get(item.fixture.id);
-    const kickoff = new Date(item.fixture.date);
-    const msUntilKickoff = kickoff.getTime() - now.getTime();
-    const itemIsPreLive = isPreLive || (msUntilKickoff > 0 && msUntilKickoff <= PRE_LIVE_WINDOW_MS);
+    const existing        = existingMap.get(item.fixture.id);
+    const kickoff         = new Date(item.fixture.date);
+    const msUntilKickoff  = kickoff.getTime() - now.getTime();
+    const itemIsPreLive   = isPreLive || (msUntilKickoff > 0 && msUntilKickoff <= PRE_LIVE_WINDOW_MS);
 
-    // Use caller-supplied lineups map if available, otherwise fall back to DB value
     const existingLineups = externalLineupsMap
       ? (externalLineupsMap.get(item.fixture.id) ?? null)
       : (existing?.lineups ?? null);
@@ -205,15 +197,6 @@ async function upsertFixtures(
     result.errors.push(msg);
   } else {
     console.log(`[${label}] Upserted ${payloads.length} match(es)`);
-
-    // Keep nudge table status in sync so finished matches drop out of
-    // future Watcher invocations without waiting for the next Planner run
-    await Promise.all(payloads.map((p: any) =>
-      supabase
-        .from('watcher_nudge')
-        .update({ status: p.status })
-        .eq('id', p.id)
-    ));
   }
 
   return payloads;
@@ -237,7 +220,6 @@ async function fixturesService(
   const hour  = now.getUTCHours();
   const today = todayStr(now);
 
-  // Collect all raw fixtures from the API before filtering
   const allFixtures: any[] = [];
 
   try {
@@ -250,8 +232,7 @@ async function fixturesService(
       for (const f of (json.response || [])) allFixtures.push(f);
       console.log(`[PLANNER] Midnight fetch returned ${json.response?.length ?? 0} fixtures`);
     } else {
-      // ── Midday run: the API requires league+season alongside from/to.
-      //    Make one request per supported league and merge the results. ──
+      // ── Midday run: fetch today + next 14 days per supported league ──
       const futureDate = todayStr(addDays(now, 14));
       console.log(`[PLANNER] Midday run — fetching fixtures ${today} → ${futureDate} per league`);
 
@@ -302,12 +283,12 @@ async function fixturesService(
         new Date(item.fixture.date),
         now
       ),
-      home_team:  item.teams.home.name,
-      away_team:  item.teams.away.name,
-      home_logo:  item.teams.home.logo,
-      away_logo:  item.teams.away.logo,
-      home_score: item.goals.home ?? 0,
-      away_score: item.goals.away ?? 0,
+      home_team:    item.teams.home.name,
+      away_team:    item.teams.away.name,
+      home_logo:    item.teams.home.logo,
+      away_logo:    item.teams.away.logo,
+      home_score:   item.goals.home ?? 0,
+      away_score:   item.goals.away ?? 0,
       last_updated: now.toISOString(),
     }));
 
@@ -322,36 +303,6 @@ async function fixturesService(
     } else {
       result.upserted = payloads.length;
       console.log(`[PLANNER] Upserted ${payloads.length} fixtures`);
-    }
-
-    // ── NUDGE ──
-    const todayFixtures = supported.filter(
-      (item: any) => item.fixture.date.split('T')[0] === today
-    );
-
-    if (todayFixtures.length > 0) {
-      const nudgePayloads = todayFixtures.map((item: any) => ({
-        id:           item.fixture.id,
-        date:         item.fixture.date.split('T')[0],
-        kickoff_time: item.fixture.date,
-        league_id:    item.league.id,
-        season:       item.league.season,
-        status:       item.fixture.status.short,
-      }));
-
-      const { error: nudgeError } = await supabase
-        .from('watcher_nudge')
-        .upsert(nudgePayloads, { onConflict: 'id' });
-
-      if (nudgeError) {
-        const msg = `[PLANNER] Nudge upsert error: ${nudgeError.message}`;
-        console.error(msg);
-        result.errors.push(msg);
-      } else {
-        console.log(`[PLANNER] Nudged Watcher with ${nudgePayloads.length} matches for ${today}`);
-      }
-    } else {
-      console.log(`[PLANNER] No matches today (${today}) — no nudge sent`);
     }
 
     await supabase.from('sync_logs').upsert(
@@ -397,63 +348,50 @@ async function liveScoresService(
   };
 
   const PRELIVE_THROTTLE_MS = 9 * 60_000;
-  const today = todayStr(now);
+  const today               = todayStr(now);
 
-  // ── Step 1: Load today's unfinished matches from watcher_nudge ──
-  const { data: nudgedMatches, error: nudgeErr } = await supabase
-    .from('watcher_nudge')
-    .select('id, kickoff_time, league_id, season, status')
+  // ── Step 1: Load today's unfinished matches directly from matches table ──
+  //
+  // The Watcher is self-sufficient — it queries matches directly every minute
+  // and decides what needs attention based on kickoff_time and status.
+  // No external nudge mechanism required.
+  const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
+
+  const { data: activeMatches, error: matchesErr } = await supabase
+    .from('matches')
+    .select('id, kickoff_time, league_id, season, status, started_at')
     .eq('date', today)
+    .lte('kickoff_time', preLiveCutoff)
     .not('status', 'in', `(${TERMINAL_STATUSES.join(',')})`);
 
-  if (nudgeErr) console.error('[WATCHER] Nudge table query error:', nudgeErr);
+  if (matchesErr) console.error('[WATCHER] Matches query error:', matchesErr);
 
-  let todayMatches: any[] = [];
+  const todayMatches: any[] = activeMatches || [];
+  console.log(`[WATCHER] Found ${todayMatches.length} active match(es) for ${today}`);
 
-  if (nudgedMatches && nudgedMatches.length > 0) {
-    console.log(`[WATCHER] Using nudge table — ${nudgedMatches.length} matches for ${today}`);
-    todayMatches = nudgedMatches;
-  } else {
-    // Cold-start fallback
-    console.log(`[WATCHER] No nudge data for ${today} — falling back to matches table`);
-    const zombieCutoff  = new Date(now.getTime() - ZOMBIE_IDLE_MS).toISOString();
-    const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
-
-    const { data: fallbackMatches, error: fallbackErr } = await supabase
-      .from('matches')
-      .select('id, kickoff_time, league_id, season, status, last_synced_at')
-      .eq('date', today)
-      .lte('kickoff_time', preLiveCutoff)
-      .not('status', 'in', `(${TERMINAL_STATUSES.join(',')})`)
-      .or(`last_synced_at.is.null,last_synced_at.gte.${zombieCutoff}`);
-
-    if (fallbackErr) console.error('[WATCHER] Fallback query error:', fallbackErr);
-    todayMatches = fallbackMatches || [];
+  if (todayMatches.length === 0) {
+    console.log('[WATCHER] Nothing active this invocation — exiting');
+    return result;
   }
 
-  // ── Step 2: Fetch per-match metadata for throttle + guard logic ──
+  // ── Step 2: Fetch pre_live_synced_at and lineups for throttle + lineup logic ──
   //
-  // pre_live_synced_at is a dedicated column updated ONLY by the PRE-LIVE track.
-  // Using last_synced_at for the 9-min throttle was wrong: the LIVE track updates
-  // last_synced_at every minute, which permanently blocks the pre-live throttle
-  // from ever triggering for a pre-live match that co-exists with live matches.
+  // started_at is already included in the Step 1 select.
+  // pre_live_synced_at is a dedicated column updated ONLY by the PRE-LIVE track —
+  // using last_synced_at would be wrong as the LIVE track stamps it every minute.
   const todayIds = todayMatches.map((m: any) => m.id);
 
-  let startedAtMap     = new Map<number, string | null>();
   let preLiveSyncedMap = new Map<number, string | null>();
   let lineupsMap       = new Map<number, any>();
 
-  if (todayIds.length > 0) {
-    const { data: metaRows } = await supabase
-      .from('matches')
-      .select('id, started_at, pre_live_synced_at, lineups')
-      .in('id', todayIds);
+  const { data: metaRows } = await supabase
+    .from('matches')
+    .select('id, pre_live_synced_at, lineups')
+    .in('id', todayIds);
 
-    for (const r of (metaRows || [])) {
-      startedAtMap.set(r.id,     r.started_at        ?? null);
-      preLiveSyncedMap.set(r.id, r.pre_live_synced_at ?? null);
-      lineupsMap.set(r.id,       r.lineups            ?? null);
-    }
+  for (const r of (metaRows || [])) {
+    preLiveSyncedMap.set(r.id, r.pre_live_synced_at ?? null);
+    lineupsMap.set(r.id,       r.lineups            ?? null);
   }
 
   // ── Step 3: Identify FINISH-GUARD targets ──
@@ -464,31 +402,31 @@ async function liveScoresService(
   //   - now <= started_at + 105min + 30min (still within the guard window), AND
   //   - status is not yet terminal
   //
-  // These matches are fetched individually every minute regardless of the
-  // regular live track, to guarantee we capture FT/AET/PEN/CANC/ABD/PST.
+  // These matches are fetched individually every minute to guarantee we capture
+  // FT/AET/PEN/CANC/ABD/PST even if the regular live feed missed it.
   const finishGuardTargets: any[] = [];
-  const remainingMatches: any[]   = [];
+  const remainingMatches:   any[] = [];
 
   for (const m of todayMatches) {
-    const startedAt = startedAtMap.get(m.id) ?? null;
+    const startedAt = m.started_at ?? null;
     if (startedAt) {
-      const startedMs      = new Date(startedAt).getTime();
-      const guardStartMs   = startedMs + FINISH_GUARD_OFFSET_MS;
-      const guardEndMs     = guardStartMs + FINISH_GUARD_WINDOW_MS;
-      const nowMs          = now.getTime();
+      const startedMs    = new Date(startedAt).getTime();
+      const guardStartMs = startedMs + FINISH_GUARD_OFFSET_MS;
+      const guardEndMs   = guardStartMs + FINISH_GUARD_WINDOW_MS;
+      const nowMs        = now.getTime();
 
       if (nowMs >= guardStartMs && nowMs <= guardEndMs) {
         finishGuardTargets.push(m);
-        continue; // handled separately, skip normal window logic
+        continue;
       }
     }
     remainingMatches.push(m);
   }
 
-  // ── Step 4: Finish-guard track (highest priority, always by ID) ──
+  // ── Step 4: Finish-guard track (highest priority, always fetched by ID) ──
   if (finishGuardTargets.length > 0) {
-    const ids    = finishGuardTargets.map((m: any) => m.id).join('-');
-    const fgUrl  = `${API_BASE}/fixtures?ids=${ids}`;
+    const ids   = finishGuardTargets.map((m: any) => m.id).join('-');
+    const fgUrl = `${API_BASE}/fixtures?ids=${ids}`;
     console.log(`[WATCHER] [FINISH-GUARD] Polling ${finishGuardTargets.length} match(es) → ?ids=${ids}`);
     result.apiCalls++;
 
@@ -502,8 +440,8 @@ async function liveScoresService(
       const payloads = await upsertFixtures(
         supabase, fixtures, now, false, 'WATCHER/FINISH-GUARD', result
       );
-      result.finishGuardSynced = payloads.length;
-      result.processedMatches += payloads.length;
+      result.finishGuardSynced  = payloads.length;
+      result.processedMatches  += payloads.length;
     } catch (err) {
       const msg = `[WATCHER] [FINISH-GUARD] Fetch error: ${err}`;
       console.error(msg);
@@ -522,7 +460,6 @@ async function liveScoresService(
     if (msUntil <= LIVE_WINDOW_MS) {
       liveTargets.push(m);
     } else if (msUntil <= PRE_LIVE_WINDOW_MS) {
-      // Attach pre_live_synced_at so the throttle check uses the right timestamp
       preLiveTargets.push({ ...m, pre_live_synced_at: preLiveSyncedMap.get(m.id) ?? null });
     }
   }
@@ -538,7 +475,6 @@ async function liveScoresService(
 
   // ── Step 6: PRE-LIVE track (non-blocking, 9-min throttle) ──
   // Throttle is based on pre_live_synced_at — a column written ONLY by this track.
-  // last_synced_at is updated every minute by the live track and must not be used here.
   const stalePreLive = preLiveTargets.filter((m: any) => {
     if (!m.pre_live_synced_at) return true;
     return now.getTime() - new Date(m.pre_live_synced_at).getTime() >= PRELIVE_THROTTLE_MS;
@@ -593,10 +529,10 @@ async function liveScoresService(
       fetchUrl    = `${API_BASE}/fixtures?live=${uniqueLiveLeagues.join('-')}`;
       console.log(`[WATCHER] [LIVE] MULTI mode: ?live=${uniqueLiveLeagues.join('-')}`);
     } else {
-      result.mode = 'MULTI_SINGLE_LEAGUE';
-      const leagueId = uniqueLiveLeagues[0];
-      const season   = liveTargets[0].season;
-      fetchUrl       = `${API_BASE}/fixtures?league=${leagueId}&season=${season}&date=${today}`;
+      result.mode        = 'MULTI_SINGLE_LEAGUE';
+      const leagueId     = uniqueLiveLeagues[0];
+      const season       = liveTargets[0].season;
+      fetchUrl           = `${API_BASE}/fixtures?league=${leagueId}&season=${season}&date=${today}`;
       console.log(`[WATCHER] [LIVE] MULTI_SINGLE_LEAGUE mode: league=${leagueId} season=${season} date=${today}`);
     }
 
@@ -608,7 +544,7 @@ async function liveScoresService(
 
       console.log(`[WATCHER] [LIVE] API returned ${fixtures.length} fixture(s)`);
 
-      // Ghost resolution: any liveTarget absent from response may have just
+      // Ghost resolution: any liveTarget absent from the response may have just
       // reached FT and dropped off ?live=. Fetch individually to confirm.
       const returnedIds  = new Set(fixtures.map((f: any) => f.fixture.id));
       const ghostTargets = liveTargets.filter((t: any) => !returnedIds.has(t.id));
@@ -639,24 +575,21 @@ async function liveScoresService(
 
       // ── Lineup supplement ──
       // The ?live= and ?league= endpoints do not return lineups. After the main
-      // live upsert, check if any live match is still missing lineups in the DB
-      // and fetch them individually by ID. Once lineups are stored this check
-      // short-circuits immediately, so there is no ongoing API cost.
+      // live upsert, check if any live match is still missing lineups and fetch
+      // them individually. Once lineups are stored this short-circuits immediately.
       const missingLineupIds = liveTargets
         .filter((t: any) => !lineupsMap.get(t.id))
         .map((t: any) => t.id);
 
       if (missingLineupIds.length > 0) {
         const supplementUrl = `${API_BASE}/fixtures?ids=${missingLineupIds.join('-')}`;
-        console.log(`[WATCHER] [LIVE] Lineup supplement: fetching ${missingLineupIds.length} match(es) missing lineups → ?ids=${missingLineupIds.join('-')}`);
+        console.log(`[WATCHER] [LIVE] Lineup supplement: fetching ${missingLineupIds.length} match(es) → ?ids=${missingLineupIds.join('-')}`);
         try {
           result.apiCalls++;
           const suppRes      = await fetch(supplementUrl, { headers: apiHeaders(apiKey) });
           const suppJson     = await suppRes.json();
           const suppFixtures = (suppJson.response || []) as any[];
 
-          // Build a fresh lineups map from the supplement response and upsert.
-          // Pass isPreLive=true so buildPayload writes the lineups if present.
           const suppLineupsMap = new Map<number, any>(
             suppFixtures.map((f: any) => [f.fixture.id, lineupsMap.get(f.fixture.id) ?? null])
           );
@@ -720,11 +653,11 @@ Deno.serve(async (req) => {
     console.log(`[HANDLER] ══════ PLANNER complete — ${result.upserted} fixtures upserted, ${result.apiCalls} API calls ══════`);
 
     return new Response(JSON.stringify({
-      success:   result.errors.length === 0,
-      service:   'PLANNER',
-      upserted:  result.upserted,
-      apiCalls:  result.apiCalls,
-      errors:    result.errors,
+      success:  result.errors.length === 0,
+      service:  'PLANNER',
+      upserted: result.upserted,
+      apiCalls: result.apiCalls,
+      errors:   result.errors,
     }), {
       status:  result.errors.length === 0 ? 200 : 207,
       headers: { 'Content-Type': 'application/json' },
