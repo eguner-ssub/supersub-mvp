@@ -5,6 +5,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // ────────────────────────────────────────────────────
 const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
 
+// Current season for all supported leagues.
+// Update this when the season rolls over, or replace with a leagues DB table.
+const CURRENT_SEASON = 2025;
+
 // Statuses where the match is actively in progress (ball is in play or half-time)
 const IN_PLAY_STATUSES = ['1H', 'HT', '2H', 'ET', 'BT', 'P'];
 
@@ -215,24 +219,47 @@ async function fixturesService(
   const hour  = now.getUTCHours();
   const today = todayStr(now);
 
-  let url: string;
-  if (hour < 12) {
-    url = `${API_BASE}/fixtures?date=${today}`;
-    console.log(`[PLANNER] Midnight run — fetching fixtures for ${today}`);
-  } else {
-    const futureDate = todayStr(addDays(now, 14));
-    url = `${API_BASE}/fixtures?from=${today}&to=${futureDate}`;
-    console.log(`[PLANNER] Midday run — fetching fixtures from ${today} to ${futureDate}`);
-  }
+  // Collect all raw fixtures from the API before filtering
+  const allFixtures: any[] = [];
 
   try {
-    result.apiCalls++;
-    const res  = await fetch(url, { headers: apiHeaders(apiKey) });
-    const json = await res.json();
-    const fixtures = (json.response || []) as any[];
+    if (hour < 12) {
+      // ── Midnight run: fetch today's fixtures in a single call by date ──
+      console.log(`[PLANNER] Midnight run — fetching fixtures for ${today}`);
+      result.apiCalls++;
+      const res  = await fetch(`${API_BASE}/fixtures?date=${today}`, { headers: apiHeaders(apiKey) });
+      const json = await res.json();
+      for (const f of (json.response || [])) allFixtures.push(f);
+      console.log(`[PLANNER] Midnight fetch returned ${json.response?.length ?? 0} fixtures`);
+    } else {
+      // ── Midday run: the API requires league+season alongside from/to.
+      //    Make one request per supported league and merge the results. ──
+      const futureDate = todayStr(addDays(now, 14));
+      console.log(`[PLANNER] Midday run — fetching fixtures ${today} → ${futureDate} per league`);
 
-    const supported = fixtures.filter((f: any) => SUPPORTED_LEAGUE_IDS.includes(f.league.id));
-    console.log(`[PLANNER] API returned ${fixtures.length} fixtures, ${supported.length} in supported leagues`);
+      for (const leagueId of SUPPORTED_LEAGUE_IDS) {
+        const url = `${API_BASE}/fixtures?league=${leagueId}&season=${CURRENT_SEASON}&from=${today}&to=${futureDate}`;
+        result.apiCalls++;
+        const res  = await fetch(url, { headers: apiHeaders(apiKey) });
+        const json = await res.json();
+        const count = json.response?.length ?? 0;
+        console.log(`[PLANNER] League ${leagueId}: ${count} fixtures`);
+        for (const f of (json.response || [])) allFixtures.push(f);
+      }
+    }
+
+    // Deduplicate by fixture id (midday per-league calls can overlap on today's matches)
+    const seen = new Set<number>();
+    const uniqueFixtures: any[] = [];
+    for (const f of allFixtures) {
+      if (!seen.has(f.fixture.id)) {
+        seen.add(f.fixture.id);
+        uniqueFixtures.push(f);
+      }
+    }
+
+    const supported = uniqueFixtures.filter((f: any) => SUPPORTED_LEAGUE_IDS.includes(f.league.id));
+    console.log(`[PLANNER] Total fetched: ${uniqueFixtures.length} fixtures, ${supported.length} in supported leagues`);
 
     if (supported.length === 0) {
       console.log('[PLANNER] No supported fixtures — logging and exiting');
@@ -315,7 +342,7 @@ async function fixturesService(
     );
     console.log(`[PLANNER] Logged sync for ${today}`);
   } catch (err) {
-    const msg = `[PLANNER] Fetch error: ${err}`;
+    const msg = `[PLANNER] Error: ${err}`;
     console.error(msg);
     result.errors.push(msg);
   }
