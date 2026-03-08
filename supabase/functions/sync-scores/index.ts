@@ -80,6 +80,7 @@ function buildPayload(
   now: Date,
   existingFinishedAt: string | null,
   existingStartedAt: string | null,
+  existingLineups: any,
   isPreLive: boolean
 ): any {
   const apiStatus   = item.fixture.status.short;
@@ -122,9 +123,13 @@ function buildPayload(
     payload.events = item.events;
   }
 
-  // Lineups — only during pre-live window
+  // Lineups — write fresh lineups from API if available and we're in pre-live,
+  // otherwise carry forward whatever is already stored so upsert never wipes them.
   if (isPreLive && item.lineups && Array.isArray(item.lineups) && item.lineups.length > 0) {
-    payload.lineups = item.lineups;
+    payload.lineups          = item.lineups;
+    payload.pre_live_synced_at = now.toISOString();
+  } else if (existingLineups) {
+    payload.lineups = existingLineups;
   }
 
   // Statistics
@@ -147,18 +152,25 @@ async function upsertFixtures(
   now: Date,
   isPreLive: boolean,
   label: string,
-  result: { errors: string[] }
+  result: { errors: string[] },
+  // Optional: pre-loaded lineups map from the caller to avoid a redundant DB fetch.
+  // When provided, skips the internal lineups lookup.
+  externalLineupsMap?: Map<number, any>
 ): Promise<any[]> {
   if (fixtures.length === 0) return [];
 
   const fixtureIds = fixtures.map((f: any) => f.fixture.id);
   const { data: existingRows } = await supabase
     .from('matches')
-    .select('id, finished_at, started_at')
+    .select('id, finished_at, started_at, lineups')
     .in('id', fixtureIds);
 
   const existingMap = new Map(
-    (existingRows || []).map((r: any) => [r.id, { finished_at: r.finished_at, started_at: r.started_at }])
+    (existingRows || []).map((r: any) => [r.id, {
+      finished_at: r.finished_at,
+      started_at:  r.started_at,
+      lineups:     r.lineups ?? null,
+    }])
   );
 
   const payloads: any[] = [];
@@ -168,11 +180,17 @@ async function upsertFixtures(
     const msUntilKickoff = kickoff.getTime() - now.getTime();
     const itemIsPreLive = isPreLive || (msUntilKickoff > 0 && msUntilKickoff <= PRE_LIVE_WINDOW_MS);
 
+    // Use caller-supplied lineups map if available, otherwise fall back to DB value
+    const existingLineups = externalLineupsMap
+      ? (externalLineupsMap.get(item.fixture.id) ?? null)
+      : (existing?.lineups ?? null);
+
     payloads.push(buildPayload(
       item,
       now,
       existing?.finished_at || null,
       existing?.started_at  || null,
+      existingLineups,
       itemIsPreLive
     ));
   }
@@ -413,21 +431,28 @@ async function liveScoresService(
     todayMatches = fallbackMatches || [];
   }
 
-  // ── Step 2: Fetch started_at + last_synced_at for all today's matches ──
+  // ── Step 2: Fetch per-match metadata for throttle + guard logic ──
+  //
+  // pre_live_synced_at is a dedicated column updated ONLY by the PRE-LIVE track.
+  // Using last_synced_at for the 9-min throttle was wrong: the LIVE track updates
+  // last_synced_at every minute, which permanently blocks the pre-live throttle
+  // from ever triggering for a pre-live match that co-exists with live matches.
   const todayIds = todayMatches.map((m: any) => m.id);
 
-  let startedAtMap = new Map<number, string | null>();
-  let syncedAtMap  = new Map<number, string | null>();
+  let startedAtMap     = new Map<number, string | null>();
+  let preLiveSyncedMap = new Map<number, string | null>();
+  let lineupsMap       = new Map<number, any>();
 
   if (todayIds.length > 0) {
     const { data: metaRows } = await supabase
       .from('matches')
-      .select('id, started_at, last_synced_at')
+      .select('id, started_at, pre_live_synced_at, lineups')
       .in('id', todayIds);
 
     for (const r of (metaRows || [])) {
-      startedAtMap.set(r.id, r.started_at ?? null);
-      syncedAtMap.set(r.id,  r.last_synced_at ?? null);
+      startedAtMap.set(r.id,     r.started_at        ?? null);
+      preLiveSyncedMap.set(r.id, r.pre_live_synced_at ?? null);
+      lineupsMap.set(r.id,       r.lineups            ?? null);
     }
   }
 
@@ -495,9 +520,10 @@ async function liveScoresService(
     const msUntil = kickoff.getTime() - now.getTime();
 
     if (msUntil <= LIVE_WINDOW_MS) {
-      liveTargets.push({ ...m, last_synced_at: syncedAtMap.get(m.id) ?? null });
+      liveTargets.push(m);
     } else if (msUntil <= PRE_LIVE_WINDOW_MS) {
-      preLiveTargets.push({ ...m, last_synced_at: syncedAtMap.get(m.id) ?? null });
+      // Attach pre_live_synced_at so the throttle check uses the right timestamp
+      preLiveTargets.push({ ...m, pre_live_synced_at: preLiveSyncedMap.get(m.id) ?? null });
     }
   }
 
@@ -511,9 +537,11 @@ async function liveScoresService(
   }
 
   // ── Step 6: PRE-LIVE track (non-blocking, 9-min throttle) ──
+  // Throttle is based on pre_live_synced_at — a column written ONLY by this track.
+  // last_synced_at is updated every minute by the live track and must not be used here.
   const stalePreLive = preLiveTargets.filter((m: any) => {
-    if (!m.last_synced_at) return true;
-    return now.getTime() - new Date(m.last_synced_at).getTime() >= PRELIVE_THROTTLE_MS;
+    if (!m.pre_live_synced_at) return true;
+    return now.getTime() - new Date(m.pre_live_synced_at).getTime() >= PRELIVE_THROTTLE_MS;
   });
 
   let preLivePromise: Promise<void> | null = null;
@@ -604,10 +632,43 @@ async function liveScoresService(
       }
 
       const payloads = await upsertFixtures(
-        supabase, fixtures, now, false, 'WATCHER/LIVE', result
+        supabase, fixtures, now, false, 'WATCHER/LIVE', result, lineupsMap
       );
       result.syncedToDb       = payloads.length;
       result.processedMatches += payloads.length;
+
+      // ── Lineup supplement ──
+      // The ?live= and ?league= endpoints do not return lineups. After the main
+      // live upsert, check if any live match is still missing lineups in the DB
+      // and fetch them individually by ID. Once lineups are stored this check
+      // short-circuits immediately, so there is no ongoing API cost.
+      const missingLineupIds = liveTargets
+        .filter((t: any) => !lineupsMap.get(t.id))
+        .map((t: any) => t.id);
+
+      if (missingLineupIds.length > 0) {
+        const supplementUrl = `${API_BASE}/fixtures?ids=${missingLineupIds.join('-')}`;
+        console.log(`[WATCHER] [LIVE] Lineup supplement: fetching ${missingLineupIds.length} match(es) missing lineups → ?ids=${missingLineupIds.join('-')}`);
+        try {
+          result.apiCalls++;
+          const suppRes      = await fetch(supplementUrl, { headers: apiHeaders(apiKey) });
+          const suppJson     = await suppRes.json();
+          const suppFixtures = (suppJson.response || []) as any[];
+
+          // Build a fresh lineups map from the supplement response and upsert.
+          // Pass isPreLive=true so buildPayload writes the lineups if present.
+          const suppLineupsMap = new Map<number, any>(
+            suppFixtures.map((f: any) => [f.fixture.id, lineupsMap.get(f.fixture.id) ?? null])
+          );
+          await upsertFixtures(
+            supabase, suppFixtures, now, true, 'WATCHER/LIVE/LINEUP-SUPPLEMENT', result, suppLineupsMap
+          );
+        } catch (suppErr) {
+          const msg = `[WATCHER] [LIVE] Lineup supplement fetch error: ${suppErr}`;
+          console.error(msg);
+          result.errors.push(msg);
+        }
+      }
 
     } catch (err) {
       const msg = `[WATCHER] [LIVE] Fetch error: ${err}`;
