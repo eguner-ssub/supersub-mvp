@@ -119,6 +119,10 @@ const SubstitutesTab = ({ fixtureId, match, onStageSupersub }) => {
     const subs = team.substitutes || [];
     const teamName = team.team?.name || (teamIndex === 0 ? 'Home' : 'Away');
     const teamLogo = team.team?.logo;
+    // API-Football integer team ID — required by backend settlement engine
+    const teamId = team.team?.id ?? null;
+    // Derive HOME/AWAY side from index (lineups[0] is always home)
+    const side = teamIndex === 0 ? 'HOME' : 'AWAY';
 
     return (
       <div key={teamIndex} style={{ marginBottom: '20px' }}>
@@ -140,7 +144,7 @@ const SubstitutesTab = ({ fixtureId, match, onStageSupersub }) => {
 
         {/* Supersub CTA — Command Button */}
         <button
-          onClick={() => onStageSupersub && onStageSupersub(teamName)}
+          onClick={() => onStageSupersub && onStageSupersub(side, teamId, teamName)}
           style={{
             width: '100%',
             padding: '10px 16px',
@@ -598,7 +602,7 @@ const MatchDetail = () => {
 
   const handlePlay = async () => {
     if (!userProfile || !stagedBet) return;
-    const result = await placeBet(match, stagedBet.selection, stagedBet.reward, stagedBet.card, stagedBet.odds, stagedBet.displayLabel);
+    const result = await placeBet(match, stagedBet.selection, stagedBet.reward, stagedBet.card, stagedBet.odds, stagedBet.displayLabel, stagedBet.teamId ?? null);
     if (result.success) {
       await consumeCard(stagedBet.card);
       setFlowState('resolved');
@@ -611,11 +615,23 @@ const MatchDetail = () => {
     setFlowState('idle');
   };
 
-  const handleStageSupersub = (teamName) => {
+  const handleStageSupersub = (side, teamId, teamName) => {
+    // side: 'HOME' | 'AWAY'
+    // teamId: API-Football integer — passed straight through to placeBet
     const count = getCardCount('c_supersub');
     if (count > 0) {
       setSelectedCard('c_supersub');
-      setFlowState('selection');
+      // Pre-stage the supersub bet with side and teamId already resolved.
+      // The Supersub UI just confirms — no second team selection needed.
+      setStagedBet({
+        card: 'c_supersub',
+        selection: side,
+        teamId,
+        displayLabel: `${teamName} Sub to Score`,
+        odds: odds?.supersub_yes || 4.50,
+        reward: Math.floor((odds?.supersub_yes || 4.50) * 100),
+      });
+      setFlowState('staging');
     }
   };
 
@@ -949,16 +965,9 @@ const MatchDetail = () => {
             </div>
           )}
 
-          {/* Super Sub UI */}
-          {selectedCard === 'c_supersub' && (
-            <div className="w-full max-w-sm">
-              <button onClick={() => handleOutcomeClick('SUPERSUB_YES', odds.supersub_yes, 'Super Sub')} className="w-full bg-gradient-to-br from-yellow-600/20 to-black border border-yellow-500/50 rounded-3xl p-10 flex flex-col items-center gap-6 hover:scale-105 transition-transform">
-                <div className="relative"><Zap className="w-20 h-20 text-yellow-400 fill-yellow-400" /><div className="absolute inset-0 bg-yellow-400 blur-2xl opacity-20 animate-pulse"></div></div>
-                <div className="text-center"><h3 className="text-white font-black text-3xl uppercase tracking-tighter">Super Sub</h3><p className="text-white/60 text-xs mt-2 uppercase tracking-widest">Any Substitute to Score</p></div>
-                <div className="bg-yellow-500 text-black font-black px-8 py-3 rounded-full text-2xl shadow-[0_0_20px_rgba(234,179,8,0.4)]">+{Math.floor(odds.supersub_yes * 100)} PTS</div>
-              </button>
-            </div>
-          )}
+          {/* Super Sub UI — removed: Supersub now stages directly from the SUBS tab
+              without entering the selection flow. Team side (HOME/AWAY) and team_id
+              are captured at the point of the "Use Supersub Card" button click. */}
         </div>
       )}
 

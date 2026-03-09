@@ -84,31 +84,37 @@ export const calculateBetResult = (cardType, selection, matchData) => {
             };
         }
 
-        // --- D. SUPERSUB (The "Any Sub" Mechanic) ---
+        // --- D. SUPERSUB ---
+        // Wins if a substitute from the BACKED TEAM scores.
+        // selection: 'HOME' | 'AWAY'
+        // matchData.team_id: API-Football integer — the team the user backed.
+        // This mirrors the backend settlement engine which uses team_id for routing.
         case 'c_supersub': {
-            // 1. Identify Bench Players from Lineups (Primary Source)
+            const backedTeamId = matchData.team_id ? Number(matchData.team_id) : null;
+
+            // 1. Identify bench players — scoped to the backed team if team_id available
             const benchIds = new Set();
 
             if (lineups.length > 0) {
-                // Parse lineups to find substitutes
                 lineups.forEach(team => {
+                    // If we know the backed team, only collect subs from that team
+                    if (backedTeamId && Number(team.team?.id) !== backedTeamId) return;
                     const substitutes = team.substitutes || [];
                     substitutes.forEach(sub => {
-                        if (sub.player?.id) {
-                            benchIds.add(Number(sub.player.id));
-                        }
+                        if (sub.player?.id) benchIds.add(Number(sub.player.id));
                     });
                 });
             } else {
-                // Fallback: Use 'subst' events if lineups missing
+                // Fallback: derive from substitution events filtered by team
                 events.forEach(e => {
                     if (e.type === 'subst' && e.player?.id) {
+                        if (backedTeamId && Number(e.team?.id) !== backedTeamId) return;
                         benchIds.add(Number(e.player.id));
                     }
                 });
             }
 
-            // 2. Check if any bench player scored
+            // 2. Check if any backed-team bench player scored
             const subScored = events.some(e =>
                 e.type === 'Goal' &&
                 e.detail !== 'Missed Penalty' &&
@@ -118,7 +124,7 @@ export const calculateBetResult = (cardType, selection, matchData) => {
 
             return {
                 status: subScored ? 'WON' : 'LOST',
-                fixed_points: 5000 // JACKPOT REWARD
+                fixed_points: 5000
             };
         }
 

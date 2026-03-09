@@ -103,29 +103,60 @@ export const GameProvider = ({ children }) => {
 
   /**
    * PLACE BET
-   * Fixed: Now takes 'displayLabel' to prevent non-match result cards from being called "Draw"
+   * - displayLabel: human-readable label ("Over 2.5 Goals", player name, etc.)
+   * - teamId: required for Supersub cards — the API-Football team ID the user is backing.
+   *   Pass match.teams.home.id or match.teams.away.id at the call site.
+   *   Without this, the backend settlement engine will always settle Supersub as LOST.
    */
-  const placeBet = async (match, selection, potentialReward, cardType, odds, displayLabel) => {
+  const placeBet = async (match, selection, potentialReward, cardType, odds, displayLabel, teamId = null) => {
     if (!userProfile) return { success: false, error: 'No user' };
     try {
       const homeTeam = match.teams?.home?.name || match.home_team || 'Home';
       const awayTeam = match.teams?.away?.name || match.away_team || 'Away';
       const matchId = match.fixture?.id || match.id;
 
+      // Supersub requires team_id (API-Football integer) for backend settlement.
+      // Derive it from match data if not explicitly passed.
+      const isSupersub = String(cardType).toLowerCase().includes('supersub');
+
+      let resolvedTeamId = teamId;
+      if (isSupersub && !resolvedTeamId) {
+        // Attempt to derive from selection ('HOME' or 'AWAY')
+        if (selection === 'HOME') {
+          resolvedTeamId = match.teams?.home?.id ?? match.home_team_id ?? null;
+        } else if (selection === 'AWAY') {
+          resolvedTeamId = match.teams?.away?.id ?? match.away_team_id ?? null;
+        }
+      }
+
+      // Enforce: Supersub selection must be 'HOME' or 'AWAY' (not HOME_WIN etc.)
+      // Normalize in case the call site passes a legacy format.
+      let resolvedSelection = selection;
+      if (isSupersub) {
+        if (String(selection).toUpperCase().includes('HOME')) resolvedSelection = 'HOME';
+        else if (String(selection).toUpperCase().includes('AWAY')) resolvedSelection = 'AWAY';
+      }
+
+      const payload = {
+        user_id: userProfile.id,
+        match_id: matchId,
+        selection: resolvedSelection,
+        team_name: displayLabel,
+        potential_reward: potentialReward,
+        card_type: cardType,
+        status: 'PENDING',
+        match_title: `${homeTeam} vs ${awayTeam}`,
+        odds,
+        stake: 100,
+        // Always include team_id in the payload.
+        // Non-Supersub cards send null — backend ignores it for those card types.
+        team_id: resolvedTeamId,
+      };
+
       const { data, error } = await supabase
         .from('predictions')
-        .insert([{
-          user_id: userProfile.id,
-          match_id: matchId,
-          selection,
-          team_name: displayLabel, // Stores "Over 2.5 Goals", Player Name, etc.
-          potential_reward: potentialReward,
-          card_type: cardType,
-          status: 'PENDING',
-          match_title: `${homeTeam} vs ${awayTeam}`,
-          odds,
-          stake: 100
-        }]).select();
+        .insert([payload])
+        .select();
 
       if (error) throw error;
       return { success: true, data };

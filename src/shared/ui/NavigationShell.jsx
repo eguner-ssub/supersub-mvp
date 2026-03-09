@@ -26,18 +26,27 @@ export default function NavigationShell({ children }) {
         const isLeftSwipe = distance > minSwipeDistance;
         const isRightSwipe = distance < -minSwipeDistance;
 
-        // LOGIC: Dressing Room (/dashboard) <-> Office (/manager-office)
+        // Swipe rail: Dressing Room <-> Office <-> Match Hub
+        // Left swipe moves "forward": Dashboard → ManagerOffice → MatchHub
+        // Right swipe moves "back":  MatchHub → ManagerOffice → Dashboard
         if (location.pathname === '/dashboard' && isLeftSwipe) {
             navigate('/manager-office');
         }
         if (location.pathname === '/manager-office' && isRightSwipe) {
             navigate('/dashboard');
         }
+        if (location.pathname === '/manager-office' && isLeftSwipe) {
+            navigate('/match-hub');
+        }
+        if (location.pathname === '/match-hub' && isRightSwipe) {
+            navigate('/manager-office');
+        }
     };
 
     // ACTIVE STATE
     const isOffice = location.pathname === '/manager-office';
     const isDressingRoom = location.pathname === '/dashboard';
+    const isMatchHub = location.pathname === '/match-hub';
 
     return (
         <div
@@ -58,7 +67,7 @@ export default function NavigationShell({ children }) {
                     {/* TAB 1: MANAGER OFFICE (Landing) */}
                     <button
                         onClick={() => navigate('/manager-office')}
-                        className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-all duration-300 active:scale-95 ${isOffice
+                        className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-all duration-300 active:scale-95 ${isOffice || isMatchHub
                             ? 'bg-white/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.2)]'
                             : 'text-gray-500 hover:text-white'
                             }`}

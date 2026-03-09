@@ -8,20 +8,32 @@ import React, { useState, useEffect } from 'react';
  * Performance: GPU-accelerated animations only
  */
 const TacticalHUD = ({ homeTeam, awayTeam, status, elapsed, date }) => {
-    const [previousScore, setPreviousScore] = useState({ home: 0, away: 0 });
+    // initialised to null so we can distinguish "first render" from "0-0 after a goal"
+    const [previousScore, setPreviousScore] = useState(null);
     const [goalAlert, setGoalAlert] = useState(false);
 
     // Detect score changes and trigger goal alert animation
     useEffect(() => {
-        if (homeTeam.score !== previousScore.home || awayTeam.score !== previousScore.away) {
-            if (previousScore.home !== 0 || previousScore.away !== 0) {
-                setGoalAlert(true);
-                const timer = setTimeout(() => setGoalAlert(false), 1000);
-                return () => clearTimeout(timer);
-            }
-            setPreviousScore({ home: homeTeam.score, away: awayTeam.score });
+        const currentHome = homeTeam.score ?? 0;
+        const currentAway = awayTeam.score ?? 0;
+
+        // First render — seed previousScore without flashing
+        if (previousScore === null) {
+            setPreviousScore({ home: currentHome, away: currentAway });
+            return;
         }
-    }, [homeTeam.score, awayTeam.score, previousScore]);
+
+        const scoreChanged = currentHome !== previousScore.home || currentAway !== previousScore.away;
+        if (scoreChanged) {
+            // Always update first so subsequent goals are tracked correctly
+            setPreviousScore({ home: currentHome, away: currentAway });
+            setGoalAlert(true);
+            const timer = setTimeout(() => setGoalAlert(false), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [homeTeam.score, awayTeam.score]);
+    // Deliberately excludes previousScore from deps — it's internal tracking state,
+    // not an external trigger. Including it would cause an infinite re-render loop.
 
     // Status badge configuration
     const getStatusConfig = () => {
