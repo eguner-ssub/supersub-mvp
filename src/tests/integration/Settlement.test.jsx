@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import ViewPending from '../../features/locker-room/ViewPending';
+import ViewPending from '../../features/locker-room/ViewPendingGrid';
 import { useGame } from '../../shared/context/GameContext';
 import { usePredictions } from '../../shared/hooks/usePredictions';
 

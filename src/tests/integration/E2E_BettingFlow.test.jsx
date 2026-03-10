@@ -24,7 +24,8 @@ describe('E2E Betting Flow - Complete Integration Test', () => {
         coins: 500,
         energy: 3,
         max_energy: 100,
-        inventory: ['c_match_result', 'c_match_result']
+        inventory: ['c_match_result', 'c_match_result'],
+        inventoryMap: { c_match_result: 2 }
     };
 
     const mockMatchResponse = {

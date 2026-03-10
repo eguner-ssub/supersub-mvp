@@ -856,7 +856,7 @@ const MatchDetail = () => {
 
       {/* Card Selection Shelf - Active States Only (PRE-MATCH / LIVE) */}
       {(matchPhase === 'PRE' || matchPhase === 'LIVE') && (
-        <div className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
+        <div data-testid="card-shelf" className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
           <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
           <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 pointer-events-auto">
             {cardTypes.map(card => {
@@ -864,6 +864,7 @@ const MatchDetail = () => {
               return (
                 <button
                   key={card.id}
+                  data-testid={`card-${card.id}`}
                   onClick={() => {
                     if (count === 0) return;
                     if (card.id === 'c_supersub') {
@@ -901,17 +902,17 @@ const MatchDetail = () => {
           {/* Match Result UI */}
           {selectedCard === 'c_match_result' && (
             <div className="grid grid-cols-3 gap-4 w-full max-w-lg">
-              <button onClick={() => handleOutcomeClick('HOME_WIN', odds.home, match.teams.home.name)} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
+              <button data-testid="panel-home" onClick={() => handleOutcomeClick('HOME_WIN', odds.home, match.teams.home.name)} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
                 <img src={match.teams.home.logo} className="w-16 h-16 object-contain" alt="Home" />
                 <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.home * 100)}</span>
                 <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Home Win</span>
               </button>
-              <button onClick={() => handleOutcomeClick('DRAW', odds.draw, 'Draw Result')} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
+              <button data-testid="panel-draw" onClick={() => handleOutcomeClick('DRAW', odds.draw, 'Draw Result')} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
                 <Trophy className="w-16 h-16 text-zinc-600" />
                 <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.draw * 100)}</span>
                 <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Draw</span>
               </button>
-              <button onClick={() => handleOutcomeClick('AWAY_WIN', odds.away, match.teams.away.name)} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
+              <button data-testid="panel-away" onClick={() => handleOutcomeClick('AWAY_WIN', odds.away, match.teams.away.name)} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
                 <img src={match.teams.away.logo} className="w-16 h-16 object-contain" alt="Away" />
                 <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.away * 100)}</span>
                 <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Away Win</span>
@@ -983,7 +984,7 @@ const MatchDetail = () => {
 
       {/* STAGING PANEL - Block on Finished Matches */}
       {flowState === 'staging' && stagedBet && matchPhase !== 'POST' && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
+        <div data-testid="staging-bar" className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
             <div className="flex justify-between items-start mb-8">
               <div className="space-y-1"><p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Outcome Selection</p><h3 className="text-white font-black text-3xl uppercase italic tracking-tighter leading-tight">{stagedBet.displayLabel}</h3></div>
@@ -991,7 +992,7 @@ const MatchDetail = () => {
             </div>
             <div className="flex gap-4">
               <button onClick={handleReset} className="flex-1 py-4 bg-zinc-800 rounded-2xl font-bold uppercase text-zinc-400 text-xs tracking-widest hover:bg-zinc-700 transition-colors">Cancel</button>
-              <button onClick={handlePlay} className="flex-[2] py-4 bg-emerald-500 rounded-2xl font-black uppercase text-black text-xl shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:scale-105 transition-all">Confirm Play</button>
+              <button data-testid="play-button" onClick={handlePlay} className="flex-[2] py-4 bg-emerald-500 rounded-2xl font-black uppercase text-black text-xl shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:scale-105 transition-all">Confirm Play</button>
             </div>
           </div>
         </div>

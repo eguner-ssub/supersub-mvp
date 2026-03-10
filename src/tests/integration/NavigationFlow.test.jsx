@@ -2,7 +2,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import ManagerOffice from '../../features/office/ManagerOffice';
-import LockerRoom from '../../features/locker-room/LockerRoom';
 
 // Mock GameContext
 vi.mock('../../shared/context/GameContext', () => ({
@@ -30,19 +29,28 @@ const renderWithRouter = (ui, initialEntries = ['/']) => {
         <MemoryRouter initialEntries={initialEntries}>
             <Routes>
                 <Route path="/manager-office" element={<ManagerOffice />} />
-                <Route path="/inventory" element={<LockerRoom />} />
 
-                {/* TARGET ROUTES - Critical for Navigation Tests */}
-                <Route path="/dashboard" element={<div>Season Stats</div>} />
-                <Route path="/messages" element={<div>Manager Inbox</div>} />
-                <Route path="/view-pending" element={<div>Global Rankings</div>} />
+                {/* TARGET ROUTES — match actual navigate() calls in ManagerOffice */}
+                <Route path="/scouting" element={<div>Season Stats</div>} />
+                <Route path="/inbox" element={<div>Manager Inbox</div>} />
+                <Route path="/leaderboard" element={<div>Global Rankings</div>} />
+                <Route path="/history" element={<div>History Archive</div>} />
                 <Route path="/match-hub" element={<div>Match Hub</div>} />
+                <Route path="/dashboard" element={<div>Dashboard</div>} />
             </Routes>
         </MemoryRouter>
     );
 };
 
 describe('Navigation & Inventory Flow', () => {
+
+    beforeEach(() => {
+        // Suppress "Invalid URL" from fetch('/api/matches') in jsdom
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ response: [] }),
+        });
+    });
 
     it('Manager Office: "Laptop" takes user to Stats', async () => {
         renderWithRouter(null, ['/manager-office']);
@@ -59,18 +67,16 @@ describe('Navigation & Inventory Flow', () => {
 
     it('Manager Office: "Tablet" takes user to Leaderboard', async () => {
         renderWithRouter(null, ['/manager-office']);
-        fireEvent.click(screen.getByTestId('hotspot-tablet'));
+        // Component uses data-testid="hotspot-tablet-office" for the tablet hotspot
+        fireEvent.click(screen.getByTestId('hotspot-tablet-office'));
         await waitFor(() => expect(screen.getByText('Global Rankings')).toBeInTheDocument());
     });
 
-    it('Manager Office: "Bookcase" takes user to Inventory', async () => {
+    it('Manager Office: "Bookcase" takes user to History', async () => {
         renderWithRouter(null, ['/manager-office']);
-        // The LockerRoom component should load. 
-        // Since we didn't mock ViewLedger here, we just check for a known element in LockerRoom
         fireEvent.click(screen.getByTestId('hotspot-bookcase'));
         await waitFor(() => {
-            // Check for the navigation tabs in LockerRoom
-            expect(screen.getByText(/Ledger/i)).toBeInTheDocument();
+            expect(screen.getByText('History Archive')).toBeInTheDocument();
         });
     });
 });

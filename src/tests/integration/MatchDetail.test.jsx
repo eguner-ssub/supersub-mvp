@@ -14,7 +14,8 @@ vi.mock('../../shared/context/GameContext', () => ({
             id: 'test-user',
             energy: 50,
             max_energy: 100,
-            inventory: ['c_match_result', 'c_match_result', 'c_total_goals']
+            inventory: ['c_match_result', 'c_match_result', 'c_total_goals'],
+            inventoryMap: { c_match_result: 2, c_total_goals: 1 }
         },
         loading: false,
         placeBet: mockPlaceBet,
@@ -41,6 +42,24 @@ vi.mock('react-router-dom', async () => {
         useParams: () => ({ id: '123' })
     };
 });
+
+vi.mock('../../shared/services/oddsService', () => ({
+    getHybridOdds: vi.fn().mockResolvedValue({
+        source: 'SIMULATION',
+        odds: {
+            home: 2.10,
+            draw: 3.20,
+            away: 2.80,
+            goals_over: 1.85,
+            goals_under: 1.95,
+            supersub_yes: 4.50,
+            scorers: [
+                { id: 's1', name: 'Home Star', odds: 1.90 },
+                { id: 's2', name: 'Away Star', odds: 2.20 },
+            ]
+        }
+    })
+}));
 
 // Mock Global Fetch
 global.fetch = vi.fn();
@@ -109,10 +128,10 @@ describe('MatchDetail - Industrial Battle Arena', () => {
         // Wait for Staging Bar
         await waitFor(() => {
             const stagingBar = screen.getByTestId('staging-bar');
-            expect(stagingBar).toHaveTextContent(/AWAY WIN/i);
-            // Default mock odds for away is ~2.90 -> 290 or similar. 
-            // We'll just check if PTS is present as exact odds might vary by mock logic
-            expect(stagingBar).toHaveTextContent(/PTS/);
+            // displayLabel is set to the team name, e.g. 'Tottenham' for away click
+            expect(stagingBar).toHaveTextContent(/Tottenham/i);
+            // Reward is rendered as "{reward} pts"
+            expect(stagingBar).toHaveTextContent(/pts/i);
         });
     });
 

@@ -28,7 +28,7 @@ const isLive = (status) => ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(status
  *
  * Requires: bet.team_id (integer) — the team the user backed.
  */
-const settleSupersub = (bet, events) => {
+export const settleSupersub = (bet, events) => {
     const teamId = bet.team_id;
 
     if (!teamId) {
@@ -98,7 +98,7 @@ const settleSupersub = (bet, events) => {
  * Main settlement logic for all card types.
  * Events are read from the matches.events JSONB column — no external API calls.
  */
-const calculateResult = (bet, match, events = []) => {
+export const calculateResult = (bet, match, events = []) => {
     if (!isFinished(match.status)) return { status: 'PENDING' };
 
     const type = bet.card_type.toLowerCase();
@@ -216,4 +216,7 @@ async function settle() {
     console.log(`\n🏁 Settlement complete — ${settled} settled, ${transitioned} transitioned to LIVE`);
 }
 
-settle();
+// Guard: only auto-run when executed directly (not when imported by tests)
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+    settle();
+}

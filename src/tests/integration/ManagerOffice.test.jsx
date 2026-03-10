@@ -24,6 +24,12 @@ describe('ManagerOffice Simulation Drill', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // Mock fetch so the component's fetch('/api/matches') doesn't throw
+        // "Invalid URL" in the jsdom/Node environment (no base URL for relative paths).
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ response: [] }),
+        });
     });
 
     // ============================================================================
@@ -37,10 +43,11 @@ describe('ManagerOffice Simulation Drill', () => {
 
         render(<ManagerOffice />);
 
-        // Verify Background Image presence (using the alt text)
+        // The 'Manager Office' alt text is on the packed (live) background image.
+        // The empty background uses aria-hidden and alt="" — not queryable by alt.
         const bgImage = screen.getByAltText('Manager Office');
         expect(bgImage).toBeInTheDocument();
-        expect(bgImage).toHaveAttribute('src', '/assets/manager-room-empty.webp');
+        expect(bgImage).toHaveAttribute('src', '/assets/manager-room-packed.webp');
 
         // Verify "LIVE" badge is MISSING (Quiet State)
         const liveBadge = screen.queryByText(/LIVE/i);

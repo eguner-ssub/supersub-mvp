@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Prevent dotenv from loading .env and overriding our test env vars
+vi.mock('dotenv/config', () => ({}));
+
 // The handler now inlines SUPPORTED_LEAGUE_IDS — keep a mirror here for assertions.
 const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
 
 // ── Mock @supabase/supabase-js ──
+// createClient checks env vars at call time so that a fresh module instance
+// (with _client = null) throws when the required env vars are absent.
 let mockQueryResult = { data: [], error: null };
 
 const mockChain = {
@@ -16,15 +21,26 @@ const mockChain = {
     then: undefined,
 };
 
-for (const method of ['from', 'select', 'eq', 'in', 'order']) {
-    mockChain[method].mockImplementation(() => {
-        return { ...mockChain, then: (resolve) => resolve(mockQueryResult) };
-    });
-}
-mockChain.single.mockImplementation(() => Promise.resolve(mockQueryResult));
+const resetChain = () => {
+    for (const method of ['from', 'select', 'eq', 'in', 'order']) {
+        mockChain[method].mockImplementation(() => ({
+            ...mockChain,
+            then: (resolve) => resolve(mockQueryResult),
+        }));
+    }
+    mockChain.single.mockImplementation(() => Promise.resolve(mockQueryResult));
+};
+resetChain();
 
 vi.mock('@supabase/supabase-js', () => ({
-    createClient: vi.fn(() => mockChain),
+    createClient: vi.fn((url, key) => {
+        if (!url || !key) {
+            throw new Error(
+                `Missing env vars – SUPABASE_URL: ${url ? '✓' : '✗'}, SUPABASE_SERVICE_ROLE_KEY: ${key ? '✓' : '✗'}`
+            );
+        }
+        return mockChain;
+    }),
 }));
 
 // ── Helpers ──
@@ -43,30 +59,40 @@ function createMockReqRes(query = {}) {
 describe('API /api/matches', () => {
     let originalEnv;
 
-    beforeEach(async () => {
-        vi.clearAllMocks();
+    beforeEach(() => {
+        resetChain();
         originalEnv = { ...process.env };
         process.env.SUPABASE_URL = 'https://test.supabase.co';
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
         mockQueryResult = { data: [], error: null };
-
-        // Reset the cached lazy client so env changes take effect.
-        // We do this by re-importing the module after clearing the cache.
     });
 
     afterEach(() => {
         process.env = originalEnv;
     });
 
-    async function getHandler() {
-        const mod = await import('../matches.js?t=' + Date.now());
+    // Each test uses vi.resetModules then re-imports so the lazy _client is null.
+    async function getFreshHandler() {
+        vi.resetModules();
+        // Re-register mock after resetModules clears the registry
+        vi.mock('@supabase/supabase-js', () => ({
+            createClient: vi.fn((url, key) => {
+                if (!url || !key) {
+                    throw new Error(
+                        `Missing env vars – SUPABASE_URL: ${url ? '✓' : '✗'}, SUPABASE_SERVICE_ROLE_KEY: ${key ? '✓' : '✗'}`
+                    );
+                }
+                return mockChain;
+            }),
+        }));
+        const mod = await import('../matches.js');
         return mod.default;
     }
 
     // ─── 1. Missing Config → API_INIT_FAILED ───
     it('returns 500 with API_INIT_FAILED when SUPABASE_URL is missing', async () => {
         delete process.env.SUPABASE_URL;
-        const handler = await getHandler();
+        const handler = await getFreshHandler();
         const { req, res } = createMockReqRes({ date: '2026-02-23' });
 
         await handler(req, res);
@@ -78,7 +104,7 @@ describe('API /api/matches', () => {
 
     it('returns 500 with API_INIT_FAILED when SUPABASE_SERVICE_ROLE_KEY is missing', async () => {
         delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-        const handler = await getHandler();
+        const handler = await getFreshHandler();
         const { req, res } = createMockReqRes({ date: '2026-02-23' });
 
         await handler(req, res);
@@ -91,7 +117,7 @@ describe('API /api/matches', () => {
     // ─── 2. Database Connection Error ───
     it('returns the Supabase error message on a failed query', async () => {
         mockQueryResult = { data: null, error: { message: 'connection refused' } };
-        const handler = await getHandler();
+        const handler = await getFreshHandler();
         const { req, res } = createMockReqRes({ date: '2026-02-23' });
 
         await handler(req, res);
@@ -111,7 +137,7 @@ describe('API /api/matches', () => {
             ],
             error: null,
         };
-        const handler = await getHandler();
+        const handler = await getFreshHandler();
         const { req, res } = createMockReqRes({ date: testDate });
 
         await handler(req, res);
@@ -127,7 +153,7 @@ describe('API /api/matches', () => {
     // ─── 4. League Filter ───
     it('passes SUPPORTED_LEAGUE_IDS to the .in() filter', async () => {
         mockQueryResult = { data: [], error: null };
-        const handler = await getHandler();
+        const handler = await getFreshHandler();
         const { req, res } = createMockReqRes({ date: '2026-02-23' });
 
         await handler(req, res);

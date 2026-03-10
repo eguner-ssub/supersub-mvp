@@ -29,9 +29,9 @@ describe('TacticalBoardCarousel', () => {
     it('renders the immersive background and board assets', () => {
         render(<TacticalBoardCarousel bets={mockBets} />);
 
-        const bgImage = screen.getByAltText('Bench Background');
+        const bgImage = screen.getByAltText('Desk');
         expect(bgImage).toBeInTheDocument();
-        expect(bgImage).toHaveAttribute('src', '/assets/bg-board-bench.webp');
+        expect(bgImage).toHaveAttribute('src', '/assets/bg-desk-dark.webp');
 
         const boardProps = screen.getAllByAltText('Tactical Board');
         expect(boardProps.length).toBeGreaterThan(0);
