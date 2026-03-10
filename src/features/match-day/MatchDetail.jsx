@@ -864,7 +864,17 @@ const MatchDetail = () => {
               return (
                 <button
                   key={card.id}
-                  onClick={() => { if (count > 0) { setSelectedCard(card.id); setFlowState('selection'); } }}
+                  onClick={() => {
+                    if (count === 0) return;
+                    if (card.id === 'c_supersub') {
+                      // Supersub requires team context — guide user to the SUBS tab
+                      // where they tap "Use Supersub Card" under a specific team.
+                      setActiveTab('SUBS');
+                      return;
+                    }
+                    setSelectedCard(card.id);
+                    setFlowState('selection');
+                  }}
                   disabled={count === 0}
                   className={`relative transition-all duration-300 ${selectedCard === card.id ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl' : count > 0 ? 'hover:translate-y-[-8px]' : 'opacity-40 grayscale'}`}
                 >
