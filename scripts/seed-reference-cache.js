@@ -14,8 +14,8 @@ dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 // These are the Sportmonks state developer_names we care about.
 // The IDs are resolved at runtime from the /states endpoint and cached.
 
-const TERMINAL_STATE_NAMES = ['FT', 'AET', 'FT_PEN', 'POSTP', 'CANC', 'ABAN', 'SUSP'];
-const IN_PLAY_STATE_NAMES = ['1H', 'HT', '2H', 'ET', 'BT', 'PEN_LIVE'];
+const TERMINAL_STATE_NAMES = ['FT', 'AET', 'FT_PEN', 'POSTPONED', 'SUSPENDED', 'CANCELLED', 'ABANDONED', 'AWARDED', 'WO', 'DELETED'];
+const IN_PLAY_STATE_NAMES = ['INPLAY_1ST_HALF', 'HT', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'EXTRA_TIME_BREAK', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'BREAK'];
 
 // ── Supabase client ─────────────────────────────────────────────────────────
 

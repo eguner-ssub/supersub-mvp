@@ -10,10 +10,10 @@ const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
 const CURRENT_SEASON = 2025;
 
 // Statuses where the match is actively in progress (ball is in play or half-time)
-const IN_PLAY_STATUSES = ['1H', 'HT', '2H', 'ET', 'BT', 'P'];
+const IN_PLAY_STATUSES = ['INPLAY_1ST_HALF', 'HT', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'EXTRA_TIME_BREAK', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'BREAK'];
 
 // Statuses that mean the match is definitively over in any form
-const TERMINAL_STATUSES = ['FT', 'AET', 'PEN', 'SUSP', 'INT', 'PST', 'CANC', 'ABD', 'AWD', 'WO'];
+const TERMINAL_STATUSES = ['FT', 'AET', 'FT_PEN', 'POSTPONED', 'SUSPENDED', 'CANCELLED', 'ABANDONED', 'AWARDED', 'WO', 'DELETED'];
 
 const PRE_LIVE_WINDOW_MS      = 60 * 60_000;  // 60 minutes before kickoff → PRE-LIVE
 const LIVE_WINDOW_MS          =  5 * 60_000;  // 5 minutes before kickoff → LIVE
