@@ -94,14 +94,15 @@ function extractParticipants(fixture) {
 function extractCurrentScore(fixture) {
   let scoreHome = null;
   let scoreAway = null;
-  const { homeTeam, awayTeam } = extractParticipants(fixture);
 
+  // Sportmonks scores use s.score.participant as a string ('home' or 'away'),
+  // not a participant_id. Filter by description === 'CURRENT' for the final score.
   for (const s of fixture.scores || []) {
     if (s.description === 'CURRENT') {
-      if (homeTeam && s.score?.participant_id === homeTeam.id) {
+      if (s.score?.participant === 'home') {
         scoreHome = s.score.goals;
       }
-      if (awayTeam && s.score?.participant_id === awayTeam.id) {
+      if (s.score?.participant === 'away') {
         scoreAway = s.score.goals;
       }
     }
@@ -198,10 +199,8 @@ async function ensureTeam(db, teamCache, participant) {
 
 // ── Core backfill steps ─────────────────────────────────────────────────────
 
-async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonStart, teamCache) {
-  const today = toDateStr(new Date());
-  const endDate = seasonStart > today ? seasonStart : today;
-  const chunks = chunkDateRange(seasonStart, endDate, CHUNK_DAYS);
+async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonStart, seasonEnd, teamCache) {
+  const chunks = chunkDateRange(seasonStart, seasonEnd, CHUNK_DAYS);
 
   let totalFixtures = 0;
 
@@ -337,8 +336,21 @@ async function backfillStandings(db, leagueName, smSeasonId, seasonUuid, teamCac
 }
 
 async function backfillTopScorers(db, leagueName, smSeasonId, seasonUuid, teamCache) {
-  const res = await api(getTopScorers, smSeasonId);
-  const scorers = res.data || [];
+  // Paginate through all top scorer pages until has_more is false
+  const scorers = [];
+  let page = 1;
+
+  while (true) {
+    const res = await api(getTopScorers, smSeasonId, page);
+    const pageData = res.data || [];
+    scorers.push(...pageData);
+
+    const hasMore = res.pagination?.has_more ?? false;
+    if (!hasMore || pageData.length === 0) break;
+    page++;
+  }
+
+  console.log(`  ${leagueName}: fetched ${scorers.length} top scorers across ${page} page(s)`);
 
   const rows = [];
 
@@ -428,13 +440,14 @@ async function backfill({ supabase } = {}) {
 
     // 3. Backfill fixtures in 30-day chunks
     const seasonStart = currentSeason.starting_at?.split(' ')[0];
-    if (!seasonStart) {
-      console.log(`  No season start date — skipping fixtures`);
+    const seasonEnd = currentSeason.ending_at?.split(' ')[0];
+    if (!seasonStart || !seasonEnd) {
+      console.log(`  No season start/end date — skipping fixtures`);
       continue;
     }
 
     const fixtureCount = await backfillFixtures(
-      db, league.name, league.id, seasonUuid, seasonStart, teamCache
+      db, league.name, league.id, seasonUuid, seasonStart, seasonEnd, teamCache
     );
     console.log(`  Total fixtures: ${fixtureCount}`);
 
