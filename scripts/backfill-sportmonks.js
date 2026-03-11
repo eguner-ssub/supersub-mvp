@@ -1,0 +1,460 @@
+// Backfill Sportmonks data: leagues, seasons, teams, fixtures, standings, top scorers.
+// Idempotent — safe to run multiple times. Rate-limited to ≤1 req/sec.
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
+import {
+  getLeagues,
+  getFixturesByDateRange,
+  getStandings,
+  getTopScorers,
+} from '../lib/sportmonks.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+
+// ── Config ──────────────────────────────────────────────────────────────────
+
+const CHUNK_DAYS = 30;
+const RATE_LIMIT_MS = 1100; // just over 1 req/sec
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      `Missing env vars – SUPABASE_URL: ${url ? '✓' : '✗'}, SUPABASE_SERVICE_ROLE_KEY: ${key ? '✓' : '✗'}`
+    );
+  }
+  return createClient(url, key);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Track last request time globally to enforce rate limit across all calls
+let lastRequestAt = 0;
+
+async function throttle() {
+  const now = Date.now();
+  const elapsed = now - lastRequestAt;
+  if (elapsed < RATE_LIMIT_MS) {
+    await sleep(RATE_LIMIT_MS - elapsed);
+  }
+  lastRequestAt = Date.now();
+}
+
+/** Rate-limited wrapper around any Sportmonks API call. */
+async function api(fn, ...args) {
+  await throttle();
+  return fn(...args);
+}
+
+// ── Date helpers ────────────────────────────────────────────────────────────
+
+function toDateStr(d) {
+  return d.toISOString().split('T')[0];
+}
+
+/** Split a date range into chunks of `days` length. Returns [{ from, to }]. */
+function chunkDateRange(startStr, endStr, days) {
+  const chunks = [];
+  let cursor = new Date(startStr);
+  const end = new Date(endStr);
+
+  while (cursor <= end) {
+    const chunkEnd = new Date(cursor);
+    chunkEnd.setDate(chunkEnd.getDate() + days - 1);
+    const clampedEnd = chunkEnd > end ? end : chunkEnd;
+    chunks.push({ from: toDateStr(cursor), to: toDateStr(clampedEnd) });
+    cursor = new Date(clampedEnd);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return chunks;
+}
+
+// ── Sportmonks response helpers ─────────────────────────────────────────────
+
+function extractParticipants(fixture) {
+  let homeTeam = null;
+  let awayTeam = null;
+
+  for (const p of fixture.participants || []) {
+    if (p.meta?.location === 'home') homeTeam = p;
+    if (p.meta?.location === 'away') awayTeam = p;
+  }
+
+  return { homeTeam, awayTeam };
+}
+
+function extractCurrentScore(fixture) {
+  let scoreHome = null;
+  let scoreAway = null;
+  const { homeTeam, awayTeam } = extractParticipants(fixture);
+
+  for (const s of fixture.scores || []) {
+    if (s.description === 'CURRENT') {
+      if (homeTeam && s.score?.participant_id === homeTeam.id) {
+        scoreHome = s.score.goals;
+      }
+      if (awayTeam && s.score?.participant_id === awayTeam.id) {
+        scoreAway = s.score.goals;
+      }
+    }
+  }
+
+  return { scoreHome, scoreAway };
+}
+
+function extractStateName(fixture) {
+  return fixture.state?.developer_name || null;
+}
+
+// ── DB upsert helpers ───────────────────────────────────────────────────────
+
+async function upsertLeague(db, league) {
+  const countryName = league.country?.name || null;
+
+  const { data, error } = await db
+    .from('leagues')
+    .upsert(
+      {
+        sportmonks_id: league.id,
+        name: league.name,
+        country: countryName,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'sportmonks_id' }
+    )
+    .select('id')
+    .single();
+
+  if (error) throw new Error(`League upsert failed (${league.name}): ${error.message}`);
+  return data.id;
+}
+
+async function upsertSeason(db, season, leagueUuid) {
+  const { data, error } = await db
+    .from('seasons')
+    .upsert(
+      {
+        sportmonks_id: season.id,
+        league_id: leagueUuid,
+        name: season.name,
+        start_date: season.starting_at?.split(' ')[0] || null,
+        end_date: season.ending_at?.split(' ')[0] || null,
+        is_current: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'sportmonks_id' }
+    )
+    .select('id')
+    .single();
+
+  if (error) throw new Error(`Season upsert failed (${season.name}): ${error.message}`);
+  return data.id;
+}
+
+async function linkCurrentSeason(db, leagueUuid, seasonUuid) {
+  const { error } = await db
+    .from('leagues')
+    .update({ current_season_id: seasonUuid })
+    .eq('id', leagueUuid);
+
+  if (error) throw new Error(`Link current_season_id failed: ${error.message}`);
+}
+
+/** Upsert a team and return its internal UUID. Caches lookups in teamCache. */
+async function ensureTeam(db, teamCache, participant) {
+  if (!participant) return null;
+
+  const smId = participant.id;
+  if (teamCache.has(smId)) return teamCache.get(smId);
+
+  const { data, error } = await db
+    .from('teams')
+    .upsert(
+      {
+        sportmonks_id: smId,
+        name: participant.name,
+        short_name: participant.short_code || null,
+        logo_url: participant.image_path || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'sportmonks_id' }
+    )
+    .select('id')
+    .single();
+
+  if (error) throw new Error(`Team upsert failed (${participant.name}): ${error.message}`);
+
+  teamCache.set(smId, data.id);
+  return data.id;
+}
+
+// ── Core backfill steps ─────────────────────────────────────────────────────
+
+async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonStart, teamCache) {
+  const today = toDateStr(new Date());
+  const endDate = seasonStart > today ? seasonStart : today;
+  const chunks = chunkDateRange(seasonStart, endDate, CHUNK_DAYS);
+
+  let totalFixtures = 0;
+
+  for (const chunk of chunks) {
+    const res = await api(getFixturesByDateRange, chunk.from, chunk.to, smLeagueId);
+    const fixtures = res.data || [];
+
+    if (fixtures.length === 0) continue;
+
+    // Ensure all teams exist first
+    for (const f of fixtures) {
+      const { homeTeam, awayTeam } = extractParticipants(f);
+      await ensureTeam(db, teamCache, homeTeam);
+      await ensureTeam(db, teamCache, awayTeam);
+    }
+
+    // Build fixture rows
+    const now = new Date().toISOString();
+    const rows = [];
+
+    for (const f of fixtures) {
+      const { homeTeam, awayTeam } = extractParticipants(f);
+      const { scoreHome, scoreAway } = extractCurrentScore(f);
+
+      const homeUuid = homeTeam ? teamCache.get(homeTeam.id) : null;
+      const awayUuid = awayTeam ? teamCache.get(awayTeam.id) : null;
+
+      if (!homeUuid || !awayUuid) continue; // skip malformed fixtures
+
+      rows.push({
+        sportmonks_id: f.id,
+        season_id: seasonUuid,
+        home_team_id: homeUuid,
+        away_team_id: awayUuid,
+        scheduled_at: f.starting_at || null,
+        status: extractStateName(f),
+        score_home: scoreHome,
+        score_away: scoreAway,
+        round: f.round_id ? String(f.round_id) : null,
+        venue_id: f.venue_id || null,
+        raw_data: f,
+        last_synced_at: now,
+        updated_at: now,
+      });
+    }
+
+    if (rows.length > 0) {
+      const { error } = await db
+        .from('fixtures')
+        .upsert(rows, { onConflict: 'sportmonks_id' });
+
+      if (error) throw new Error(`Fixtures upsert failed (${leagueName} ${chunk.from}–${chunk.to}): ${error.message}`);
+    }
+
+    totalFixtures += rows.length;
+    console.log(`  ${leagueName}: ${chunk.from} → ${chunk.to} — ${rows.length} fixtures`);
+  }
+
+  return totalFixtures;
+}
+
+async function backfillStandings(db, leagueName, smSeasonId, seasonUuid, teamCache) {
+  const res = await api(getStandings, smSeasonId);
+  const groups = res.data || [];
+
+  const rows = [];
+
+  for (const group of groups) {
+    // Standings response can be nested: each group has a details include or a standings array
+    const entries = group.details || group.standings || [];
+
+    for (const entry of entries) {
+      // The participant is the team — could be nested or referenced
+      const teamSmId = entry.participant_id || entry.participant?.id;
+      if (!teamSmId) continue;
+
+      // Ensure team exists (may have been created during fixture backfill)
+      let teamUuid = teamCache.get(teamSmId);
+      if (!teamUuid && entry.participant) {
+        teamUuid = await ensureTeam(db, teamCache, entry.participant);
+      }
+      if (!teamUuid) {
+        // Try to look up from DB by sportmonks_id
+        const { data } = await db
+          .from('teams')
+          .select('id')
+          .eq('sportmonks_id', teamSmId)
+          .single();
+        if (data) {
+          teamUuid = data.id;
+          teamCache.set(teamSmId, teamUuid);
+        } else {
+          continue; // skip unknown team
+        }
+      }
+
+      const detail = entry.details || [];
+      const stat = (typeId) => {
+        const found = detail.find?.((d) => d.type_id === typeId);
+        return found?.value ?? null;
+      };
+
+      rows.push({
+        season_id: seasonUuid,
+        team_id: teamUuid,
+        position: entry.position ?? stat(129),
+        played: entry.overall?.games_played ?? stat(130),
+        won: entry.overall?.won ?? stat(131),
+        drawn: entry.overall?.draw ?? stat(132),
+        lost: entry.overall?.lost ?? stat(133),
+        goals_for: entry.overall?.goals_scored ?? stat(134),
+        goals_against: entry.overall?.goals_against ?? stat(135),
+        points: entry.points ?? stat(136),
+        form: entry.form || null,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  if (rows.length > 0) {
+    const { error } = await db
+      .from('standings')
+      .upsert(rows, { onConflict: 'season_id,team_id' });
+
+    if (error) throw new Error(`Standings upsert failed (${leagueName}): ${error.message}`);
+  }
+
+  console.log(`  ${leagueName}: ${rows.length} standing rows`);
+  return rows.length;
+}
+
+async function backfillTopScorers(db, leagueName, smSeasonId, seasonUuid, teamCache) {
+  const res = await api(getTopScorers, smSeasonId);
+  const scorers = res.data || [];
+
+  const rows = [];
+
+  for (const entry of scorers) {
+    const player = entry.player || {};
+    const participant = entry.participant || {};
+    const playerSmId = entry.player_id || player.id;
+    const teamSmId = entry.participant_id || participant.id;
+
+    if (!playerSmId) continue;
+
+    // Ensure team exists
+    let teamUuid = teamSmId ? teamCache.get(teamSmId) : null;
+    if (!teamUuid && teamSmId && participant.id) {
+      teamUuid = await ensureTeam(db, teamCache, participant);
+    }
+    if (!teamUuid && teamSmId) {
+      const { data } = await db
+        .from('teams')
+        .select('id')
+        .eq('sportmonks_id', teamSmId)
+        .single();
+      if (data) {
+        teamUuid = data.id;
+        teamCache.set(teamSmId, teamUuid);
+      }
+    }
+    if (!teamUuid) continue;
+
+    const playerName =
+      player.display_name || player.common_name || player.name || `Player ${playerSmId}`;
+
+    rows.push({
+      sportmonks_id: playerSmId,
+      player_name: playerName,
+      season_id: seasonUuid,
+      team_id: teamUuid,
+      goals: entry.total ?? 0,
+      assists: entry.assists ?? 0,
+      penalties: entry.penalties ?? 0,
+      minutes_played: entry.minutes_played ?? 0,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  if (rows.length > 0) {
+    const { error } = await db
+      .from('top_scorers')
+      .upsert(rows, { onConflict: 'sportmonks_id,season_id' });
+
+    if (error) throw new Error(`Top scorers upsert failed (${leagueName}): ${error.message}`);
+  }
+
+  console.log(`  ${leagueName}: ${rows.length} top scorers`);
+  return rows.length;
+}
+
+// ── Main ────────────────────────────────────────────────────────────────────
+
+async function backfill({ supabase } = {}) {
+  const db = supabase || getSupabase();
+
+  console.log('Fetching leagues from Sportmonks...');
+  const leaguesRes = await api(getLeagues);
+  const leagues = leaguesRes.data || [];
+  console.log(`Found ${leagues.length} leagues\n`);
+
+  // Shared team cache: sportmonks_id → internal UUID
+  const teamCache = new Map();
+
+  for (const league of leagues) {
+    const currentSeason = league.currentseason || league.currentSeason;
+    if (!currentSeason) {
+      console.log(`[${league.name}] No current season — skipping`);
+      continue;
+    }
+
+    console.log(`[${league.name}]`);
+
+    // 1. Upsert league
+    const leagueUuid = await upsertLeague(db, league);
+
+    // 2. Upsert season
+    const seasonUuid = await upsertSeason(db, currentSeason, leagueUuid);
+    await linkCurrentSeason(db, leagueUuid, seasonUuid);
+    console.log(`  Season: ${currentSeason.name} (SM ID: ${currentSeason.id})`);
+
+    // 3. Backfill fixtures in 30-day chunks
+    const seasonStart = currentSeason.starting_at?.split(' ')[0];
+    if (!seasonStart) {
+      console.log(`  No season start date — skipping fixtures`);
+      continue;
+    }
+
+    const fixtureCount = await backfillFixtures(
+      db, league.name, league.id, seasonUuid, seasonStart, teamCache
+    );
+    console.log(`  Total fixtures: ${fixtureCount}`);
+
+    // 4. Standings
+    await backfillStandings(db, league.name, currentSeason.id, seasonUuid, teamCache);
+
+    // 5. Top scorers
+    await backfillTopScorers(db, league.name, currentSeason.id, seasonUuid, teamCache);
+
+    console.log(`  Done.\n`);
+  }
+
+  console.log(`✓ Backfill complete. ${teamCache.size} teams cached.`);
+}
+
+// ── CLI entry point ─────────────────────────────────────────────────────────
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  backfill().catch((err) => {
+    console.error('✗ Backfill failed:', err.message);
+    console.error(err.stack);
+    process.exit(1);
+  });
+}
+
+export { backfill };
