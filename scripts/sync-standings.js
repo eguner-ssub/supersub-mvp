@@ -83,24 +83,31 @@ async function syncStandings(db, smSeasonId, seasonUuid, teamCache) {
       const teamUuid = await resolveTeamUuid(db, teamCache, teamSmId, entry.participant);
       if (!teamUuid) continue;
 
+      // Sportmonks standings detail type_id mapping (verified from /v3/core/types):
+      //   129 = Overall Matches Played
+      //   130 = Overall Won
+      //   131 = Overall Draw
+      //   132 = Overall Lost
+      //   133 = Overall Goals Scored
+      //   134 = Overall Goals Conceded
+      //   176 = Streak (form)
+      //   187 = Overall Points
       const detail = entry.details || [];
-      const stat = (typeId) => {
-        const found = detail.find?.((d) => d.type_id === typeId);
-        return found?.value ?? null;
-      };
+      const detailMap = new Map(detail.map((d) => [d.type_id, d.value]));
+      const stat = (typeId) => detailMap.get(typeId) ?? null;
 
       rows.push({
         season_id: seasonUuid,
         team_id: teamUuid,
-        position: entry.position ?? stat(129),
-        played: entry.overall?.games_played ?? stat(130),
-        won: entry.overall?.won ?? stat(131),
-        drawn: entry.overall?.draw ?? stat(132),
-        lost: entry.overall?.lost ?? stat(133),
-        goals_for: entry.overall?.goals_scored ?? stat(134),
-        goals_against: entry.overall?.goals_against ?? stat(135),
-        points: entry.points ?? stat(136),
-        form: entry.form || null,
+        position: entry.position ?? null,
+        played: stat(129),
+        won: stat(130),
+        drawn: stat(131),
+        lost: stat(132),
+        goals_for: stat(133),
+        goals_against: stat(134),
+        points: stat(187),
+        form: stat(176) || entry.form || null,
         updated_at: new Date().toISOString(),
       });
     }
