@@ -3,11 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // ────────────────────────────────────────────────────
 // CONFIGURATION
 // ────────────────────────────────────────────────────
-const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
-
-// Current season for all supported leagues.
-// Update this when the season rolls over, or replace with a leagues DB table.
-const CURRENT_SEASON = 2025;
+const SUPPORTED_LEAGUE_IDS = [8, 9, 82, 564, 384]; // EPL, Championship, Bundesliga, La Liga, Serie A
 
 // Statuses where the match is actively in progress (ball is in play or half-time)
 const IN_PLAY_STATUSES = ['INPLAY_1ST_HALF', 'HT', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'EXTRA_TIME_BREAK', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'BREAK'];
@@ -23,7 +19,74 @@ const LIVE_WINDOW_MS          =  5 * 60_000;  // 5 minutes before kickoff → LI
 const FINISH_GUARD_OFFSET_MS  = 105 * 60_000;
 const FINISH_GUARD_WINDOW_MS  =  30 * 60_000;
 
-const API_BASE = 'https://v3.football.api-sports.io';
+const SPORTMONKS_BASE = 'https://api.sportmonks.com/v3/football';
+
+// ────────────────────────────────────────────────────
+// SPORTMONKS REQUEST HELPER
+// ────────────────────────────────────────────────────
+
+async function smRequest(path: string, params: Record<string, string> = {}): Promise<any> {
+  const apiToken = Deno.env.get('SPORTMONKS_API_TOKEN')?.trim() ?? '';
+  if (!apiToken) throw new Error('Missing env var SPORTMONKS_API_TOKEN');
+
+  const url = new URL(`${SPORTMONKS_BASE}${path}`);
+  url.searchParams.set('api_token', apiToken);
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  const res = await fetch(url.toString());
+
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(`Sportmonks auth error ${res.status} on ${path}`);
+  }
+  if (res.status === 429) {
+    throw new Error(`Sportmonks rate limit exceeded on ${path}`);
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Sportmonks ${res.status} on ${path}: ${text}`);
+  }
+
+  return res.json();
+}
+
+// ────────────────────────────────────────────────────
+// SPORTMONKS RESPONSE HELPERS
+// ────────────────────────────────────────────────────
+
+function extractParticipants(fixture: any): { homeTeam: any; awayTeam: any } {
+  let homeTeam: any = null;
+  let awayTeam: any = null;
+
+  for (const p of fixture.participants || []) {
+    if (p.meta?.location === 'home') homeTeam = p;
+    if (p.meta?.location === 'away') awayTeam = p;
+  }
+
+  return { homeTeam, awayTeam };
+}
+
+function extractCurrentScore(fixture: any): { scoreHome: number | null; scoreAway: number | null } {
+  let scoreHome: number | null = null;
+  let scoreAway: number | null = null;
+
+  for (const s of fixture.scores || []) {
+    if (s.description === 'CURRENT') {
+      if (s.score?.participant === 'home') scoreHome = s.score.goals;
+      if (s.score?.participant === 'away') scoreAway = s.score.goals;
+    }
+  }
+
+  return { scoreHome, scoreAway };
+}
+
+function extractStateName(fixture: any): string {
+  return fixture.state?.developer_name || 'NS';
+}
 
 // ────────────────────────────────────────────────────
 // STATUS DERIVATION
@@ -47,9 +110,6 @@ function deriveCustomStatus(
 // ────────────────────────────────────────────────────
 // HELPERS
 // ────────────────────────────────────────────────────
-function apiHeaders(apiKey: string): Record<string, string> {
-  return { 'x-apisports-key': apiKey, 'Content-Type': 'application/json' };
-}
 
 function todayStr(now: Date): string {
   return now.toISOString().split('T')[0];
@@ -62,43 +122,49 @@ function addDays(date: Date, days: number): Date {
 }
 
 /**
- * Build a full upsert payload from a raw API fixture object.
+ * Build a full upsert payload from a raw Sportmonks fixture object.
  *
- * Stamps started_at on the first invocation where the API status transitions
- * into an in-play status (1H, HT, 2H, ET, BT, P). This timestamp is used by
- * the finish-guard to begin polling at T+105min.
+ * Sportmonks fixture shape:
+ *   - fixture.id              (top-level ID)
+ *   - fixture.starting_at     (kickoff datetime)
+ *   - fixture.state.developer_name  (e.g. "FT", "INPLAY_1ST_HALF")
+ *   - fixture.participants[]  with meta.location = "home" | "away"
+ *   - fixture.scores[]        with score.participant = "home" | "away", description = "CURRENT"
+ *   - fixture.league_id       (Sportmonks league ID)
+ *   - fixture.events[]        (match events)
+ *   - fixture.lineups[]       (player lineups)
  */
 function buildPayload(
-  item: any,
+  fixture: any,
   now: Date,
   existingFinishedAt: string | null,
   existingStartedAt: string | null,
   existingLineups: any,
   isPreLive: boolean
 ): any {
-  const apiStatus    = item.fixture.status.short;
-  const kickoffTime  = new Date(item.fixture.date);
+  const apiStatus    = extractStateName(fixture);
+  const kickoffTime  = new Date(fixture.starting_at);
   const customStatus = deriveCustomStatus(apiStatus, kickoffTime, now);
 
+  const { homeTeam, awayTeam }     = extractParticipants(fixture);
+  const { scoreHome, scoreAway }   = extractCurrentScore(fixture);
+
   const payload: any = {
-    id:             item.fixture.id,
-    league_id:      item.league.id,
-    season:         item.league.season,
-    home_team:      item.teams.home.name,
-    away_team:      item.teams.away.name,
-    home_logo:      item.teams.home.logo,
-    away_logo:      item.teams.away.logo,
-    league_name:    item.league.name,
-    league_logo:    item.league.logo,
+    id:             fixture.id,
+    league_id:      fixture.league_id,
+    home_team:      homeTeam?.name ?? 'Unknown',
+    away_team:      awayTeam?.name ?? 'Unknown',
+    home_logo:      homeTeam?.image_path ?? null,
+    away_logo:      awayTeam?.image_path ?? null,
     status:         apiStatus,
     custom_status:  customStatus,
-    home_score:     item.goals.home ?? 0,
-    away_score:     item.goals.away ?? 0,
-    kickoff_time:   item.fixture.date,
-    date:           item.fixture.date.split('T')[0],
+    home_score:     scoreHome ?? 0,
+    away_score:     scoreAway ?? 0,
+    kickoff_time:   fixture.starting_at,
+    date:           fixture.starting_at?.split('T')[0] ?? todayStr(now),
     last_updated:   now.toISOString(),
     last_synced_at: now.toISOString(),
-    raw_data:       item,
+    raw_data:       fixture,
   };
 
   // Stamp started_at on first transition into any in-play status
@@ -112,25 +178,22 @@ function buildPayload(
   }
 
   // Events
-  if (item.events && Array.isArray(item.events) && item.events.length > 0) {
-    payload.events = item.events;
+  if (fixture.events && Array.isArray(fixture.events) && fixture.events.length > 0) {
+    payload.events = fixture.events;
   }
 
   // Lineups — write fresh lineups from API if available and we're in pre-live,
   // otherwise carry forward whatever is already stored so upsert never wipes them.
-  if (isPreLive && item.lineups && Array.isArray(item.lineups) && item.lineups.length > 0) {
-    payload.lineups             = item.lineups;
+  if (isPreLive && fixture.lineups && Array.isArray(fixture.lineups) && fixture.lineups.length > 0) {
+    payload.lineups             = fixture.lineups;
     payload.pre_live_synced_at  = now.toISOString();
   } else if (existingLineups) {
     payload.lineups = existingLineups;
   }
 
-  // Statistics
-  if (item.statistics && Array.isArray(item.statistics) && item.statistics.length >= 2) {
-    payload.statistics = {
-      home: item.statistics[0],
-      away: item.statistics[1],
-    };
+  // Statistics (Sportmonks includes statistics in the fixture when requested)
+  if (fixture.statistics && Array.isArray(fixture.statistics) && fixture.statistics.length > 0) {
+    payload.statistics = fixture.statistics;
   }
 
   return payload;
@@ -147,12 +210,12 @@ async function upsertFixtures(
   label: string,
   result: { errors: string[] },
   // Optional: pre-loaded lineups map from the caller to avoid a redundant DB fetch.
-  // When provided, skips the internal lineups lookup.
   externalLineupsMap?: Map<number, any>
 ): Promise<any[]> {
   if (fixtures.length === 0) return [];
 
-  const fixtureIds = fixtures.map((f: any) => f.fixture.id);
+  // Sportmonks fixtures have the ID at the top level (fixture.id), not fixture.fixture.id
+  const fixtureIds = fixtures.map((f: any) => f.id);
   const { data: existingRows } = await supabase
     .from('matches')
     .select('id, finished_at, started_at, lineups')
@@ -167,18 +230,18 @@ async function upsertFixtures(
   );
 
   const payloads: any[] = [];
-  for (const item of fixtures) {
-    const existing        = existingMap.get(item.fixture.id);
-    const kickoff         = new Date(item.fixture.date);
+  for (const fixture of fixtures) {
+    const existing        = existingMap.get(fixture.id);
+    const kickoff         = new Date(fixture.starting_at);
     const msUntilKickoff  = kickoff.getTime() - now.getTime();
     const itemIsPreLive   = isPreLive || (msUntilKickoff > 0 && msUntilKickoff <= PRE_LIVE_WINDOW_MS);
 
     const existingLineups = externalLineupsMap
-      ? (externalLineupsMap.get(item.fixture.id) ?? null)
+      ? (externalLineupsMap.get(fixture.id) ?? null)
       : (existing?.lineups ?? null);
 
     payloads.push(buildPayload(
-      item,
+      fixture,
       now,
       existing?.finished_at || null,
       existing?.started_at  || null,
@@ -213,7 +276,6 @@ interface PlannerResult {
 
 async function fixturesService(
   supabase: ReturnType<typeof createClient>,
-  apiKey: string,
   now: Date
 ): Promise<PlannerResult> {
   const result: PlannerResult = { apiCalls: 0, upserted: 0, errors: [] };
@@ -224,40 +286,46 @@ async function fixturesService(
 
   try {
     if (hour < 12) {
-      // ── Midnight run: fetch today's fixtures in a single call by date ──
+      // ── Midnight run: fetch today's fixtures by date ──
+      // Sportmonks: GET /fixtures/date/{date} with league filter
       console.log(`[PLANNER] Midnight run — fetching fixtures for ${today}`);
       result.apiCalls++;
-      const res  = await fetch(`${API_BASE}/fixtures?date=${today}`, { headers: apiHeaders(apiKey) });
-      const json = await res.json();
-      for (const f of (json.response || [])) allFixtures.push(f);
-      console.log(`[PLANNER] Midnight fetch returned ${json.response?.length ?? 0} fixtures`);
+      const json = await smRequest(`/fixtures/date/${today}`, {
+        include: 'scores;state;participants',
+        filters: `fixtureLeagues:${SUPPORTED_LEAGUE_IDS.join(',')}`,
+      });
+      for (const f of (json.data || [])) allFixtures.push(f);
+      console.log(`[PLANNER] Midnight fetch returned ${json.data?.length ?? 0} fixtures`);
     } else {
       // ── Midday run: fetch today + next 14 days per supported league ──
+      // Sportmonks: GET /fixtures/between/{from}/{to} with per-league filter
       const futureDate = todayStr(addDays(now, 14));
       console.log(`[PLANNER] Midday run — fetching fixtures ${today} → ${futureDate} per league`);
 
       for (const leagueId of SUPPORTED_LEAGUE_IDS) {
-        const url = `${API_BASE}/fixtures?league=${leagueId}&season=${CURRENT_SEASON}&from=${today}&to=${futureDate}`;
         result.apiCalls++;
-        const res  = await fetch(url, { headers: apiHeaders(apiKey) });
-        const json = await res.json();
-        const count = json.response?.length ?? 0;
+        const json = await smRequest(`/fixtures/between/${today}/${futureDate}`, {
+          include: 'scores;state;participants',
+          filters: `fixtureLeagues:${leagueId}`,
+        });
+        const count = json.data?.length ?? 0;
         console.log(`[PLANNER] League ${leagueId}: ${count} fixtures`);
-        for (const f of (json.response || [])) allFixtures.push(f);
+        for (const f of (json.data || [])) allFixtures.push(f);
       }
     }
 
-    // Deduplicate by fixture id (midday per-league calls can overlap on today's matches)
+    // Deduplicate by fixture id
     const seen = new Set<number>();
     const uniqueFixtures: any[] = [];
     for (const f of allFixtures) {
-      if (!seen.has(f.fixture.id)) {
-        seen.add(f.fixture.id);
+      if (!seen.has(f.id)) {
+        seen.add(f.id);
         uniqueFixtures.push(f);
       }
     }
 
-    const supported = uniqueFixtures.filter((f: any) => SUPPORTED_LEAGUE_IDS.includes(f.league.id));
+    // Filter to supported leagues (should already be filtered by API, but belt-and-braces)
+    const supported = uniqueFixtures.filter((f: any) => SUPPORTED_LEAGUE_IDS.includes(f.league_id));
     console.log(`[PLANNER] Total fetched: ${uniqueFixtures.length} fixtures, ${supported.length} in supported leagues`);
 
     if (supported.length === 0) {
@@ -269,28 +337,28 @@ async function fixturesService(
       return result;
     }
 
-    const payloads = supported.map((item: any) => ({
-      id:           item.fixture.id,
-      date:         item.fixture.date.split('T')[0],
-      kickoff_time: item.fixture.date,
-      league_id:    item.league.id,
-      league_name:  item.league.name,
-      league_logo:  item.league.logo,
-      season:       item.league.season,
-      status:       item.fixture.status.short,
-      custom_status: deriveCustomStatus(
-        item.fixture.status.short,
-        new Date(item.fixture.date),
-        now
-      ),
-      home_team:    item.teams.home.name,
-      away_team:    item.teams.away.name,
-      home_logo:    item.teams.home.logo,
-      away_logo:    item.teams.away.logo,
-      home_score:   item.goals.home ?? 0,
-      away_score:   item.goals.away ?? 0,
-      last_updated: now.toISOString(),
-    }));
+    const payloads = supported.map((fixture: any) => {
+      const apiStatus  = extractStateName(fixture);
+      const kickoff    = new Date(fixture.starting_at);
+      const { homeTeam, awayTeam }   = extractParticipants(fixture);
+      const { scoreHome, scoreAway } = extractCurrentScore(fixture);
+
+      return {
+        id:            fixture.id,
+        date:          fixture.starting_at?.split('T')[0] ?? today,
+        kickoff_time:  fixture.starting_at,
+        league_id:     fixture.league_id,
+        status:        apiStatus,
+        custom_status: deriveCustomStatus(apiStatus, kickoff, now),
+        home_team:     homeTeam?.name ?? 'Unknown',
+        away_team:     awayTeam?.name ?? 'Unknown',
+        home_logo:     homeTeam?.image_path ?? null,
+        away_logo:     awayTeam?.image_path ?? null,
+        home_score:    scoreHome ?? 0,
+        away_score:    scoreAway ?? 0,
+        last_updated:  now.toISOString(),
+      };
+    });
 
     const { error } = await supabase
       .from('matches')
@@ -334,7 +402,6 @@ interface WatcherResult {
 
 async function liveScoresService(
   supabase: ReturnType<typeof createClient>,
-  apiKey: string,
   now: Date
 ): Promise<WatcherResult> {
   const result: WatcherResult = {
@@ -351,15 +418,11 @@ async function liveScoresService(
   const today               = todayStr(now);
 
   // ── Step 1: Load today's unfinished matches directly from matches table ──
-  //
-  // The Watcher is self-sufficient — it queries matches directly every minute
-  // and decides what needs attention based on kickoff_time and status.
-  // No external nudge mechanism required.
   const preLiveCutoff = new Date(now.getTime() + PRE_LIVE_WINDOW_MS).toISOString();
 
   const { data: activeMatches, error: matchesErr } = await supabase
     .from('matches')
-    .select('id, kickoff_time, league_id, season, status, started_at')
+    .select('id, kickoff_time, league_id, status, started_at')
     .eq('date', today)
     .lte('kickoff_time', preLiveCutoff)
     .not('status', 'in', `(${TERMINAL_STATUSES.join(',')})`);
@@ -375,10 +438,6 @@ async function liveScoresService(
   }
 
   // ── Step 2: Fetch pre_live_synced_at and lineups for throttle + lineup logic ──
-  //
-  // started_at is already included in the Step 1 select.
-  // pre_live_synced_at is a dedicated column updated ONLY by the PRE-LIVE track —
-  // using last_synced_at would be wrong as the LIVE track stamps it every minute.
   const todayIds = todayMatches.map((m: any) => m.id);
 
   let preLiveSyncedMap = new Map<number, string | null>();
@@ -395,15 +454,6 @@ async function liveScoresService(
   }
 
   // ── Step 3: Identify FINISH-GUARD targets ──
-  //
-  // A match enters finish-guard when:
-  //   - started_at is set (it went in-play at some point), AND
-  //   - now >= started_at + 105min (nominal full-time window), AND
-  //   - now <= started_at + 105min + 30min (still within the guard window), AND
-  //   - status is not yet terminal
-  //
-  // These matches are fetched individually every minute to guarantee we capture
-  // FT/AET/PEN/CANC/ABD/PST even if the regular live feed missed it.
   const finishGuardTargets: any[] = [];
   const remainingMatches:   any[] = [];
 
@@ -424,28 +474,33 @@ async function liveScoresService(
   }
 
   // ── Step 4: Finish-guard track (highest priority, always fetched by ID) ──
+  // Sportmonks: GET /fixtures/{id} for each match individually
   if (finishGuardTargets.length > 0) {
-    const ids   = finishGuardTargets.map((m: any) => m.id).join('-');
-    const fgUrl = `${API_BASE}/fixtures?ids=${ids}`;
-    console.log(`[WATCHER] [FINISH-GUARD] Polling ${finishGuardTargets.length} match(es) → ?ids=${ids}`);
-    result.apiCalls++;
+    console.log(`[WATCHER] [FINISH-GUARD] Polling ${finishGuardTargets.length} match(es)`);
 
-    try {
-      const res      = await fetch(fgUrl, { headers: apiHeaders(apiKey) });
-      const json     = await res.json();
-      const fixtures = (json.response || []) as any[];
+    const fgFixtures: any[] = [];
+    for (const m of finishGuardTargets) {
+      try {
+        result.apiCalls++;
+        const json = await smRequest(`/fixtures/${m.id}`, {
+          include: 'scores;state;participants;events',
+        });
+        if (json.data) fgFixtures.push(json.data);
+      } catch (err) {
+        const msg = `[WATCHER] [FINISH-GUARD] Fetch error for id=${m.id}: ${err}`;
+        console.error(msg);
+        result.errors.push(msg);
+      }
+    }
 
-      console.log(`[WATCHER] [FINISH-GUARD] API returned ${fixtures.length} fixture(s)`);
+    console.log(`[WATCHER] [FINISH-GUARD] Fetched ${fgFixtures.length} fixture(s)`);
 
+    if (fgFixtures.length > 0) {
       const payloads = await upsertFixtures(
-        supabase, fixtures, now, false, 'WATCHER/FINISH-GUARD', result
+        supabase, fgFixtures, now, false, 'WATCHER/FINISH-GUARD', result
       );
       result.finishGuardSynced  = payloads.length;
       result.processedMatches  += payloads.length;
-    } catch (err) {
-      const msg = `[WATCHER] [FINISH-GUARD] Fetch error: ${err}`;
-      console.error(msg);
-      result.errors.push(msg);
     }
   }
 
@@ -474,7 +529,8 @@ async function liveScoresService(
   }
 
   // ── Step 6: PRE-LIVE track (non-blocking, 9-min throttle) ──
-  // Throttle is based on pre_live_synced_at — a column written ONLY by this track.
+  // Sportmonks: GET /livescores (pre-live / upcoming fixtures)
+  // with include=lineups;participants;scores;state
   const stalePreLive = preLiveTargets.filter((m: any) => {
     if (!m.pre_live_synced_at) return true;
     return now.getTime() - new Date(m.pre_live_synced_at).getTime() >= PRELIVE_THROTTLE_MS;
@@ -483,28 +539,34 @@ async function liveScoresService(
   let preLivePromise: Promise<void> | null = null;
 
   if (stalePreLive.length > 0) {
-    const batchedIds = stalePreLive.map((m: any) => m.id).join('-');
-    const preLiveUrl = `${API_BASE}/fixtures?ids=${batchedIds}`;
-    console.log(`[WATCHER] [PRE-LIVE] Fetching ${stalePreLive.length} stale match(es) → ?ids=${batchedIds}`);
-    result.apiCalls++;
+    console.log(`[WATCHER] [PRE-LIVE] Fetching ${stalePreLive.length} stale match(es) individually`);
 
     preLivePromise = (async () => {
       try {
-        const res      = await fetch(preLiveUrl, { headers: apiHeaders(apiKey) });
-        const json     = await res.json();
-        const fixtures = (json.response || []) as any[];
+        const plFixtures: any[] = [];
+        for (const m of stalePreLive) {
+          try {
+            result.apiCalls++;
+            const json = await smRequest(`/fixtures/${m.id}`, {
+              include: 'scores;state;participants;lineups',
+            });
+            if (json.data) plFixtures.push(json.data);
+          } catch (err) {
+            console.error(`[WATCHER] [PRE-LIVE] Fetch error for id=${m.id}: ${err}`);
+          }
+        }
 
-        if (fixtures.length === 0) {
-          console.log('[WATCHER] [PRE-LIVE] No fixtures in API response');
+        if (plFixtures.length === 0) {
+          console.log('[WATCHER] [PRE-LIVE] No fixtures fetched');
           return;
         }
 
         const payloads = await upsertFixtures(
-          supabase, fixtures, now, true, 'WATCHER/PRE-LIVE', result
+          supabase, plFixtures, now, true, 'WATCHER/PRE-LIVE', result
         );
         result.preLiveSynced = payloads.length;
       } catch (err) {
-        const msg = `[WATCHER] [PRE-LIVE] Fetch error: ${err}`;
+        const msg = `[WATCHER] [PRE-LIVE] Error: ${err}`;
         console.error(msg);
         result.errors.push(msg);
       }
@@ -514,92 +576,97 @@ async function liveScoresService(
   }
 
   // ── Step 7: LIVE track ──
-  // Mode is driven by combinedCount (PRE-LIVE + LIVE), but the ?live= URL
-  // only includes leagues from liveTargets — never pre-live leagues.
+  // Sportmonks: GET /livescores/inplay for all currently live fixtures,
+  // filtered by league. For single-match mode, use GET /fixtures/{id}.
   if (liveTargets.length > 0) {
-    const uniqueLiveLeagues = [...new Set(liveTargets.map((t: any) => t.league_id))];
-    let fetchUrl: string;
-
-    if (combinedCount === 1) {
-      result.mode = 'SINGLE';
-      fetchUrl    = `${API_BASE}/fixtures?id=${liveTargets[0].id}`;
-      console.log(`[WATCHER] [LIVE] SINGLE mode: id=${liveTargets[0].id}`);
-    } else if (uniqueLiveLeagues.length > 1) {
-      result.mode = 'MULTI';
-      fetchUrl    = `${API_BASE}/fixtures?live=${uniqueLiveLeagues.join('-')}`;
-      console.log(`[WATCHER] [LIVE] MULTI mode: ?live=${uniqueLiveLeagues.join('-')}`);
-    } else {
-      result.mode        = 'MULTI_SINGLE_LEAGUE';
-      const leagueId     = uniqueLiveLeagues[0];
-      const season       = liveTargets[0].season;
-      fetchUrl           = `${API_BASE}/fixtures?league=${leagueId}&season=${season}&date=${today}`;
-      console.log(`[WATCHER] [LIVE] MULTI_SINGLE_LEAGUE mode: league=${leagueId} season=${season} date=${today}`);
-    }
-
     try {
-      result.apiCalls++;
-      const res      = await fetch(fetchUrl, { headers: apiHeaders(apiKey) });
-      const json     = await res.json();
-      const fixtures = (json.response || []) as any[];
+      let liveFixtures: any[] = [];
 
-      console.log(`[WATCHER] [LIVE] API returned ${fixtures.length} fixture(s)`);
+      if (combinedCount === 1 && liveTargets.length === 1) {
+        // SINGLE mode: fetch by individual fixture ID
+        result.mode = 'SINGLE';
+        console.log(`[WATCHER] [LIVE] SINGLE mode: id=${liveTargets[0].id}`);
+        result.apiCalls++;
+        const json = await smRequest(`/fixtures/${liveTargets[0].id}`, {
+          include: 'scores;state;participants;events',
+        });
+        if (json.data) liveFixtures.push(json.data);
+      } else {
+        // MULTI mode: use /livescores/inplay with league filter
+        result.mode = 'MULTI';
+        const uniqueLiveLeagues = [...new Set(liveTargets.map((t: any) => t.league_id))];
+        console.log(`[WATCHER] [LIVE] MULTI mode: leagues=${uniqueLiveLeagues.join(',')}`);
+        result.apiCalls++;
+        const json = await smRequest('/livescores/inplay', {
+          include: 'scores;state;events;participants',
+          filters: `fixtureLeagues:${uniqueLiveLeagues.join(',')}`,
+        });
+        liveFixtures = json.data || [];
+      }
+
+      console.log(`[WATCHER] [LIVE] API returned ${liveFixtures.length} fixture(s)`);
 
       // Ghost resolution: any liveTarget absent from the response may have just
-      // reached FT and dropped off ?live=. Fetch individually to confirm.
-      const returnedIds  = new Set(fixtures.map((f: any) => f.fixture.id));
+      // reached FT and dropped off /livescores/inplay. Fetch individually to confirm.
+      const returnedIds  = new Set(liveFixtures.map((f: any) => f.id));
       const ghostTargets = liveTargets.filter((t: any) => !returnedIds.has(t.id));
 
       if (ghostTargets.length > 0) {
         console.log(`[WATCHER] [LIVE] ${ghostTargets.length} ghost match(es) — resolving individually`);
-        const ghostUrl = `${API_BASE}/fixtures?ids=${ghostTargets.map((t: any) => t.id).join('-')}`;
 
-        try {
-          result.apiCalls++;
-          const ghostRes      = await fetch(ghostUrl, { headers: apiHeaders(apiKey) });
-          const ghostJson     = await ghostRes.json();
-          const ghostFixtures = (ghostJson.response || []) as any[];
-          console.log(`[WATCHER] [LIVE] Ghost resolution returned ${ghostFixtures.length} fixture(s)`);
-          for (const gf of ghostFixtures) fixtures.push(gf);
-        } catch (ghostErr) {
-          const msg = `[WATCHER] [LIVE] Ghost resolution error: ${ghostErr}`;
-          console.error(msg);
-          result.errors.push(msg);
+        for (const ghost of ghostTargets) {
+          try {
+            result.apiCalls++;
+            const ghostJson = await smRequest(`/fixtures/${ghost.id}`, {
+              include: 'scores;state;participants;events',
+            });
+            if (ghostJson.data) liveFixtures.push(ghostJson.data);
+          } catch (ghostErr) {
+            const msg = `[WATCHER] [LIVE] Ghost resolution error for id=${ghost.id}: ${ghostErr}`;
+            console.error(msg);
+            result.errors.push(msg);
+          }
         }
+        console.log(`[WATCHER] [LIVE] After ghost resolution: ${liveFixtures.length} total fixture(s)`);
       }
 
       const payloads = await upsertFixtures(
-        supabase, fixtures, now, false, 'WATCHER/LIVE', result, lineupsMap
+        supabase, liveFixtures, now, false, 'WATCHER/LIVE', result, lineupsMap
       );
       result.syncedToDb       = payloads.length;
       result.processedMatches += payloads.length;
 
       // ── Lineup supplement ──
-      // The ?live= and ?league= endpoints do not return lineups. After the main
+      // The /livescores/inplay endpoint does not return lineups. After the main
       // live upsert, check if any live match is still missing lineups and fetch
-      // them individually. Once lineups are stored this short-circuits immediately.
+      // them individually with lineups included.
       const missingLineupIds = liveTargets
         .filter((t: any) => !lineupsMap.get(t.id))
         .map((t: any) => t.id);
 
       if (missingLineupIds.length > 0) {
-        const supplementUrl = `${API_BASE}/fixtures?ids=${missingLineupIds.join('-')}`;
-        console.log(`[WATCHER] [LIVE] Lineup supplement: fetching ${missingLineupIds.length} match(es) → ?ids=${missingLineupIds.join('-')}`);
-        try {
-          result.apiCalls++;
-          const suppRes      = await fetch(supplementUrl, { headers: apiHeaders(apiKey) });
-          const suppJson     = await suppRes.json();
-          const suppFixtures = (suppJson.response || []) as any[];
+        console.log(`[WATCHER] [LIVE] Lineup supplement: fetching ${missingLineupIds.length} match(es)`);
+        const suppFixtures: any[] = [];
 
+        for (const fId of missingLineupIds) {
+          try {
+            result.apiCalls++;
+            const suppJson = await smRequest(`/fixtures/${fId}`, {
+              include: 'scores;state;participants;lineups',
+            });
+            if (suppJson.data) suppFixtures.push(suppJson.data);
+          } catch (suppErr) {
+            console.error(`[WATCHER] [LIVE] Lineup supplement error for id=${fId}: ${suppErr}`);
+          }
+        }
+
+        if (suppFixtures.length > 0) {
           const suppLineupsMap = new Map<number, any>(
-            suppFixtures.map((f: any) => [f.fixture.id, lineupsMap.get(f.fixture.id) ?? null])
+            suppFixtures.map((f: any) => [f.id, lineupsMap.get(f.id) ?? null])
           );
           await upsertFixtures(
             supabase, suppFixtures, now, true, 'WATCHER/LIVE/LINEUP-SUPPLEMENT', result, suppLineupsMap
           );
-        } catch (suppErr) {
-          const msg = `[WATCHER] [LIVE] Lineup supplement fetch error: ${suppErr}`;
-          console.error(msg);
-          result.errors.push(msg);
         }
       }
 
@@ -628,7 +695,6 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const apiKey = Deno.env.get('SPORTS_API_KEY')?.trim() ?? '';
   const now    = new Date();
   const url    = new URL(req.url);
   const mode   = url.searchParams.get('mode');
@@ -649,7 +715,7 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[HANDLER] ══════ PLANNER invocation ══════`);
-    const result = await fixturesService(supabase, apiKey, now);
+    const result = await fixturesService(supabase, now);
     console.log(`[HANDLER] ══════ PLANNER complete — ${result.upserted} fixtures upserted, ${result.apiCalls} API calls ══════`);
 
     return new Response(JSON.stringify({
@@ -665,7 +731,7 @@ Deno.serve(async (req) => {
 
   } else {
     console.log(`[HANDLER] ══════ WATCHER invocation ══════`);
-    const result = await liveScoresService(supabase, apiKey, now);
+    const result = await liveScoresService(supabase, now);
     console.log(
       `[HANDLER] ══════ WATCHER complete — mode=${result.mode} live=${result.syncedToDb} preLive=${result.preLiveSynced} finishGuard=${result.finishGuardSynced} API=${result.apiCalls} ══════`
     );
