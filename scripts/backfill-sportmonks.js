@@ -13,7 +13,7 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -265,67 +265,63 @@ async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonSt
 
 async function backfillStandings(db, leagueName, smSeasonId, seasonUuid, teamCache) {
   const res = await api(getStandings, smSeasonId);
-  const groups = res.data || [];
+
+  // Sportmonks standings response is a flat array — each item is a standing entry
+  // with participant_id, position, points, and a details[] array of type_id stats.
+  const entries = res.data || [];
 
   const rows = [];
 
-  for (const group of groups) {
-    // Standings response can be nested: each group has a details include or a standings array
-    const entries = group.details || group.standings || [];
+  for (const entry of entries) {
+    const teamSmId = entry.participant_id || entry.participant?.id;
+    if (!teamSmId) continue;
 
-    for (const entry of entries) {
-      // The participant is the team — could be nested or referenced
-      const teamSmId = entry.participant_id || entry.participant?.id;
-      if (!teamSmId) continue;
-
-      // Ensure team exists (may have been created during fixture backfill)
-      let teamUuid = teamCache.get(teamSmId);
-      if (!teamUuid && entry.participant) {
-        teamUuid = await ensureTeam(db, teamCache, entry.participant);
-      }
-      if (!teamUuid) {
-        // Try to look up from DB by sportmonks_id
-        const { data } = await db
-          .from('teams')
-          .select('id')
-          .eq('sportmonks_id', teamSmId)
-          .single();
-        if (data) {
-          teamUuid = data.id;
-          teamCache.set(teamSmId, teamUuid);
-        } else {
-          continue; // skip unknown team
-        }
-      }
-
-      // Sportmonks standings detail type_id mapping (verified from /v3/core/types):
-      //   129 = Overall Matches Played
-      //   130 = Overall Won
-      //   131 = Overall Draw
-      //   132 = Overall Lost
-      //   133 = Overall Goals Scored
-      //   134 = Overall Goals Conceded
-      //   176 = Streak (form)
-      //   187 = Overall Points
-      const detail = entry.details || [];
-      const detailMap = new Map(detail.map((d) => [d.type_id, d.value]));
-      const stat = (typeId) => detailMap.get(typeId) ?? null;
-
-      rows.push({
-        season_id: seasonUuid,
-        team_id: teamUuid,
-        position: entry.position ?? null,
-        played: stat(129),
-        won: stat(130),
-        drawn: stat(131),
-        lost: stat(132),
-        goals_for: stat(133),
-        goals_against: stat(134),
-        points: stat(187),
-        form: stat(176) || entry.form || null,
-        updated_at: new Date().toISOString(),
-      });
+    // Ensure team exists (may have been created during fixture backfill)
+    let teamUuid = teamCache.get(teamSmId);
+    if (!teamUuid && entry.participant) {
+      teamUuid = await ensureTeam(db, teamCache, entry.participant);
     }
+    if (!teamUuid) {
+      // Try to look up from DB by sportmonks_id
+      const { data } = await db
+        .from('teams')
+        .select('id')
+        .eq('sportmonks_id', teamSmId)
+        .single();
+      if (data) {
+        teamUuid = data.id;
+        teamCache.set(teamSmId, teamUuid);
+      } else {
+        continue; // skip unknown team
+      }
+    }
+
+    // Sportmonks standings detail type_id mapping (verified from /v3/core/types):
+    //   129 = Overall Matches Played
+    //   130 = Overall Won
+    //   131 = Overall Draw
+    //   132 = Overall Lost
+    //   133 = Overall Goals Scored
+    //   134 = Overall Goals Conceded
+    //   187 = Overall Points
+    const detail = entry.details || [];
+    const detailMap = new Map(detail.map((d) => [d.type_id, d.value]));
+    const stat = (typeId) => detailMap.get(typeId) ?? null;
+
+    rows.push({
+      season_id: seasonUuid,
+      team_id: teamUuid,
+      position: entry.position ?? null,
+      played: stat(129),
+      won: stat(130),
+      drawn: stat(131),
+      lost: stat(132),
+      goals_for: stat(133),
+      goals_against: stat(134),
+      points: entry.points ?? stat(187),
+      form: null,
+      updated_at: new Date().toISOString(),
+    });
   }
 
   if (rows.length > 0) {

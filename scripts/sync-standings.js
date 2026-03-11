@@ -8,7 +8,7 @@ import { getStandings, getTopScorers } from '../lib/sportmonks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // ── Supabase (only used for CLI mode) ───────────────────────────────────────
 
@@ -69,48 +69,46 @@ async function resolveTeamUuid(db, teamCache, sportmonksId, participant) {
 
 async function syncStandings(db, smSeasonId, seasonUuid, teamCache) {
   const res = await getStandings(smSeasonId);
-  const groups = res.data || [];
+
+  // Sportmonks standings response is a flat array — each item is a standing entry
+  // with participant_id, position, points, and a details[] array of type_id stats.
+  const entries = res.data || [];
 
   const rows = [];
 
-  for (const group of groups) {
-    const entries = group.details || group.standings || [];
+  for (const entry of entries) {
+    const teamSmId = entry.participant_id || entry.participant?.id;
+    if (!teamSmId) continue;
 
-    for (const entry of entries) {
-      const teamSmId = entry.participant_id || entry.participant?.id;
-      if (!teamSmId) continue;
+    const teamUuid = await resolveTeamUuid(db, teamCache, teamSmId, entry.participant);
+    if (!teamUuid) continue;
 
-      const teamUuid = await resolveTeamUuid(db, teamCache, teamSmId, entry.participant);
-      if (!teamUuid) continue;
+    // Sportmonks standings detail type_id mapping (verified from /v3/core/types):
+    //   129 = Overall Matches Played
+    //   130 = Overall Won
+    //   131 = Overall Draw
+    //   132 = Overall Lost
+    //   133 = Overall Goals Scored
+    //   134 = Overall Goals Conceded
+    //   187 = Overall Points
+    const detail = entry.details || [];
+    const detailMap = new Map(detail.map((d) => [d.type_id, d.value]));
+    const stat = (typeId) => detailMap.get(typeId) ?? null;
 
-      // Sportmonks standings detail type_id mapping (verified from /v3/core/types):
-      //   129 = Overall Matches Played
-      //   130 = Overall Won
-      //   131 = Overall Draw
-      //   132 = Overall Lost
-      //   133 = Overall Goals Scored
-      //   134 = Overall Goals Conceded
-      //   176 = Streak (form)
-      //   187 = Overall Points
-      const detail = entry.details || [];
-      const detailMap = new Map(detail.map((d) => [d.type_id, d.value]));
-      const stat = (typeId) => detailMap.get(typeId) ?? null;
-
-      rows.push({
-        season_id: seasonUuid,
-        team_id: teamUuid,
-        position: entry.position ?? null,
-        played: stat(129),
-        won: stat(130),
-        drawn: stat(131),
-        lost: stat(132),
-        goals_for: stat(133),
-        goals_against: stat(134),
-        points: stat(187),
-        form: stat(176) || entry.form || null,
-        updated_at: new Date().toISOString(),
-      });
-    }
+    rows.push({
+      season_id: seasonUuid,
+      team_id: teamUuid,
+      position: entry.position ?? null,
+      played: stat(129),
+      won: stat(130),
+      drawn: stat(131),
+      lost: stat(132),
+      goals_for: stat(133),
+      goals_against: stat(134),
+      points: entry.points ?? stat(187),
+      form: null,
+      updated_at: new Date().toISOString(),
+    });
   }
 
   if (rows.length > 0) {
