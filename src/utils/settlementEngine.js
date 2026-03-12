@@ -87,7 +87,7 @@ export const calculateBetResult = (cardType, selection, matchData) => {
         // --- D. SUPERSUB ---
         // Wins if a substitute from the BACKED TEAM scores.
         // selection: 'HOME' | 'AWAY'
-        // matchData.team_id: API-Football integer — the team the user backed.
+        // matchData.team_id: integer — the team the user backed.
         // This mirrors the backend settlement engine which uses team_id for routing.
         case 'c_supersub': {
             const backedTeamId = matchData.team_id ? Number(matchData.team_id) : null;

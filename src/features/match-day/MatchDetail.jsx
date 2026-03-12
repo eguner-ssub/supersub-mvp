@@ -119,7 +119,7 @@ const SubstitutesTab = ({ fixtureId, match, onStageSupersub }) => {
     const subs = team.substitutes || [];
     const teamName = team.team?.name || (teamIndex === 0 ? 'Home' : 'Away');
     const teamLogo = team.team?.logo;
-    // API-Football integer team ID — required by backend settlement engine
+    // Integer team ID — required by backend settlement engine
     const teamId = team.team?.id ?? null;
     // Derive HOME/AWAY side from index (lineups[0] is always home)
     const side = teamIndex === 0 ? 'HOME' : 'AWAY';
@@ -381,7 +381,7 @@ const EventsTab = ({ fixtureId }) => {
    STATS TAB — High-contrast comparison bars
    ───────────────────────────────────────────────────────────── */
 const StatsTab = ({ match }) => {
-  // API-Football match detail includes statistics in match.statistics
+  // Match detail includes statistics in match.statistics
   // For now, use what's available or mock
   const stats = match?.statistics;
 
@@ -617,7 +617,7 @@ const MatchDetail = () => {
 
   const handleStageSupersub = (side, teamId, teamName) => {
     // side: 'HOME' | 'AWAY'
-    // teamId: API-Football integer — passed straight through to placeBet
+    // teamId: integer — passed straight through to placeBet
     const count = getCardCount('c_supersub');
     if (count > 0) {
       setSelectedCard('c_supersub');

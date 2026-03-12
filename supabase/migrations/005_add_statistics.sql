@@ -2,4 +2,4 @@
 ALTER TABLE matches
 ADD COLUMN IF NOT EXISTS statistics JSONB DEFAULT NULL;
 
-COMMENT ON COLUMN matches.statistics IS 'Transformed {home, away} statistics from API-Football, synced during LIVE and POST-MATCH phases';
+COMMENT ON COLUMN matches.statistics IS 'Transformed {home, away} statistics, synced during LIVE and POST-MATCH phases';

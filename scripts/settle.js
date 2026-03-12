@@ -1,4 +1,4 @@
-// v3.2.0 - DB-Only Settlement Engine (No API-Football)
+// v3.2.0 - DB-Only Settlement Engine
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -22,7 +22,7 @@ const isLive = (status) => ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(status
  *   - Assists a goal scored by the selected team (Normal Goal or Penalty, elapsed ≤ 120)
  * ...after being substituted into the match.
  *
- * Data shape (from API-Football events array):
+ * Data shape (from events array):
  *   subst event: { type: 'subst', team: { id }, player: { id } (coming OFF), assist: { id } (coming ON), time: { elapsed } }
  *   goal event:  { type: 'Goal',  team: { id }, player: { id } (scorer), assist: { id } (assister), detail, time: { elapsed } }
  *
@@ -37,7 +37,7 @@ export const settleSupersub = (bet, events) => {
     }
 
     // Step 1: Build a map of players who actually came on for the selected team.
-    // In API-Football subst events, the incoming player is stored in `assist`.
+    // In subst events, the incoming player is stored in `assist`.
     // Map: playerId -> elapsed minute they came on.
     const subsOnMap = new Map();
     for (const event of events) {

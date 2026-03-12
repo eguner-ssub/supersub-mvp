@@ -1,7 +1,7 @@
 /**
  * normalizeMatch(raw)
  *
- * Bridges the gap between flat Supabase rows and the nested API-Football
+ * Bridges the gap between flat Supabase rows and the nested fixture
  * JSON shape that all components (MatchDetail, ManagerOffice, oddsService,
  * GameContext.placeBet) expect.
  *
@@ -11,7 +11,7 @@
 export function normalizeMatch(raw) {
     if (!raw) return null;
 
-    // Already in nested API-Football format — pass through unchanged
+    // Already in nested fixture format — pass through unchanged
     if (raw.fixture) return raw;
 
     // ── Flat Supabase row → nested shape ──────────────────────────────────

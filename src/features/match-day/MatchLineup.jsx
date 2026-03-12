@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────
    FORMATION GRID ENGINE
-   Converts API-Football grid strings ("row:col") into
+   Converts grid strings ("row:col") into
    percentage-based CSS positions on each team's half.
    ───────────────────────────────────────────────────────────── */
 

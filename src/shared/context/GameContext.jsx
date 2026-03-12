@@ -104,7 +104,7 @@ export const GameProvider = ({ children }) => {
   /**
    * PLACE BET
    * - displayLabel: human-readable label ("Over 2.5 Goals", player name, etc.)
-   * - teamId: required for Supersub cards — the API-Football team ID the user is backing.
+   * - teamId: required for Supersub cards — the integer team ID the user is backing.
    *   Pass match.teams.home.id or match.teams.away.id at the call site.
    *   Without this, the backend settlement engine will always settle Supersub as LOST.
    */
@@ -115,7 +115,7 @@ export const GameProvider = ({ children }) => {
       const awayTeam = match.teams?.away?.name || match.away_team || 'Away';
       const matchId = match.fixture?.id || match.id;
 
-      // Supersub requires team_id (API-Football integer) for backend settlement.
+      // Supersub requires team_id (integer) for backend settlement.
       // Derive it from match data if not explicitly passed.
       const isSupersub = String(cardType).toLowerCase().includes('supersub');
 

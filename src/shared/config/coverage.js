@@ -41,7 +41,7 @@ export const LEAGUE_COVERAGE = {
         seasonType: 'european',
     },
 };
-// Helper to get league config by API-Football ID
+// Helper to get league config by league ID
 export const getLeagueById = (id) => {
     return Object.values(LEAGUE_COVERAGE).find(league => league.id === id) || null;
 };

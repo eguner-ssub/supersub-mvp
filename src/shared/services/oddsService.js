@@ -123,46 +123,5 @@ const parseDbOdds = (odds) => {
         };
     }
 
-    // If stored as API-Football bookmaker format (array with bookmakers)
-    if (Array.isArray(odds) && odds.length > 0) {
-        const bookmakers = odds[0]?.bookmakers || [];
-        const target = bookmakers.find(b => [8, 1, 6, 10, 16, 7].includes(b.id)) || bookmakers[0];
-        if (!target) return null;
-
-        const markets = target.bets || [];
-        const findMarket = (keywords) => markets.find(m => {
-            const name = m.name.toLowerCase();
-            return keywords.some(k => name.includes(k.toLowerCase()));
-        });
-
-        const matchWinner = findMarket(["Match Winner", "1x2", "Full Time"]);
-        const goalsMarket = findMarket(["Goals Over/Under", "Total Goals", "Over/Under"]);
-
-        const getOdd = (market, name) =>
-            market?.values?.find(v => v.value.toString().toLowerCase() === name.toLowerCase())?.odd;
-
-        const getGoalsOdd = (direction) => {
-            if (!goalsMarket?.values) return 0;
-            const found = goalsMarket.values.find(v => {
-                const val = v.value.toString();
-                return (val.includes(direction) || val.startsWith(direction[0])) && val.includes("2.5");
-            });
-            return found ? parseFloat(found.odd) : 0;
-        };
-
-        return {
-            source: `Database (${target.name})`,
-            odds: {
-                home: parseFloat(getOdd(matchWinner, "Home") || 0),
-                draw: parseFloat(getOdd(matchWinner, "Draw") || 0),
-                away: parseFloat(getOdd(matchWinner, "Away") || 0),
-                goals_over: getGoalsOdd("Over"),
-                goals_under: getGoalsOdd("Under"),
-                supersub_yes: 4.50,
-                scorers: []
-            }
-        };
-    }
-
     return null;
 };

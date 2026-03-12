@@ -50,7 +50,7 @@ const goalEvent = (teamId, scorerId, assisterId = null, elapsed = 70, detail = '
     time: { elapsed },
 });
 
-// API-Football subst shape: player = coming OFF, assist = coming ON
+// Subst event shape: player = coming OFF, assist = coming ON
 const substEvent = (teamId, playerOffId, playerOnId, elapsed = 60) => ({
     type: 'subst',
     team: { id: teamId },

@@ -1,5 +1,5 @@
 -- Sportmonks migration: leagues and seasons tables
--- Part of API-Football → Sportmonks v3 migration
+-- Part of Sportmonks v3 migration
 
 CREATE TABLE IF NOT EXISTS leagues (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
