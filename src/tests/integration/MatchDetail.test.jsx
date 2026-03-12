@@ -43,44 +43,47 @@ vi.mock('react-router-dom', async () => {
     };
 });
 
-vi.mock('../../shared/services/oddsService', () => ({
-    getHybridOdds: vi.fn().mockResolvedValue({
-        source: 'SIMULATION',
-        odds: {
-            home: 2.10,
-            draw: 3.20,
-            away: 2.80,
-            goals_over: 1.85,
-            goals_under: 1.95,
-            supersub_yes: 4.50,
-            scorers: [
-                { id: 's1', name: 'Home Star', odds: 1.90 },
-                { id: 's2', name: 'Away Star', odds: 2.20 },
-            ]
-        }
-    })
-}));
-
 // Mock Global Fetch
 global.fetch = vi.fn();
+
+// Sportmonks odds mock response
+const MOCK_SPORTMONKS_ODDS = {
+    source: 'Sportmonks',
+    fixture_id: 123,
+    match_result: { home: 2.10, draw: 3.20, away: 2.80 },
+    total_goals: { over_2_5: 1.85, under_2_5: 1.95 },
+    first_goalscorer: [
+        { player_id: 101, player_name: 'Home Star', odds: 1.90 },
+        { player_id: 102, player_name: 'Away Star', odds: 2.20 },
+    ]
+};
 
 describe('MatchDetail - Industrial Battle Arena', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        // Default API Mock
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                response: [{
-                    fixture: { id: 123, date: '2026-02-01T15:00:00', status: { short: 'NS' } },
-                    teams: {
-                        home: { id: 1, name: 'Arsenal', logo: '/arsenal.png' },
-                        away: { id: 2, name: 'Tottenham', logo: '/tottenham.png' }
-                    },
-                    goals: { home: 0, away: 0 }
-                }]
-            })
+        // Route fetch calls to the correct mock based on URL
+        global.fetch.mockImplementation((url) => {
+            if (String(url).includes('/api/odds/sportmonks')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => MOCK_SPORTMONKS_ODDS,
+                });
+            }
+            // Default: match API
+            return Promise.resolve({
+                ok: true,
+                json: async () => ({
+                    response: [{
+                        fixture: { id: 123, date: '2026-02-01T15:00:00', status: { short: 'NS' } },
+                        teams: {
+                            home: { id: 1, name: 'Arsenal', logo: '/arsenal.png' },
+                            away: { id: 2, name: 'Tottenham', logo: '/tottenham.png' }
+                        },
+                        goals: { home: 0, away: 0 }
+                    }]
+                }),
+            });
         });
     });
 

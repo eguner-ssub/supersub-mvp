@@ -8,28 +8,24 @@ export const LEAGUE_COVERAGE = {
         id: 39,
         name: 'Premier League',
         country: 'England',
-        theOddsApiKey: 'soccer_epl',
         seasonType: 'european',
     },
     CHAMPIONSHIP: {
         id: 40,
         name: 'Championship',
         country: 'England',
-        theOddsApiKey: 'soccer_england_efl_championship',
         seasonType: 'european',
     },
     SERIE_A: {
         id: 135,
         name: 'Serie A',
         country: 'Italy',
-        theOddsApiKey: 'soccer_italy_serie_a',
         seasonType: 'european',
     },
     LIGA_PORTUGAL: {
         id: 94,
         name: 'Liga Portugal',
         country: 'Portugal',
-        theOddsApiKey: 'soccer_portugal_primeira_liga',
         seasonType: 'european',
     },
 
@@ -37,19 +33,12 @@ export const LEAGUE_COVERAGE = {
         id: 78,
         name: 'Bundesliga',
         country: 'Germany',
-        theOddsApiKey: 'soccer_germany_bundesliga',
         seasonType: 'european',
     },
 };
 // Helper to get league config by league ID
 export const getLeagueById = (id) => {
     return Object.values(LEAGUE_COVERAGE).find(league => league.id === id) || null;
-};
-
-// Helper to get The Odds API sport key by league ID
-export const getOddsApiKey = (leagueId) => {
-    const league = getLeagueById(leagueId);
-    return league?.theOddsApiKey || null;
 };
 
 // Export all league IDs as array for api/matches.js

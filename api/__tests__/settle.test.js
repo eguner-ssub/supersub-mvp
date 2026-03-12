@@ -1,11 +1,16 @@
 /**
  * settle.test.js
  *
- * Tests the full prediction lifecycle:
- *   Bet placed (PENDING) → match goes LIVE → match finishes → settlement → WON/LOST + payout
- *
- * Tests the pure logic functions directly (calculateResult, settleSupersub).
+ * Tests the pure settlement logic functions directly (calculateResult, settleSupersub).
  * No DB, no network, no env vars required.
+ *
+ * Coverage:
+ *   - Match Result: selection matching, all terminal states
+ *   - Total Goals: over/under 2.5
+ *   - Player Score: normal goal, penalty, own goal exclusion, 90-minute cutoff
+ *   - Supersub: team-level (500 pts), player-level (2500 pts), assists, time checks
+ *   - Points calculation for all card types
+ *   - Edge cases
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -27,8 +32,10 @@ const makeBet = (overrides = {}) => ({
     card_type: 'c_match_result',
     selection: 'HOME_WIN',
     potential_reward: 210,
+    odds: 2.10,
     status: 'PENDING',
     team_id: null,
+    player_id: null,
     ...overrides,
 });
 
@@ -67,17 +74,21 @@ const AWAY_TEAM = 20;
 describe('Match Result card', () => {
 
     it('WON: HOME_WIN predicted, home wins', () => {
-        expect(calculateResult(
+        const result = calculateResult(
             makeBet({ selection: 'HOME_WIN' }),
             makeMatch({ home_score: 2, away_score: 0 })
-        ).status).toBe('WON');
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(210); // Math.round(2.10 * 100)
     });
 
     it('LOST: HOME_WIN predicted, away wins', () => {
-        expect(calculateResult(
+        const result = calculateResult(
             makeBet({ selection: 'HOME_WIN' }),
             makeMatch({ home_score: 0, away_score: 2 })
-        ).status).toBe('LOST');
+        );
+        expect(result.status).toBe('LOST');
+        expect(result.points).toBe(0);
     });
 
     it('LOST: HOME_WIN predicted, match draws', () => {
@@ -128,6 +139,14 @@ describe('Match Result card', () => {
             makeMatch({ status: 'PEN', home_score: 0, away_score: 1 })
         ).status).toBe('WON');
     });
+
+    it('points = Math.round(odds * 100) on win', () => {
+        const result = calculateResult(
+            makeBet({ selection: 'HOME_WIN', odds: 1.75 }),
+            makeMatch({ home_score: 3, away_score: 0 })
+        );
+        expect(result.points).toBe(175);
+    });
 });
 
 // ─── Total Goals ──────────────────────────────────────────────────────────────
@@ -135,10 +154,12 @@ describe('Match Result card', () => {
 describe('Total Goals card', () => {
 
     it('WON: OVER_2_5, 3 goals scored', () => {
-        expect(calculateResult(
-            makeBet({ card_type: 'c_total_goals', selection: 'OVER_2_5' }),
+        const result = calculateResult(
+            makeBet({ card_type: 'c_total_goals', selection: 'OVER_2_5', odds: 1.90 }),
             makeMatch({ home_score: 2, away_score: 1 })
-        ).status).toBe('WON');
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(190);
     });
 
     it('LOST: OVER_2_5, only 2 goals scored', () => {
@@ -168,32 +189,133 @@ describe('Total Goals card', () => {
             makeMatch({ home_score: 2, away_score: 1 })
         ).status).toBe('LOST');
     });
+
+    it('points = 0 on loss', () => {
+        const result = calculateResult(
+            makeBet({ card_type: 'c_total_goals', selection: 'OVER_2_5', odds: 1.90 }),
+            makeMatch({ home_score: 0, away_score: 0 })
+        );
+        expect(result.points).toBe(0);
+    });
 });
 
-// ─── Supersub — settleSupersub() ─────────────────────────────────────────────
+// ─── Player Score ─────────────────────────────────────────────────────────────
 
-describe('Supersub card', () => {
+describe('Player Score card', () => {
 
-    it('WON: sub from backed team scores after coming on', () => {
-        const events = [
-            substEvent(HOME_TEAM, 99, 55, 60),  // player 55 on at 60'
-            goalEvent(HOME_TEAM, 55, null, 75),  // player 55 scores at 75'
-        ];
-        expect(settleSupersub(
-            makeBet({ card_type: 'c_supersub', selection: 'HOME', team_id: HOME_TEAM }),
+    it('WON: player scores a Normal Goal (using player_id)', () => {
+        const events = [goalEvent(HOME_TEAM, 42, null, 30, 'Normal Goal')];
+        const result = calculateResult(
+            makeBet({ card_type: 'c_player_score', selection: 'PLAYER_42', player_id: 42, odds: 3.00 }),
+            makeMatch({ events }),
+            events
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(300);
+    });
+
+    it('WON: player scores a Penalty (non-shootout)', () => {
+        const events = [goalEvent(HOME_TEAM, 42, null, 85, 'Penalty')];
+        const result = calculateResult(
+            makeBet({ card_type: 'c_player_score', selection: 'PLAYER_42', player_id: 42 }),
+            makeMatch({ events }),
+            events
+        );
+        expect(result.status).toBe('WON');
+    });
+
+    it('WON: legacy format (selection = PLAYER_<id>, player_id null)', () => {
+        const events = [goalEvent(HOME_TEAM, 42, null, 50, 'Normal Goal')];
+        const result = calculateResult(
+            makeBet({ card_type: 'c_player_score', selection: 'PLAYER_42', player_id: null }),
+            makeMatch({ events }),
+            events
+        );
+        expect(result.status).toBe('WON');
+    });
+
+    it('LOST: player does not score', () => {
+        const events = [goalEvent(HOME_TEAM, 99, null, 50, 'Normal Goal')];
+        expect(calculateResult(
+            makeBet({ card_type: 'c_player_score', player_id: 42, selection: 'PLAYER_42' }),
+            makeMatch({ events }),
+            events
+        ).status).toBe('LOST');
+    });
+
+    it('LOST: own goal does not count', () => {
+        const events = [goalEvent(HOME_TEAM, 42, null, 50, 'Own Goal')];
+        expect(calculateResult(
+            makeBet({ card_type: 'c_player_score', player_id: 42, selection: 'PLAYER_42' }),
+            makeMatch({ events }),
+            events
+        ).status).toBe('LOST');
+    });
+
+    it('LOST: goal after 90 minutes does not count', () => {
+        const events = [goalEvent(HOME_TEAM, 42, null, 95, 'Normal Goal')];
+        expect(calculateResult(
+            makeBet({ card_type: 'c_player_score', player_id: 42, selection: 'PLAYER_42' }),
+            makeMatch({ events }),
+            events
+        ).status).toBe('LOST');
+    });
+
+    it('LOST: shootout penalty does not count (elapsed > 90)', () => {
+        const events = [goalEvent(HOME_TEAM, 42, null, 125, 'Penalty')];
+        expect(calculateResult(
+            makeBet({ card_type: 'c_player_score', player_id: 42, selection: 'PLAYER_42' }),
+            makeMatch({ events }),
+            events
+        ).status).toBe('LOST');
+    });
+
+    it('WON: goal at exactly 90 minutes counts', () => {
+        const events = [goalEvent(HOME_TEAM, 42, null, 90, 'Normal Goal')];
+        expect(calculateResult(
+            makeBet({ card_type: 'c_player_score', player_id: 42, selection: 'PLAYER_42' }),
+            makeMatch({ events }),
             events
         ).status).toBe('WON');
     });
 
-    it('WON: sub from backed team assists a goal', () => {
+    it('LOST: malformed selection with no player_id returns LOST', () => {
+        expect(calculateResult(
+            makeBet({ card_type: 'c_player_score', selection: 'INVALID', player_id: null }),
+            makeMatch(),
+            []
+        ).status).toBe('LOST');
+    });
+});
+
+// ─── Supersub — settleSupersub() ─────────────────────────────────────────────
+
+describe('Supersub card (team-level)', () => {
+
+    it('WON: sub from backed team scores after coming on (500 pts)', () => {
+        const events = [
+            substEvent(HOME_TEAM, 99, 55, 60),  // player 55 on at 60'
+            goalEvent(HOME_TEAM, 55, null, 75),  // player 55 scores at 75'
+        ];
+        const result = settleSupersub(
+            makeBet({ card_type: 'c_supersub', selection: 'HOME', team_id: HOME_TEAM }),
+            events
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(500);
+    });
+
+    it('WON: sub from backed team assists a goal (500 pts)', () => {
         const events = [
             substEvent(HOME_TEAM, 99, 55, 60),  // player 55 on at 60'
             goalEvent(HOME_TEAM, 77, 55, 80),    // player 55 assists at 80'
         ];
-        expect(settleSupersub(
+        const result = settleSupersub(
             makeBet({ card_type: 'c_supersub', selection: 'HOME', team_id: HOME_TEAM }),
             events
-        ).status).toBe('WON');
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(500);
     });
 
     it('LOST: sub scores but for the wrong team', () => {
@@ -207,15 +329,28 @@ describe('Supersub card', () => {
         ).status).toBe('LOST');
     });
 
-    it('LOST: sub scores before their own substitution time (data integrity)', () => {
+    it('LOST: sub scores before their own substitution time', () => {
         const events = [
             substEvent(HOME_TEAM, 99, 55, 75),  // comes on at 75'
-            goalEvent(HOME_TEAM, 55, null, 60),  // "scores" at 60' — before sub, invalid
+            goalEvent(HOME_TEAM, 55, null, 60),  // "scores" at 60' — before sub
         ];
         expect(settleSupersub(
             makeBet({ card_type: 'c_supersub', selection: 'HOME', team_id: HOME_TEAM }),
             events
         ).status).toBe('LOST');
+    });
+
+    it('WON: sub scores at exactly the substitution minute (>= check)', () => {
+        const events = [
+            substEvent(HOME_TEAM, 99, 55, 60),  // comes on at 60'
+            goalEvent(HOME_TEAM, 55, null, 60),  // scores at 60'
+        ];
+        const result = settleSupersub(
+            makeBet({ card_type: 'c_supersub', selection: 'HOME', team_id: HOME_TEAM }),
+            events
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(500);
     });
 
     it('LOST: no substitutions made at all', () => {
@@ -275,27 +410,98 @@ describe('Supersub card', () => {
             substEvent(HOME_TEAM, 99, 55, 60),
             { ...goalEvent(HOME_TEAM, 55, null, 85), detail: 'Penalty' },
         ];
-        expect(settleSupersub(
+        const result = settleSupersub(
             makeBet({ card_type: 'c_supersub', selection: 'HOME', team_id: HOME_TEAM }),
             events
-        ).status).toBe('WON');
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(500);
     });
 });
 
-// ─── calculateResult → Supersub routing ──────────────────────────────────────
+// ─── Supersub — player-level ────────────────────────────────────────────────
 
-describe('calculateResult routing for Supersub', () => {
+describe('Supersub card (player-level)', () => {
+
+    it('WON: specific player scores → 2500 pts', () => {
+        const events = [
+            substEvent(HOME_TEAM, 99, 55, 60),
+            goalEvent(HOME_TEAM, 55, null, 75),
+        ];
+        const result = settleSupersub(
+            makeBet({ card_type: 'c_supersub', team_id: HOME_TEAM, player_id: 55 }),
+            events
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(2500);
+    });
+
+    it('WON: specific player assists → 2500 pts', () => {
+        const events = [
+            substEvent(HOME_TEAM, 99, 55, 60),
+            goalEvent(HOME_TEAM, 77, 55, 80),
+        ];
+        const result = settleSupersub(
+            makeBet({ card_type: 'c_supersub', team_id: HOME_TEAM, player_id: 55 }),
+            events
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(2500);
+    });
+
+    it('LOST: different sub scores — not the target player', () => {
+        const events = [
+            substEvent(HOME_TEAM, 99, 55, 60),  // player 55 comes on
+            substEvent(HOME_TEAM, 88, 66, 70),  // player 66 comes on
+            goalEvent(HOME_TEAM, 66, null, 80),  // player 66 scores, not 55
+        ];
+        const result = settleSupersub(
+            makeBet({ card_type: 'c_supersub', team_id: HOME_TEAM, player_id: 55 }),
+            events
+        );
+        expect(result.status).toBe('LOST');
+        expect(result.points).toBe(0);
+    });
+
+    it('LOST: target player never comes on as sub', () => {
+        const events = [
+            substEvent(HOME_TEAM, 99, 66, 60),  // player 66 comes on, not 55
+            goalEvent(HOME_TEAM, 66, null, 80),
+        ];
+        expect(settleSupersub(
+            makeBet({ card_type: 'c_supersub', team_id: HOME_TEAM, player_id: 55 }),
+            events
+        ).status).toBe('LOST');
+    });
+});
+
+// ─── calculateResult → routing ──────────────────────────────────────────────
+
+describe('calculateResult routing', () => {
 
     it('routes c_supersub bets through settleSupersub correctly', () => {
         const events = [
             substEvent(HOME_TEAM, 99, 55, 60),
             goalEvent(HOME_TEAM, 55, null, 75),
         ];
-        expect(calculateResult(
+        const result = calculateResult(
             makeBet({ card_type: 'c_supersub', selection: 'HOME', team_id: HOME_TEAM }),
             makeMatch({ events }),
             events
-        ).status).toBe('WON');
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(500);
+    });
+
+    it('routes c_player_score through player score logic', () => {
+        const events = [goalEvent(HOME_TEAM, 42, null, 30)];
+        const result = calculateResult(
+            makeBet({ card_type: 'c_player_score', selection: 'PLAYER_42', player_id: 42, odds: 2.50 }),
+            makeMatch({ events }),
+            events
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(250);
     });
 });
 
@@ -329,5 +535,14 @@ describe('Edge cases', () => {
             makeBet({ selection: 'HOME_WIN' }),
             makeMatch({ status: 'NS' })
         ).status).toBe('PENDING');
+    });
+
+    it('points are 0 when odds are missing', () => {
+        const result = calculateResult(
+            makeBet({ selection: 'HOME_WIN', odds: undefined }),
+            makeMatch({ home_score: 2, away_score: 0 })
+        );
+        expect(result.status).toBe('WON');
+        expect(result.points).toBe(0);
     });
 });

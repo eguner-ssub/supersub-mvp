@@ -108,7 +108,7 @@ export const GameProvider = ({ children }) => {
    *   Pass match.teams.home.id or match.teams.away.id at the call site.
    *   Without this, the backend settlement engine will always settle Supersub as LOST.
    */
-  const placeBet = async (match, selection, potentialReward, cardType, odds, displayLabel, teamId = null) => {
+  const placeBet = async (match, selection, potentialReward, cardType, odds, displayLabel, teamId = null, oddsSnapshot = null) => {
     if (!userProfile) return { success: false, error: 'No user' };
     try {
       const homeTeam = match.teams?.home?.name || match.home_team || 'Home';
@@ -137,6 +137,18 @@ export const GameProvider = ({ children }) => {
         else if (String(selection).toUpperCase().includes('AWAY')) resolvedSelection = 'AWAY';
       }
 
+      // Player Score: extract player_id from SCORE_<id> selection, use displayLabel as player_name
+      const isPlayerScore = String(cardType).toLowerCase().includes('player_score');
+      let resolvedPlayerId = null;
+      let resolvedPlayerName = null;
+      if (isPlayerScore && selection) {
+        const parts = selection.split('_');
+        if (parts.length > 1) {
+          resolvedPlayerId = Number(parts[1]) || null;
+        }
+        resolvedPlayerName = displayLabel || null;
+      }
+
       const payload = {
         user_id: userProfile.id,
         match_id: matchId,
@@ -151,6 +163,9 @@ export const GameProvider = ({ children }) => {
         // Always include team_id in the payload.
         // Non-Supersub cards send null — backend ignores it for those card types.
         team_id: resolvedTeamId,
+        player_id: resolvedPlayerId,
+        player_name: resolvedPlayerName,
+        odds_snapshot: oddsSnapshot,
       };
 
       const { data, error } = await supabase

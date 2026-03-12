@@ -3,13 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Zap, Loader2, Trophy, Signal, Goal, User, ArrowUpCircle, X } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 import CardBase from '../../shared/ui/CardBase';
-import { getHybridOdds } from '../../shared/services/oddsService';
 import TacticalHUD from '../../shared/ui/TacticalHUD';
 import MatchTerminationTerminal from '../../shared/ui/MatchTerminationTerminal';
 import MatchLineup from './MatchLineup';
 import { normalizeMatch } from '../../shared/utils/normalizeMatch';
-
-const ODDS_API_KEY = import.meta.env.VITE_ODDS_API_KEY;
 
 /* ─────────────────────────────────────────────────────────────
    TAB DEFINITIONS
@@ -540,44 +537,44 @@ const MatchDetail = () => {
         setMatch(matchInfo);
 
         const status = matchInfo.fixture.status.short;
-        const phase = ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(status) ? 'LIVE' : (['FT', 'AET', 'PEN'].includes(status) ? 'POST' : 'PRE');
+        // Sportmonks developer_name states
+        const IN_PLAY = ['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'];
+        const FINISHED = ['FT', 'AET', 'FT_PEN', 'POSTPONED', 'CANCELLED', 'ABANDONED', 'AWARDED', 'WO', 'DELETED'];
+        const phase = IN_PLAY.includes(status) ? 'LIVE' : (FINISHED.includes(status) ? 'POST' : 'PRE');
         setMatchPhase(phase);
 
         if (phase !== 'POST') {
-          const oddsData = await getHybridOdds(matchInfo, ODDS_API_KEY);
+          const fixtureId = matchInfo.fixture?.id || matchInfo.id;
+          try {
+            const oddsRes = await fetch(`/api/odds/sportmonks?fixture=${fixtureId}`);
+            if (oddsRes.ok) {
+              const oddsData = await oddsRes.json();
+              const mr = oddsData.match_result || {};
+              const tg = oddsData.total_goals || {};
+              const scorers = (oddsData.first_goalscorer || []).map(p => ({
+                id: p.player_id,
+                name: p.player_name,
+                odds: p.odds,
+              }));
 
-          if (oddsData && oddsData.odds) {
-            let finalOdds = oddsData.odds;
-
-            if (!finalOdds.scorers || finalOdds.scorers.length === 0) {
-              const homeName = matchInfo.teams.home.name.substring(0, 3).toUpperCase();
-              const awayName = matchInfo.teams.away.name.substring(0, 3).toUpperCase();
-
-              finalOdds.scorers = [
-                { id: 'sim1', name: `${homeName} Striker`, odds: 2.10 },
-                { id: 'sim2', name: `${awayName} Forward`, odds: 2.40 },
-                { id: 'sim3', name: `${homeName} Winger`, odds: 3.10 },
-                { id: 'sim4', name: `${awayName} Midfielder`, odds: 3.50 },
-                { id: 'sim5', name: `${homeName} Captain`, odds: 2.80 },
-                { id: 'sim6', name: `${awayName} Star`, odds: 2.20 },
-              ];
+              setOdds({
+                home: mr.home || 0,
+                draw: mr.draw || 0,
+                away: mr.away || 0,
+                goals_over: tg.over_2_5 || 0,
+                goals_under: tg.under_2_5 || 0,
+                scorers,
+              });
+              setActiveBookie(oddsData.source || 'Sportmonks');
+            } else {
+              console.warn('[MatchDetail] No odds available for this fixture');
+              setOdds(null);
+              setActiveBookie(null);
             }
-
-            setOdds(finalOdds);
-            setActiveBookie(oddsData.source);
-          } else {
-            setOdds({
-              home: 2.10, draw: 3.20, away: 2.80,
-              goals_over: 1.85, goals_under: 1.95,
-              supersub_yes: 4.50,
-              scorers: [
-                { id: 's1', name: 'Home Star', odds: 1.90 },
-                { id: 's2', name: 'Away Star', odds: 2.20 },
-                { id: 's3', name: 'Home Striker', odds: 2.50 },
-                { id: 's4', name: 'Away Striker', odds: 3.00 }
-              ]
-            });
-            setActiveBookie("SIMULATION");
+          } catch (oddsErr) {
+            console.error('[MatchDetail] Odds fetch error:', oddsErr);
+            setOdds(null);
+            setActiveBookie(null);
           }
         }
       } catch (err) {
@@ -602,7 +599,21 @@ const MatchDetail = () => {
 
   const handlePlay = async () => {
     if (!userProfile || !stagedBet) return;
-    const result = await placeBet(match, stagedBet.selection, stagedBet.reward, stagedBet.card, stagedBet.odds, stagedBet.displayLabel, stagedBet.teamId ?? null);
+
+    // Build odds snapshot from current odds state for the specific card type
+    let snapshot = null;
+    if (odds) {
+      const card = String(stagedBet.card).toLowerCase();
+      if (card.includes('match_result') || card.includes('match_winner')) {
+        snapshot = { market: 'match_result', home: odds.home, draw: odds.draw, away: odds.away };
+      } else if (card.includes('total_goals')) {
+        snapshot = { market: 'total_goals', over_2_5: odds.goals_over, under_2_5: odds.goals_under };
+      } else if (card.includes('player_score')) {
+        snapshot = { market: 'first_goalscorer', player_id: stagedBet.selection?.split('_')[1], player_name: stagedBet.displayLabel, odds: stagedBet.odds };
+      }
+    }
+
+    const result = await placeBet(match, stagedBet.selection, stagedBet.reward, stagedBet.card, stagedBet.odds, stagedBet.displayLabel, stagedBet.teamId ?? null, snapshot);
     if (result.success) {
       await consumeCard(stagedBet.card);
       setFlowState('resolved');
@@ -628,8 +639,8 @@ const MatchDetail = () => {
         selection: side,
         teamId,
         displayLabel: `${teamName} Sub to Score`,
-        odds: odds?.supersub_yes || 4.50,
-        reward: Math.floor((odds?.supersub_yes || 4.50) * 100),
+        odds: 0,
+        reward: 500,
       });
       setFlowState('staging');
     }
@@ -681,7 +692,7 @@ const MatchDetail = () => {
           </div>
           {activeBookie && (
             <div className="px-2 py-0.5 rounded-full bg-black/40 border border-white/5 flex items-center gap-1.5">
-              <Signal className={`w-3 h-3 ${activeBookie === 'SIMULATION' ? 'text-orange-500' : 'text-green-500'} animate-pulse`} />
+              <Signal className="w-3 h-3 text-green-500 animate-pulse" />
               <span className="text-[9px] font-mono uppercase text-white/60">{activeBookie}</span>
             </div>
           )}

@@ -30,15 +30,13 @@ npx playwright test
 ### Request Flow
 
 ```
-React SPA (src/) → /api/* Vercel serverless → Supabase PostgreSQL ← External APIs
-                                                                      (SportMonks, The Odds API)
+React SPA (src/) → /api/* Vercel serverless → Supabase PostgreSQL ← SportMonks v3 API
 ```
 
 ### Frontend (`src/`)
 
 - **`shared/context/GameContext.jsx`** — single global state atom: auth, profile, inventory, betting state. Access with `useGame()`.
 - **`shared/hooks/usePredictions.js`** — Supabase Realtime subscription to predictions table; used on match detail pages.
-- **`shared/services/oddsService.js`** — hybrid odds fetching: DB-first on match day, API-first otherwise.
 - **`utils/settlementEngine.js`** — resolves bet outcomes for all 4 card types.
 - **`utils/cardConfig.js`** — single source of truth for card types (`MATCH_RESULT`, `TOTAL_GOALS`, `PLAYER_SCORE`, `SUPERSUB`), states, icons, and Tailwind classes.
 - **`shared/config/coverage.js`** — canonical league ID mappings (EPL=39, Championship=40, Bundesliga=78, Serie A=135, Liga Portugal=94).
@@ -55,8 +53,7 @@ Vercel serverless functions. Pattern: lazy Supabase client initialization inside
 | `GET /api/matches?id=<id>` | Single fixture |
 | `GET /api/events?fixture=<id>` | Goals/subs from `matches.events` JSON column |
 | `GET /api/lineups?fixture=<id>` | Starters/subs from `matches.lineups` JSON column |
-| `GET /api/odds?fixture=<id>` | Cached odds from `matches.odds` column |
-| `GET /api/odds/live` | Real-time odds from The Odds API with DB fallback |
+| `GET /api/odds/sportmonks?fixture=<id>` | Pre-match odds from SportMonks (markets 1, 8, 80) |
 
 API handlers always return JSON (never HTML), even on error.
 

@@ -22,9 +22,11 @@ export default defineConfig(({ mode }) => {
       include: [
         'src/tests/integration/**/*.test.jsx',
         'api/__tests__/**/*.test.js',
+        'lib/__tests__/**/*.test.js',
       ],
       environmentMatchGlobs: [
         ['api/__tests__/**', 'node'],
+        ['lib/__tests__/**', 'node'],
       ],
     },
     // Proxy configuration to connect frontend (5173) to backend (3000)
