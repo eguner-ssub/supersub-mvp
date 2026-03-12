@@ -906,92 +906,113 @@ const MatchDetail = () => {
       {matchPhase === 'POST' && <MatchTerminationTerminal />}
 
       {/* SELECTION POPUPS - Block on Finished Matches */}
-      {flowState === 'selection' && match && odds && selectedCard && matchPhase !== 'POST' && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-          <button onClick={handleReset} className="absolute top-8 right-8 text-white/50 hover:text-white"><X className="w-8 h-8" /></button>
+      {flowState === 'selection' && match && selectedCard && matchPhase !== 'POST' && (() => {
+        const oddsUnavailable = !odds;
 
-          {/* Match Result UI */}
-          {selectedCard === 'c_match_result' && (
-            <div className="grid grid-cols-3 gap-4 w-full max-w-lg">
-              <button data-testid="panel-home" onClick={() => handleOutcomeClick('HOME_WIN', odds.home, match.teams.home.name)} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
-                <img src={match.teams.home.logo} className="w-16 h-16 object-contain" alt="Home" />
-                <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.home * 100)}</span>
-                <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Home Win</span>
-              </button>
-              <button data-testid="panel-draw" onClick={() => handleOutcomeClick('DRAW', odds.draw, 'Draw Result')} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
-                <Trophy className="w-16 h-16 text-zinc-600" />
-                <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.draw * 100)}</span>
-                <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Draw</span>
-              </button>
-              <button data-testid="panel-away" onClick={() => handleOutcomeClick('AWAY_WIN', odds.away, match.teams.away.name)} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
-                <img src={match.teams.away.logo} className="w-16 h-16 object-contain" alt="Away" />
-                <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.away * 100)}</span>
-                <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Away Win</span>
-              </button>
+        // Shared no-odds empty state
+        const NoOddsState = () => (
+          <div className="w-full max-w-lg bg-zinc-900/80 border border-white/10 rounded-3xl p-12 flex flex-col items-center gap-4 text-center">
+            <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mb-2">
+              <Signal className="w-8 h-8 text-zinc-600" />
             </div>
-          )}
+            <p className="text-white font-black text-xl uppercase tracking-tight">No Odds Available</p>
+            <p className="text-zinc-500 text-sm leading-relaxed">Odds for this match haven't been published yet. Check back closer to kick-off.</p>
+          </div>
+        );
 
-          {/* Total Goals UI */}
-          {selectedCard === 'c_total_goals' && (
-            <div className="flex gap-6 w-full max-w-lg">
-              <button onClick={() => handleOutcomeClick('OVER_2.5', odds.goals_over, 'Over 2.5 Goals')} className="flex-1 bg-zinc-900/80 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
-                <ArrowUpCircle className="w-16 h-16 text-emerald-500" />
-                <div className="text-center"><p className="text-white font-black text-2xl">OVER 2.5</p><p className="text-emerald-500 font-bold">+{Math.floor(odds.goals_over * 100)} PTS</p></div>
-              </button>
-              <button onClick={() => handleOutcomeClick('UNDER_2.5', odds.goals_under, 'Under 2.5 Goals')} className="flex-1 bg-zinc-900/80 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
-                <Goal className="w-16 h-16 text-red-500" />
-                <div className="text-center"><p className="text-white font-black text-2xl">UNDER 2.5</p><p className="text-red-500 font-bold">+{Math.floor(odds.goals_under * 100)} PTS</p></div>
-              </button>
-            </div>
-          )}
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+            <button onClick={handleReset} className="absolute top-8 right-8 text-white/50 hover:text-white"><X className="w-8 h-8" /></button>
 
-          {/* Player Score UI - Dual Column */}
-          {selectedCard === 'c_player_score' && (
-            <div className="w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
-              <div className="bg-zinc-800/50 p-6 border-b border-white/5 flex justify-between items-center">
-                <h3 className="text-white font-black uppercase tracking-tighter text-xl">Select Scorer</h3>
-                <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">Anytime Market</span>
-              </div>
-              <div className="grid grid-cols-2 h-[60vh]">
-                {/* Home Column */}
-                <div className="border-r border-white/5 flex flex-col">
-                  <div className="p-4 bg-black/20 flex items-center gap-2">
-                    <img src={match.teams.home.logo} className="w-5 h-5 object-contain" alt="" />
-                    <span className="text-zinc-400 text-[10px] font-black uppercase truncate">{match.teams.home.name}</span>
+            {/* Match Result UI */}
+            {selectedCard === 'c_match_result' && (
+              oddsUnavailable ? <NoOddsState /> : (
+                <div className="grid grid-cols-3 gap-4 w-full max-w-lg">
+                  <button data-testid="panel-home" onClick={() => handleOutcomeClick('HOME_WIN', odds.home, match.teams.home.name)} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
+                    <img src={match.teams.home.logo} className="w-16 h-16 object-contain" alt="Home" />
+                    <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.home * 100)}</span>
+                    <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Home Win</span>
+                  </button>
+                  <button data-testid="panel-draw" onClick={() => handleOutcomeClick('DRAW', odds.draw, 'Draw Result')} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
+                    <Trophy className="w-16 h-16 text-zinc-600" />
+                    <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.draw * 100)}</span>
+                    <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Draw</span>
+                  </button>
+                  <button data-testid="panel-away" onClick={() => handleOutcomeClick('AWAY_WIN', odds.away, match.teams.away.name)} className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
+                    <img src={match.teams.away.logo} className="w-16 h-16 object-contain" alt="Away" />
+                    <span className="text-yellow-400 font-black text-2xl">+{Math.floor(odds.away * 100)}</span>
+                    <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Away Win</span>
+                  </button>
+                </div>
+              )
+            )}
+
+            {/* Total Goals UI */}
+            {selectedCard === 'c_total_goals' && (
+              oddsUnavailable ? <NoOddsState /> : (
+                <div className="flex gap-6 w-full max-w-lg">
+                  <button onClick={() => handleOutcomeClick('OVER_2.5', odds.goals_over, 'Over 2.5 Goals')} className="flex-1 bg-zinc-900/80 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
+                    <ArrowUpCircle className="w-16 h-16 text-emerald-500" />
+                    <div className="text-center"><p className="text-white font-black text-2xl">OVER 2.5</p><p className="text-emerald-500 font-bold">+{Math.floor(odds.goals_over * 100)} PTS</p></div>
+                  </button>
+                  <button onClick={() => handleOutcomeClick('UNDER_2.5', odds.goals_under, 'Under 2.5 Goals')} className="flex-1 bg-zinc-900/80 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all">
+                    <Goal className="w-16 h-16 text-red-500" />
+                    <div className="text-center"><p className="text-white font-black text-2xl">UNDER 2.5</p><p className="text-red-500 font-bold">+{Math.floor(odds.goals_under * 100)} PTS</p></div>
+                  </button>
+                </div>
+              )
+            )}
+
+            {/* Player Score UI - Dual Column */}
+            {selectedCard === 'c_player_score' && (
+              oddsUnavailable ? <NoOddsState /> : (
+                <div className="w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
+                  <div className="bg-zinc-800/50 p-6 border-b border-white/5 flex justify-between items-center">
+                    <h3 className="text-white font-black uppercase tracking-tighter text-xl">Select Scorer</h3>
+                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">Anytime Market</span>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
-                    {leftScorers.map((player) => (
-                      <button key={player.id} onClick={() => handleOutcomeClick(`SCORE_${player.id}`, player.odds, player.name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
-                        <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span></div>
-                        <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 h-[60vh]">
+                    {/* Home Column */}
+                    <div className="border-r border-white/5 flex flex-col">
+                      <div className="p-4 bg-black/20 flex items-center gap-2">
+                        <img src={match.teams.home.logo} className="w-5 h-5 object-contain" alt="" />
+                        <span className="text-zinc-400 text-[10px] font-black uppercase truncate">{match.teams.home.name}</span>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
+                        {leftScorers.map((player) => (
+                          <button key={player.id} onClick={() => handleOutcomeClick(`SCORE_${player.id}`, player.odds, player.name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
+                            <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span></div>
+                            <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Away Column */}
+                    <div className="flex flex-col">
+                      <div className="p-4 bg-black/20 flex items-center gap-2 justify-end">
+                        <span className="text-zinc-400 text-[10px] font-black uppercase truncate">{match.teams.away.name}</span>
+                        <img src={match.teams.away.logo} className="w-5 h-5 object-contain" alt="" />
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
+                        {rightScorers.map((player) => (
+                          <button key={player.id} onClick={() => handleOutcomeClick(`SCORE_${player.id}`, player.odds, player.name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
+                            <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span></div>
+                            <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
-                {/* Away Column */}
-                <div className="flex flex-col">
-                  <div className="p-4 bg-black/20 flex items-center gap-2 justify-end">
-                    <span className="text-zinc-400 text-[10px] font-black uppercase truncate">{match.teams.away.name}</span>
-                    <img src={match.teams.away.logo} className="w-5 h-5 object-contain" alt="" />
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
-                    {rightScorers.map((player) => (
-                      <button key={player.id} onClick={() => handleOutcomeClick(`SCORE_${player.id}`, player.odds, player.name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
-                        <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span></div>
-                        <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+              )
+            )}
 
-          {/* Super Sub UI — removed: Supersub now stages directly from the SUBS tab
-              without entering the selection flow. Team side (HOME/AWAY) and team_id
-              are captured at the point of the "Use Supersub Card" button click. */}
-        </div>
-      )}
+            {/* Super Sub UI — removed: Supersub now stages directly from the SUBS tab
+                without entering the selection flow. Team side (HOME/AWAY) and team_id
+                are captured at the point of the "Use Supersub Card" button click. */}
+          </div>
+        );
+      })()}
 
       {/* STAGING PANEL - Block on Finished Matches */}
       {flowState === 'staging' && stagedBet && matchPhase !== 'POST' && (
