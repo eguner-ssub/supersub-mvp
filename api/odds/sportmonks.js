@@ -1,14 +1,16 @@
 import 'dotenv/config';
+import { createClient } from '@supabase/supabase-js';
 
 // ── Sportmonks odds endpoint ─────────────────────────────────────────────────
-// GET /api/odds/sportmonks?fixture=<sportmonks_fixture_id>
+// GET /api/odds/sportmonks?fixture=<matches.id (API-Football ID)>
 //
 // Fetches pre-match odds from Sportmonks for markets:
 //   1  — Match Result (1X2)
 //   80 — Over/Under Goals
 //   8  — First Goalscorer
 //
-// Returns normalized odds or 404 if no odds available. Never returns simulated data.
+// Internally translates the API-Football fixture ID to a Sportmonks fixture ID
+// before calling the Sportmonks API. Never returns simulated data.
 
 const BASE_URL = 'https://api.sportmonks.com/v3/football';
 
@@ -16,6 +18,75 @@ function getToken() {
     const token = process.env.SPORTMONKS_API_TOKEN;
     if (!token) throw new Error('Missing env var SPORTMONKS_API_TOKEN');
     return token;
+}
+
+// ── Supabase client (server-side) ────────────────────────────────────────────
+let _supabase = null;
+function getSupabase() {
+    if (_supabase) return _supabase;
+    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+    if (!url || !key) throw new Error('Missing Supabase env vars');
+    _supabase = createClient(url, key);
+    return _supabase;
+}
+
+// ── ID translation: API-Football fixture ID → Sportmonks fixture ID ──────────
+// The matches table stores API-Football IDs. Sportmonks uses completely different
+// IDs (e.g. matches.id=1386996 → Sportmonks id=19432202 for Wrexham vs Swansea).
+// We resolve by: checking sportmonks_id_map cache, then doing a Sportmonks
+// /fixtures/between lookup matched by team name.
+async function resolveToSportmonksId(apiFootballId) {
+    const supabase = getSupabase();
+
+    // 1. Check cache in sportmonks_id_map
+    const { data: cached } = await supabase
+        .from('sportmonks_id_map')
+        .select('sportmonks_id')
+        .eq('entity_type', 'fixture')
+        .eq('api_football_id', apiFootballId)
+        .maybeSingle();
+
+    if (cached?.sportmonks_id) return cached.sportmonks_id;
+
+    // 2. Look up match date and team names
+    const { data: match } = await supabase
+        .from('matches')
+        .select('date, home_team, away_team')
+        .eq('id', apiFootballId)
+        .maybeSingle();
+
+    if (!match) return null;
+
+    // 3. Fetch all Sportmonks fixtures for that calendar date
+    const token = getToken();
+    const fixtureUrl = `${BASE_URL}/fixtures/between/${match.date}/${match.date}?api_token=${token}&per_page=100`;
+    const fixtureRes = await fetch(fixtureUrl);
+    if (!fixtureRes.ok) return null;
+    const fixtureJson = await fixtureRes.json();
+
+    // 4. Match by first significant word (>3 chars) from each team name
+    const keyword = (name) =>
+        name.toLowerCase().split(/\s+/).find(w => w.length > 3) ?? name.toLowerCase().slice(0, 4);
+    const homeKw = keyword(match.home_team);
+    const awayKw = keyword(match.away_team);
+
+    const smFixture = fixtureJson.data?.find(f => {
+        const n = f.name.toLowerCase();
+        return n.includes(homeKw) && n.includes(awayKw);
+    });
+
+    if (!smFixture) return null;
+
+    // 5. Cache result in sportmonks_id_map (ignore insert errors — best-effort)
+    await supabase.from('sportmonks_id_map').insert({
+        internal_id: crypto.randomUUID(),
+        entity_type: 'fixture',
+        sportmonks_id: smFixture.id,
+        api_football_id: apiFootballId,
+    }).select().maybeSingle().catch(() => null);
+
+    return smFixture.id;
 }
 
 // ── Market IDs ───────────────────────────────────────────────────────────────
@@ -96,7 +167,14 @@ export default async function handler(req, res) {
 
     try {
         const token = getToken();
-        const url = `${BASE_URL}/odds/pre-match/fixtures/${fixture}?api_token=${token}&filters=markets:${ALL_MARKETS.join(',')}`;
+
+        // Translate API-Football ID → Sportmonks fixture ID
+        const sportmonksId = await resolveToSportmonksId(Number(fixture));
+        if (!sportmonksId) {
+            return res.status(404).json({ error: 'No odds available for this fixture' });
+        }
+
+        const url = `${BASE_URL}/odds/pre-match/fixtures/${sportmonksId}?api_token=${token}&filters=markets:${ALL_MARKETS.join(',')}`;
 
         const response = await fetch(url);
 
@@ -131,7 +209,7 @@ export default async function handler(req, res) {
 
         const result = {
             source: 'Sportmonks',
-            fixture_id: Number(fixture),
+            fixture_id: sportmonksId,
             match_result: parseMatchResult(allOdds),
             total_goals: parseTotalGoals(allOdds),
             first_goalscorer: parseFirstGoalscorer(allOdds),
