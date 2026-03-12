@@ -78,13 +78,15 @@ async function resolveToSportmonksId(apiFootballId) {
 
     if (!smFixture) return null;
 
-    // 5. Cache result in sportmonks_id_map (ignore insert errors — best-effort)
-    await supabase.from('sportmonks_id_map').insert({
-        internal_id: crypto.randomUUID(),
-        entity_type: 'fixture',
-        sportmonks_id: smFixture.id,
-        api_football_id: apiFootballId,
-    }).select().maybeSingle().catch(() => null);
+    // 5. Cache result in sportmonks_id_map (best-effort — ignore errors)
+    try {
+        await supabase.from('sportmonks_id_map').insert({
+            internal_id: crypto.randomUUID(),
+            entity_type: 'fixture',
+            sportmonks_id: smFixture.id,
+            api_football_id: apiFootballId,
+        });
+    } catch (_) { /* non-critical */ }
 
     return smFixture.id;
 }
