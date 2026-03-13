@@ -431,15 +431,24 @@ async function backfillTopScorers(db, leagueName, smSeasonId, seasonUuid, teamCa
     });
   }
 
-  if (rows.length > 0) {
+  // Deduplicate by (sportmonks_id, season_id) — SportMonks pagination can
+  // return the same player on multiple pages; PostgreSQL rejects a batch
+  // upsert that would update the same row twice in a single statement.
+  const seen = new Map();
+  for (const row of rows) {
+    seen.set(`${row.sportmonks_id}:${row.season_id}`, row);
+  }
+  const dedupedRows = Array.from(seen.values());
+
+  if (dedupedRows.length > 0) {
     const { error } = await db
       .from('top_scorers')
-      .upsert(rows, { onConflict: 'sportmonks_id,season_id' });
+      .upsert(dedupedRows, { onConflict: 'sportmonks_id,season_id' });
 
     if (error) throw new Error(`Top scorers upsert failed (${leagueName}): ${error.message}`);
   }
 
-  console.log(`  ${leagueName}: ${rows.length} top scorers`);
+  console.log(`  ${leagueName}: ${dedupedRows.length} top scorers (${rows.length} raw)`);
   return rows.length;
 }
 
