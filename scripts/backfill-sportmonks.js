@@ -305,7 +305,7 @@ async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonSt
       let oddsCount = 0;
       for (const row of upcomingRows) {
         try {
-          const url = `https://api.sportmonks.com/v3/football/odds/pre-match/fixtures/${row.id}?api_token=${token}&filters=markets:${ALL_MARKETS.join(',')}`;
+          const url = `https://api.sportmonks.com/v3/football/odds/pre-match/fixtures/${row.id}?api_token=${token}&filters=markets:${ALL_MARKETS.join(',')}&include=market`;
           const res = await fetch(url);
           if (!res.ok) continue;
           const json = await res.json();
