@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Zap, Loader2, Trophy, Signal, Goal, User, ArrowUpCircle, X } from 'lucide-react';
+import { ArrowLeft, Coins, Lock, Loader2, Trophy, Signal, Goal, User, ArrowUpCircle, X } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 import CardBase from '../../shared/ui/CardBase';
 import TacticalHUD from '../../shared/ui/TacticalHUD';
@@ -397,21 +397,16 @@ const StatsTab = ({ match }) => {
     return null;
   };
 
-  // Build stats array — real if available, mocked if not
-  const possession = getStat('Ball Possession') || { home: 55, away: 45 };
-  const shotsOn = getStat('Shots on Goal') || { home: 4, away: 3 };
-  const shotsTotal = getStat('Total Shots') || { home: 12, away: 9 };
-
-  // xG is less commonly available — mock it
-  const xgHome = parseFloat((Math.random() * 2 + 0.5).toFixed(2));
-  const xgAway = parseFloat((Math.random() * 2 + 0.3).toFixed(2));
+  // Only show real data — no fallbacks, no simulated values
+  const possession = getStat('Ball Possession');
+  const shotsOn    = getStat('Shots on Goal');
+  const shotsTotal = getStat('Total Shots');
 
   const statRows = [
-    { label: 'Possession', home: possession.home, away: possession.away, unit: '%', max: 100, isPercentage: true },
-    { label: 'xG', home: xgHome, away: xgAway, unit: '', max: Math.max(xgHome, xgAway, 1), isPercentage: false },
-    { label: 'Shots on Target', home: shotsOn.home, away: shotsOn.away, unit: '', max: Math.max(shotsOn.home, shotsOn.away, 1), isPercentage: false },
-    { label: 'Total Shots', home: shotsTotal.home, away: shotsTotal.away, unit: '', max: Math.max(shotsTotal.home, shotsTotal.away, 1), isPercentage: false },
-  ];
+    possession && { label: 'Possession',       home: possession.home, away: possession.away, unit: '%', max: 100, isPercentage: true },
+    shotsOn    && { label: 'Shots on Target',  home: shotsOn.home,    away: shotsOn.away,    unit: '',  max: Math.max(shotsOn.home, shotsOn.away, 1),    isPercentage: false },
+    shotsTotal && { label: 'Total Shots',      home: shotsTotal.home, away: shotsTotal.away, unit: '',  max: Math.max(shotsTotal.home, shotsTotal.away, 1), isPercentage: false },
+  ].filter(Boolean);
 
   const barStyle = (value, max, isHome) => ({
     height: '6px',
@@ -422,6 +417,16 @@ const StatsTab = ({ match }) => {
     marginLeft: isHome ? 'auto' : '0',
     marginRight: isHome ? '0' : 'auto',
   });
+
+  if (statRows.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 12px', color: 'rgba(255,255,255,0.35)' }}>
+        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>
+          Stats not yet available
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '0 12px' }}>
@@ -565,7 +570,7 @@ const MatchDetail = () => {
                 goals_under: tg.under_2_5 || 0,
                 scorers,
               });
-              setActiveBookie(oddsData.source || 'Sportmonks');
+              setActiveBookie(null); // no bookmaker name available from provider
             } else {
               console.warn('[MatchDetail] No odds available for this fixture');
               setOdds(null);
@@ -646,13 +651,13 @@ const MatchDetail = () => {
     }
   };
 
-  // Helper to split players evenly between Home and Away columns for the UI
+  // Split first-goalscorer players evenly between Home and Away columns.
+  // odds.scorers is pre-mapped from first_goalscorer: [{ id, name, odds }]
   const getScorerColumns = () => {
-    if (!odds?.scorers) return [[], []];
-    const midpoint = Math.ceil(odds.scorers.length / 2);
-    const leftCol = odds.scorers.slice(0, midpoint);
-    const rightCol = odds.scorers.slice(midpoint);
-    return [leftCol, rightCol];
+    const scorers = odds?.scorers;
+    if (!scorers || scorers.length === 0) return [[], []];
+    const midpoint = Math.ceil(scorers.length / 2);
+    return [scorers.slice(0, midpoint), scorers.slice(midpoint)];
   };
 
   if (gameLoading || !userProfile) return <div className="bg-black h-[100dvh] flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500 w-8 h-8" /></div>;
@@ -687,8 +692,8 @@ const MatchDetail = () => {
         <button onClick={() => navigate('/match-hub')} className="w-10 h-10 bg-black/50 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white"><ArrowLeft className="w-5 h-5" /></button>
         <div className="flex flex-col items-end gap-1">
           <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5">
-            <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-            <span className="text-white font-bold text-sm">{userProfile.energy}/{userProfile.max_energy}</span>
+            <Coins className="w-4 h-4 text-yellow-400" />
+            <span className="text-white font-bold text-sm">{userProfile.coins ?? 0}</span>
           </div>
           {activeBookie && (
             <div className="px-2 py-0.5 rounded-full bg-black/40 border border-white/5 flex items-center gap-1.5">
@@ -831,10 +836,20 @@ const MatchDetail = () => {
               minHeight: '100%',
             }}
           >
-            {/* Assistant Dialogue — shown for all tabs */}
-            <div style={{ padding: '0 12px', marginBottom: '0' }}>
-              <AssistantDialogue activeTab={activeTab} />
-            </div>
+            {/* Assistant Dialogue — only shown when the active tab has real data */}
+            {(() => {
+              const hasTabData =
+                activeTab === 'LINEUP' ? (Array.isArray(match?.lineups) && match.lineups.length > 0) :
+                activeTab === 'SUBS'   ? (Array.isArray(match?.lineups) && match.lineups.length > 0) :
+                activeTab === 'EVENTS' ? (Array.isArray(match?.events)  && match.events.length  > 0) :
+                activeTab === 'STATS'  ? (Array.isArray(match?.statistics) && match.statistics.length >= 2) :
+                false;
+              return hasTabData ? (
+                <div style={{ padding: '0 12px', marginBottom: '0' }}>
+                  <AssistantDialogue activeTab={activeTab} />
+                </div>
+              ) : null;
+            })()}
 
             {/* Tab Content */}
             {activeTab === 'LINEUP' && (
@@ -872,12 +887,17 @@ const MatchDetail = () => {
           <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 pointer-events-auto">
             {cardTypes.map(card => {
               const count = getCardCount(card.id);
+              // Supersub doesn't need odds — it's played from the SUBS tab directly
+              const needsOdds = card.id !== 'c_supersub';
+              const oddsDisabled = needsOdds && !odds;
+              const inventoryDisabled = count === 0;
+              const isDisabled = inventoryDisabled || oddsDisabled;
               return (
                 <button
                   key={card.id}
                   data-testid={`card-${card.id}`}
                   onClick={() => {
-                    if (count === 0) return;
+                    if (isDisabled) return;
                     if (card.id === 'c_supersub') {
                       // Supersub requires team context — guide user to the SUBS tab
                       // where they tap "Use Supersub Card" under a specific team.
@@ -887,13 +907,27 @@ const MatchDetail = () => {
                     setSelectedCard(card.id);
                     setFlowState('selection');
                   }}
-                  disabled={count === 0}
-                  className={`relative transition-all duration-300 ${selectedCard === card.id ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl' : count > 0 ? 'hover:translate-y-[-8px]' : 'opacity-40 grayscale'}`}
+                  disabled={isDisabled}
+                  className={`relative transition-all duration-300 ${
+                    selectedCard === card.id
+                      ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
+                      : inventoryDisabled
+                        ? 'opacity-40 grayscale'
+                        : oddsDisabled
+                          ? 'opacity-50 saturate-50 cursor-not-allowed'
+                          : 'hover:translate-y-[-8px]'
+                  }`}
                 >
                   <div className="w-[5.5rem] h-[8.25rem] relative">
-                    {/* CardBase already renders frame-standard.webp internally, no need for duplicate */}
                     <div className="absolute inset-0 flex items-center justify-center z-10"><CardBase type={card.id} label={card.label} status="generic" variant="transparent" /></div>
-                    {count > 0 && <div className="absolute -top-2 -right-2 bg-zinc-900 text-yellow-500 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border border-yellow-500 shadow-lg z-50">x{count}</div>}
+                    {/* Odds unavailable overlay — distinct from no-inventory state */}
+                    {oddsDisabled && (
+                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1">
+                        <Lock className="w-5 h-5 text-red-400/80" />
+                        <span className="text-[8px] font-black uppercase tracking-wider text-red-400/80">No Odds</span>
+                      </div>
+                    )}
+                    {count > 0 && !oddsDisabled && <div className="absolute -top-2 -right-2 bg-zinc-900 text-yellow-500 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border border-yellow-500 shadow-lg z-50">x{count}</div>}
                   </div>
                 </button>
               );
@@ -979,7 +1013,9 @@ const MatchDetail = () => {
                         <span className="text-zinc-400 text-[10px] font-black uppercase truncate">{match.teams.home.name}</span>
                       </div>
                       <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
-                        {leftScorers.map((player) => (
+                        {leftScorers.length === 0 && rightScorers.length === 0 ? (
+                          <p className="text-zinc-600 text-[10px] text-center pt-4 uppercase tracking-widest">No players available</p>
+                        ) : leftScorers.map((player) => (
                           <button key={player.id} onClick={() => handleOutcomeClick(`SCORE_${player.id}`, player.odds, player.name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
                             <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span></div>
                             <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
