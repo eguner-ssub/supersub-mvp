@@ -12,7 +12,7 @@ import {
 // Fetches pre-match odds from Sportmonks for markets:
 //   1  — Match Result (1X2)
 //   80 — Over/Under Goals
-//   8  — Goalscorers (Anytime scorer, filtered by string fields)
+//   90 — Goalscorers (Anytime scorer, filtered by string fields)
 //
 // matches.id now stores Sportmonks fixture IDs natively (migration 021).
 // No ID translation is needed.
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
         // matches.id is now the Sportmonks fixture ID directly (migration 021)
         const sportmonksId = Number(fixture);
 
-        const url = `${BASE_URL}/odds/pre-match/fixtures/${sportmonksId}?api_token=${token}&filters=markets:${ALL_MARKETS.join(',')}&include=market`;
+        const url = `${BASE_URL}/odds/pre-match/fixtures/${sportmonksId}?api_token=${token}&filters=markets:${ALL_MARKETS.join(',')}`;
 
         const response = await fetch(url);
 
@@ -75,18 +75,6 @@ export default async function handler(req, res) {
             pagination = pageJson.pagination;
         }
 
-        // ── Diagnostic: log raw odds shape before parsing ─────────────────────
-        console.log('[Sportmonks Odds] Total odds records:', allOdds.length);
-        if (allOdds.length > 0) {
-            console.log('[Sportmonks Odds] Sample record fields:', Object.keys(allOdds[0]));
-        }
-        const market8 = allOdds.filter(o => o.market_id === 8);
-        console.log('[Sportmonks Odds] market_id===8 count:', market8.length);
-        if (market8.length > 0) {
-            console.log('[Sportmonks Odds] market_id===8 sample:', JSON.stringify(market8[0], null, 2));
-        }
-        // ─────────────────────────────────────────────────────────────────────
-
         const matchResult  = parseMatchResult(allOdds);
         const totalGoals   = parseTotalGoals(allOdds);
         const goalscorers  = parseGoalscorers(allOdds);
@@ -94,7 +82,6 @@ export default async function handler(req, res) {
         // Surface which bookmaker was used (same across all markets when preferred is available)
         const bookmaker_id = matchResult?.bookmaker_id
             ?? totalGoals?.bookmaker_id
-            ?? goalscorers?.[0]?.bookmaker_id
             ?? null;
 
         const result = {
