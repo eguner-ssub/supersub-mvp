@@ -255,6 +255,41 @@ async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonSt
       if (error) throw new Error(`Fixtures upsert failed (${leagueName} ${chunk.from}–${chunk.to}): ${error.message}`);
     }
 
+    // Pre-seed the matches table with Sportmonks fixture IDs (migration 021).
+    // matches.id is now the Sportmonks fixture ID directly; sync-scores will
+    // keep these rows up-to-date at runtime.
+    const matchRows = [];
+    for (const f of fixtures) {
+      const { homeTeam, awayTeam } = extractParticipants(f);
+      const { scoreHome, scoreAway } = extractCurrentScore(f);
+      if (!homeTeam || !awayTeam) continue;
+      matchRows.push({
+        id:            f.id,
+        league_id:     f.league_id ?? null,
+        date:          f.starting_at ? f.starting_at.split('T')[0] : null,
+        kickoff_time:  f.starting_at ?? null,
+        home_team:     homeTeam.name,
+        away_team:     awayTeam.name,
+        home_logo:     homeTeam.image_path ?? null,
+        away_logo:     awayTeam.image_path ?? null,
+        status:        extractStateName(f) || 'NS',
+        custom_status: 'UPCOMING',
+        home_score:    scoreHome ?? 0,
+        away_score:    scoreAway ?? 0,
+        last_updated:  now,
+        last_synced_at: now,
+      });
+    }
+
+    if (matchRows.length > 0) {
+      const { error: matchErr } = await db
+        .from('matches')
+        .upsert(matchRows, { onConflict: 'id' });
+      if (matchErr) {
+        console.warn(`  [matches] upsert warning for ${leagueName} ${chunk.from}–${chunk.to}: ${matchErr.message}`);
+      }
+    }
+
     totalFixtures += rows.length;
     console.log(`  ${leagueName}: ${chunk.from} → ${chunk.to} — ${rows.length} fixtures`);
   }
