@@ -5,32 +5,31 @@
 
 export const LEAGUE_COVERAGE = {
     EPL: {
-        id: 39,
+        id: 8,
         name: 'Premier League',
         country: 'England',
         seasonType: 'european',
     },
     CHAMPIONSHIP: {
-        id: 40,
+        id: 9,
         name: 'Championship',
         country: 'England',
         seasonType: 'european',
     },
     SERIE_A: {
-        id: 135,
+        id: 384,
         name: 'Serie A',
         country: 'Italy',
         seasonType: 'european',
     },
-    LIGA_PORTUGAL: {
-        id: 94,
-        name: 'Liga Portugal',
-        country: 'Portugal',
+    LA_LIGA: {
+        id: 564,
+        name: 'La Liga',
+        country: 'Spain',
         seasonType: 'european',
     },
-
     BUNDESLIGA: {
-        id: 78,
+        id: 82,
         name: 'Bundesliga',
         country: 'Germany',
         seasonType: 'european',

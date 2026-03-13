@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('dotenv/config', () => ({}));
 
 // The handler now inlines SUPPORTED_LEAGUE_IDS — keep a mirror here for assertions.
-const SUPPORTED_LEAGUE_IDS = [39, 40, 78, 135, 94];
+// Sportmonks league IDs: EPL=8, Championship=9, Bundesliga=82, La Liga=564, Serie A=384
+const SUPPORTED_LEAGUE_IDS = [8, 9, 82, 564, 384];
 
 // ── Mock @supabase/supabase-js ──
 // createClient checks env vars at call time so that a fresh module instance
