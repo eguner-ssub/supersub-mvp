@@ -14,7 +14,7 @@ import {
   ALL_MARKETS,
   parseMatchResult,
   parseTotalGoals,
-  parseFirstGoalscorer,
+  parseGoalscorers,
 } from '../lib/oddsParser.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -312,9 +312,9 @@ async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonSt
           const oddsData = json.data || [];
           if (oddsData.length === 0) continue;
           const oddsSnapshot = {
-            match_result:     parseMatchResult(oddsData),
-            total_goals:      parseTotalGoals(oddsData),
-            first_goalscorer: parseFirstGoalscorer(oddsData),
+            match_result: parseMatchResult(oddsData),
+            total_goals:  parseTotalGoals(oddsData),
+            goalscorers:  parseGoalscorers(oddsData),
           };
           const { error: oddsErr } = await db
             .from('matches')

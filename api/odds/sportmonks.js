@@ -3,7 +3,7 @@ import {
     ALL_MARKETS,
     parseMatchResult,
     parseTotalGoals,
-    parseFirstGoalscorer,
+    parseGoalscorers,
 } from '../../lib/oddsParser.js';
 
 // ── Sportmonks odds endpoint ─────────────────────────────────────────────────
@@ -12,7 +12,7 @@ import {
 // Fetches pre-match odds from Sportmonks for markets:
 //   1  — Match Result (1X2)
 //   80 — Over/Under Goals
-//   8  — First Goalscorer
+//   8  — Goalscorers (Anytime scorer, filtered by string fields)
 //
 // matches.id now stores Sportmonks fixture IDs natively (migration 021).
 // No ID translation is needed.
@@ -75,23 +75,23 @@ export default async function handler(req, res) {
             pagination = pageJson.pagination;
         }
 
-        const matchResult     = parseMatchResult(allOdds);
-        const totalGoals      = parseTotalGoals(allOdds);
-        const firstGoalscorer = parseFirstGoalscorer(allOdds);
+        const matchResult  = parseMatchResult(allOdds);
+        const totalGoals   = parseTotalGoals(allOdds);
+        const goalscorers  = parseGoalscorers(allOdds);
 
         // Surface which bookmaker was used (same across all markets when preferred is available)
         const bookmaker_id = matchResult?.bookmaker_id
             ?? totalGoals?.bookmaker_id
-            ?? firstGoalscorer?.[0]?.bookmaker_id
+            ?? goalscorers?.[0]?.bookmaker_id
             ?? null;
 
         const result = {
-            source:           'Sportmonks',
+            source:       'Sportmonks',
             bookmaker_id,
-            fixture_id:       sportmonksId,
-            match_result:     matchResult,
-            total_goals:      totalGoals,
-            first_goalscorer: firstGoalscorer,
+            fixture_id:   sportmonksId,
+            match_result: matchResult,
+            total_goals:  totalGoals,
+            goalscorers,
         };
 
         return res.status(200).json(result);

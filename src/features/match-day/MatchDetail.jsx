@@ -556,19 +556,13 @@ const MatchDetail = () => {
               const oddsData = await oddsRes.json();
               const mr = oddsData.match_result || {};
               const tg = oddsData.total_goals || {};
-              const scorers = (oddsData.first_goalscorer || []).map(p => ({
-                id: p.player_id,
-                name: p.player_name,
-                odds: p.odds,
-              }));
-
               setOdds({
                 home: mr.home || 0,
                 draw: mr.draw || 0,
                 away: mr.away || 0,
                 goals_over: tg.over_2_5 || 0,
                 goals_under: tg.under_2_5 || 0,
-                scorers,
+                goalscorers: oddsData.goalscorers || [],
               });
               setActiveBookie(null); // no bookmaker name available from provider
             } else {
@@ -651,10 +645,10 @@ const MatchDetail = () => {
     }
   };
 
-  // Split first-goalscorer players evenly between Home and Away columns.
-  // odds.scorers is pre-mapped from first_goalscorer: [{ id, name, odds }]
+  // Split goalscorers evenly between Home and Away columns.
+  // odds.goalscorers: [{ player_id, player_name, odds }] from the API.
   const getScorerColumns = () => {
-    const scorers = odds?.scorers;
+    const scorers = odds?.goalscorers;
     if (!scorers || scorers.length === 0) return [[], []];
     const midpoint = Math.ceil(scorers.length / 2);
     return [scorers.slice(0, midpoint), scorers.slice(midpoint)];
@@ -1003,7 +997,7 @@ const MatchDetail = () => {
                 <div className="w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
                   <div className="bg-zinc-800/50 p-6 border-b border-white/5 flex justify-between items-center">
                     <h3 className="text-white font-black uppercase tracking-tighter text-xl">Select Scorer</h3>
-                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">Anytime Market</span>
+                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">Goalscorers</span>
                   </div>
                   <div className="grid grid-cols-2 h-[60vh]">
                     {/* Home Column */}
@@ -1016,8 +1010,8 @@ const MatchDetail = () => {
                         {leftScorers.length === 0 && rightScorers.length === 0 ? (
                           <p className="text-zinc-600 text-[10px] text-center pt-4 uppercase tracking-widest">No players available</p>
                         ) : leftScorers.map((player) => (
-                          <button key={player.id} onClick={() => handleOutcomeClick(`SCORE_${player.id}`, player.odds, player.name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
-                            <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span></div>
+                          <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
+                            <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.player_name}</span></div>
                             <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
                           </button>
                         ))}
@@ -1031,8 +1025,8 @@ const MatchDetail = () => {
                       </div>
                       <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
                         {rightScorers.map((player) => (
-                          <button key={player.id} onClick={() => handleOutcomeClick(`SCORE_${player.id}`, player.odds, player.name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
-                            <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.name}</span></div>
+                          <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
+                            <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.player_name}</span></div>
                             <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
                           </button>
                         ))}
