@@ -94,20 +94,21 @@ const MatchHub = () => {
           </div>
         ) : displayedMatches.length > 0 ? (
           displayedMatches.map((match) => {
-            const status = match.status || match.raw_data?.fixture?.status?.short || 'NS';
-            const matchId = match.id || match.raw_data?.fixture?.id;
+            const status = match.status || 'NS';
+            const matchId = match.id;
             const isMatchLive = isLive(status);
             const isMatchFinished = isFinished(status);
 
-            const homeLogo = match.home_logo || match.raw_data?.teams?.home?.logo;
-            const awayLogo = match.away_logo || match.raw_data?.teams?.away?.logo;
-            const homeName = match.home_team || match.raw_data?.teams?.home?.name || 'Home';
-            const awayName = match.away_team || match.raw_data?.teams?.away?.name || 'Away';
-            const leagueName = match.league_name || match.raw_data?.league?.name || '';
-            const homeScore = match.home_score ?? match.raw_data?.goals?.home ?? 0;
-            const awayScore = match.away_score ?? match.raw_data?.goals?.away ?? 0;
-            const kickoff = match.kickoff_time || match.raw_data?.fixture?.date;
-            const elapsed = match.raw_data?.fixture?.status?.elapsed;
+            const homeLogo = match.home_logo;
+            const awayLogo = match.away_logo;
+            const homeName = match.home_team || 'Home';
+            const awayName = match.away_team || 'Away';
+            const leagueName = match.league_name || '';
+            const homeScore = match.home_score ?? 0;
+            const awayScore = match.away_score ?? 0;
+            const kickoff = match.kickoff_time;
+            // elapsed minute not stored as a direct column yet; live badge still shows
+            const elapsed = null;
 
             return (
               <div

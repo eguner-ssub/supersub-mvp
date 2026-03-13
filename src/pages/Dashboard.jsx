@@ -50,15 +50,15 @@ export default function Dashboard() {
 
       try {
         const { data, error } = await supabase
-          .from('bets')
+          .from('predictions')
           .select('*')
           .eq('user_id', userProfile.id)
-          .in('status', ['pending', 'live']);
+          .in('status', ['PENDING', 'LIVE']);
 
         if (error) throw error;
 
-        const pending = data?.filter(bet => bet.status === 'pending') || [];
-        const live = data?.filter(bet => bet.status === 'live') || [];
+        const pending = data?.filter(bet => bet.status === 'PENDING') || [];
+        const live = data?.filter(bet => bet.status === 'LIVE') || [];
 
         setPendingBets(pending);
         setLiveBets(live);
