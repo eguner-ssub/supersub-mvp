@@ -81,30 +81,20 @@ const AssistantDialogue = ({ activeTab }) => (
 /* ─────────────────────────────────────────────────────────────
    SUBSTITUTES TAB
    ───────────────────────────────────────────────────────────── */
-const SubstitutesTab = ({ fixtureId, match, onStageSupersub }) => {
-  const [lineups, setLineups] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!fixtureId) return;
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/lineups?fixture=${fixtureId}`);
-        const data = await res.json();
-        if (data.response && data.response.length >= 2) {
-          setLineups(data.response);
-        }
-      } catch (err) {
-        console.error('[SubstitutesTab] Error:', err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [fixtureId]);
+// Sportmonks type_id reference:
+//   11 = starting eleven / starter
+//   12 = bench / substitute
+const SM_BENCH_TYPE_ID = 12;
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-white/40 w-6 h-6" /></div>;
-  if (!lineups || lineups.length < 2) return <p className="text-center text-white/30 text-xs uppercase tracking-widest py-12">No substitute data available</p>;
+const SubstitutesTab = ({ match, onStageSupersub }) => {
+  // Sportmonks: match.lineups is a single flat array across both teams.
+  // Each entry has: { team_id, type_id, jersey_number, player: { id, name, display_name }, ... }
+  const allLineups = Array.isArray(match?.lineups) ? match.lineups : [];
+  const benchPlayers = allLineups.filter((p) => p.type_id === SM_BENCH_TYPE_ID);
+
+  if (benchPlayers.length === 0)
+    return <p className="text-center text-white/30 text-xs uppercase tracking-widest py-12">No substitute data available</p>;
 
   // Generate stable mock impact scores per player ID
   const getImpact = (playerId) => {
@@ -112,127 +102,98 @@ const SubstitutesTab = ({ fixtureId, match, onStageSupersub }) => {
     return (seed % 100);
   };
 
-  const renderTeamSubs = (team, teamIndex) => {
-    const subs = team.substitutes || [];
-    const teamName = team.team?.name || (teamIndex === 0 ? 'Home' : 'Away');
-    const teamLogo = team.team?.logo;
-    // Integer team ID — required by backend settlement engine
-    const teamId = team.team?.id ?? null;
-    // Derive HOME/AWAY side from index (lineups[0] is always home)
-    const side = teamIndex === 0 ? 'HOME' : 'AWAY';
+  return (
+    <div style={{ padding: '0 12px' }}>
+      {/* Supersub CTA — spans both teams */}
+      <button
+        onClick={() => onStageSupersub && onStageSupersub('HOME', null, match?.teams?.home?.name || 'Home')}
+        style={{
+          width: '100%',
+          padding: '10px 16px',
+          marginBottom: '14px',
+          background: 'rgba(0,0,0,0.80)',
+          border: '1.5px solid #00e5ff',
+          borderRadius: '12px',
+          color: '#00e5ff',
+          fontFamily: "'Montserrat', sans-serif",
+          fontWeight: 800,
+          fontSize: '12px',
+          textTransform: 'uppercase',
+          letterSpacing: '1.5px',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          boxShadow: '0 0 10px rgba(0,229,255,0.15)',
+        }}
+        onMouseEnter={(e) => { e.target.style.background = 'rgba(0,229,255,0.12)'; e.target.style.boxShadow = '0 0 20px rgba(0,229,255,0.3)'; }}
+        onMouseLeave={(e) => { e.target.style.background = 'rgba(0,0,0,0.80)'; e.target.style.boxShadow = '0 0 10px rgba(0,229,255,0.15)'; }}
+      >
+        ⚡ Use Supersub Card
+      </button>
 
-    return (
-      <div key={teamIndex} style={{ marginBottom: '20px' }}>
-        {/* Team Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '8px 0', marginBottom: '8px',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-        }}>
-          {teamLogo && <img src={teamLogo} alt="" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
-          <span style={{
-            fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-            fontSize: '11px', color: 'rgba(255,255,255,0.7)',
-            textTransform: 'uppercase', letterSpacing: '1.5px',
-          }}>
-            {teamName}
-          </span>
-        </div>
-
-        {/* Supersub CTA — Command Button */}
-        <button
-          onClick={() => onStageSupersub && onStageSupersub(side, teamId, teamName)}
-          style={{
-            width: '100%',
-            padding: '10px 16px',
-            marginBottom: '10px',
-            background: 'rgba(0,0,0,0.80)',
-            border: '1.5px solid #00e5ff',
-            borderRadius: '12px',
-            color: '#00e5ff',
-            fontFamily: "'Montserrat', sans-serif",
-            fontWeight: 800,
-            fontSize: '12px',
-            textTransform: 'uppercase',
-            letterSpacing: '1.5px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: '0 0 10px rgba(0,229,255,0.15)',
-          }}
-          onMouseEnter={(e) => { e.target.style.background = 'rgba(0,229,255,0.12)'; e.target.style.boxShadow = '0 0 20px rgba(0,229,255,0.3)'; }}
-          onMouseLeave={(e) => { e.target.style.background = 'rgba(0,0,0,0.80)'; e.target.style.boxShadow = '0 0 10px rgba(0,229,255,0.15)'; }}
-        >
-          ⚡ Use Supersub Card
-        </button>
-
-        {/* Substitutes List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {subs.map((sub, i) => {
-            const player = sub.player;
-            const impact = getImpact(player?.id || i);
-            return (
-              <div
-                key={player?.id || i}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 10px',
-                  background: 'rgba(255,255,255,0.03)',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                  {/* Shirt Number */}
-                  <div style={{
-                    width: '28px', height: '28px', borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.08)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <span style={{
-                      fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-                      fontSize: '10px', color: 'rgba(255,255,255,0.6)',
-                    }}>
-                      {player?.number || '-'}
-                    </span>
-                  </div>
-                  {/* Name — pure white for max readability */}
-                  <span style={{
-                    fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-                    fontSize: '11px', color: '#FFFFFF',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {player?.name || 'Unknown'}
-                  </span>
-                </div>
-                {/* Impact Badge — opaque amber for pop */}
+      {/* Bench list — all bench players across both teams */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {benchPlayers.map((entry, i) => {
+          // Sportmonks: entry.player.name or entry.player.display_name, entry.jersey_number
+          const playerName = entry.player?.display_name || entry.player?.name || 'Unknown';
+          const jerseyNum  = entry.jersey_number ?? '-';
+          const playerId   = entry.player?.id || i;
+          const impact     = getImpact(playerId);
+          return (
+            <div
+              key={playerId}
+              data-testid={`sub-player-${playerId}`}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 10px',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: '10px',
+                border: '1px solid rgba(255,255,255,0.05)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                {/* Shirt Number */}
                 <div style={{
-                  padding: '3px 8px',
-                  background: 'rgba(245,158,11,0.25)',
-                  border: '1px solid rgba(245,158,11,0.6)',
-                  borderRadius: '4px',
+                  width: '28px', height: '28px', borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
                 }}>
                   <span style={{
-                    fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
-                    fontSize: '11px', color: '#fbbf24',
-                    letterSpacing: '0.5px',
+                    fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
+                    fontSize: '10px', color: 'rgba(255,255,255,0.6)',
                   }}>
-                    {impact}
+                    {jerseyNum}
                   </span>
                 </div>
+                {/* Name */}
+                <span style={{
+                  fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
+                  fontSize: '11px', color: '#FFFFFF',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {playerName}
+                </span>
               </div>
-            );
-          })}
-        </div>
+              {/* Impact Badge */}
+              <div style={{
+                padding: '3px 8px',
+                background: 'rgba(245,158,11,0.25)',
+                border: '1px solid rgba(245,158,11,0.6)',
+                borderRadius: '4px',
+                flexShrink: 0,
+              }}>
+                <span style={{
+                  fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
+                  fontSize: '11px', color: '#fbbf24',
+                  letterSpacing: '0.5px',
+                }}>
+                  {impact}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
-    );
-  };
-
-  return (
-    <div style={{ padding: '0 12px' }}>
-      {renderTeamSubs(lineups[0], 0)}
-      {renderTeamSubs(lineups[1], 1)}
     </div>
   );
 };
@@ -240,48 +201,40 @@ const SubstitutesTab = ({ fixtureId, match, onStageSupersub }) => {
 
 /* ─────────────────────────────────────────────────────────────
    EVENTS TAB — Tactical Timeline
+   Data source: match.events (Sportmonks v3 array stored in raw_data)
    ───────────────────────────────────────────────────────────── */
-const EVENT_ICONS = {
-  Goal: '⚽',
-  Card: '🟨',
-  subst: '🔄',
-  Var: '📺',
+
+// Sportmonks event type_id values (common)
+// 14 = goal, 18 = yellowcard, 15 = redcard, 16 = substitution, 19 = VAR
+const getEventIcon = (typeId, detail) => {
+  if (typeId === 14) return '⚽';
+  if (typeId === 15) return '🟥';
+  if (typeId === 18) return '🟨';
+  if (typeId === 16) return '🔄';
+  if (typeId === 19) return '📺';
+  // Fallback: string-based type for compatibility
+  if (typeof typeId === 'string') {
+    const t = typeId.toLowerCase();
+    if (t.includes('goal'))   return '⚽';
+    if (t.includes('red'))    return '🟥';
+    if (t.includes('yellow')) return '🟨';
+    if (t.includes('sub'))    return '🔄';
+  }
+  return '•';
 };
 
-const getEventIcon = (type, detail) => {
-  if (type === 'Card' && detail === 'Red Card') return '🟥';
-  if (type === 'Card' && detail === 'Second Yellow card') return '🟥';
-  if (type === 'Goal' && detail === 'Own Goal') return '⚽';
-  return EVENT_ICONS[type] || '•';
-};
+const EventsTab = ({ events: eventsProp }) => {
+  // Sportmonks v3 event shape per array entry:
+  //   { type_id, player: { name }, assist: { name }, time: { elapsed }, detail }
+  //   For subs: player = coming off, assist = coming on
+  const events = Array.isArray(eventsProp) ? eventsProp : [];
 
-const EventsTab = ({ fixtureId }) => {
-  const [events, setEvents] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!fixtureId) return;
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/events?fixture=${fixtureId}`);
-        const data = await res.json();
-        setEvents(data.response || []);
-      } catch (err) {
-        console.error('[EventsTab] Error:', err);
-        setEvents([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [fixtureId]);
-
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-white/40 w-6 h-6" /></div>;
-  if (!events || events.length === 0) return <p className="text-center text-white/30 text-xs uppercase tracking-widest py-12">No events yet</p>;
+  if (events.length === 0)
+    return <p className="text-center text-white/30 text-xs uppercase tracking-widest py-12">No events yet</p>;
 
   return (
     <div style={{ padding: '0 12px', position: 'relative' }}>
-      {/* Central timeline line — boosted contrast */}
+      {/* Central timeline line */}
       <div style={{
         position: 'absolute',
         left: '24px',
@@ -293,12 +246,22 @@ const EventsTab = ({ fixtureId }) => {
       }} />
 
       {events.map((evt, i) => {
-        const icon = getEventIcon(evt.type, evt.detail);
-        const isGoal = evt.type === 'Goal';
+        // Sportmonks: type_id is the canonical discriminator; type.name is a string fallback
+        const typeId  = evt.type_id ?? evt.type;
+        const icon    = getEventIcon(typeId, evt.detail);
+        const isGoal  = typeId === 14 || (typeof typeId === 'string' && typeId.toLowerCase().includes('goal'));
+        // Time: Sportmonks stores elapsed minute in event.minute or event.time.elapsed
+        const minute  = evt.minute ?? evt.time?.elapsed ?? '?';
+        // Player name: Sportmonks uses player.name; assist/sub-on uses assist.name
+        const playerName  = evt.player?.name  || evt.player?.display_name  || 'Unknown';
+        const assistName  = evt.assist?.name  || evt.assist?.display_name  || null;
+        // Detail label: use the type string or detail field
+        const detailLabel = evt.detail || (typeof evt.type === 'string' ? evt.type : '');
 
         return (
           <div
             key={i}
+            data-testid={`event-${i}`}
             style={{
               display: 'flex',
               alignItems: 'flex-start',
@@ -325,7 +288,7 @@ const EventsTab = ({ fixtureId }) => {
                 fontSize: '10px',
                 color: isGoal ? '#10b981' : 'rgba(255,255,255,0.5)',
               }}>
-                {evt.time?.elapsed || '?'}'
+                {minute}'
               </span>
             </div>
 
@@ -343,7 +306,7 @@ const EventsTab = ({ fixtureId }) => {
                 color: isGoal ? '#fff' : 'rgba(255,255,255,0.75)',
                 display: 'block',
               }}>
-                {evt.player?.name || 'Unknown'}
+                {playerName}
               </span>
               <span style={{
                 fontFamily: "'Montserrat', sans-serif",
@@ -353,15 +316,15 @@ const EventsTab = ({ fixtureId }) => {
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
               }}>
-                {evt.detail || evt.type}
-                {evt.assist?.name ? ` • Assist: ${evt.assist.name}` : ''}
+                {detailLabel}
+                {assistName ? ` • ${isGoal ? 'Assist' : 'On'}: ${assistName}` : ''}
               </span>
             </div>
 
-            {/* Team badge */}
-            {evt.team?.logo && (
+            {/* Team badge (Sportmonks: participant logo if available) */}
+            {evt.participant?.image_path && (
               <img
-                src={evt.team.logo}
+                src={evt.participant.image_path}
                 alt=""
                 style={{ width: '16px', height: '16px', objectFit: 'contain', opacity: 0.5, flexShrink: 0, marginTop: '4px' }}
               />
@@ -857,14 +820,13 @@ const MatchDetail = () => {
 
             {activeTab === 'SUBS' && (
               <SubstitutesTab
-                fixtureId={id}
                 match={match}
                 onStageSupersub={handleStageSupersub}
               />
             )}
 
             {activeTab === 'EVENTS' && (
-              <EventsTab fixtureId={id} />
+              <EventsTab events={match?.events} />
             )}
 
             {activeTab === 'STATS' && (

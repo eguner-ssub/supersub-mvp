@@ -58,11 +58,65 @@ const MOCK_SPORTMONKS_ODDS = {
     ]
 };
 
+// ─── Sportmonks v3 mock match payload ────────────────────────────────────────
+// normalizeMatch() receives this as already-nested (has `fixture` key),
+// so it passes through unchanged and all sub-fields are preserved.
+//
+// lineups:
+//   type_id 11 → starter (starting eleven)
+//   type_id 12 → bench / substitute
+//
+// events:
+//   type_id 14 → goal   (player = scorer, assist = assister)
+//   type_id 16 → sub    (player = off,    assist = on)
+//   minute      → elapsed minute (top-level, mirrors time.elapsed)
+const MOCK_SM_MATCH = {
+    // normalizeMatch pass-through (already has `fixture`)
+    fixture: { id: 123, date: '2026-02-01T15:00:00', status: { short: 'NS' } },
+    teams: {
+        home: { id: 1, name: 'Arsenal',   logo: '/arsenal.png'   },
+        away: { id: 2, name: 'Tottenham', logo: '/tottenham.png' },
+    },
+    goals: { home: 1, away: 0 },
+
+    // ── Lineups (single flat array across both teams) ────────────────────────
+    lineups: [
+        // Starters — type_id: 11 (Home)
+        { type_id: 11, jersey_number: 1,  team_id: 1, player: { id: 201, name: 'Raya',    display_name: 'Raya'    } },
+        { type_id: 11, jersey_number: 6,  team_id: 1, player: { id: 202, name: 'Gabriel', display_name: 'Gabriel' } },
+        // Bench — type_id: 12 (Home)
+        { type_id: 12, jersey_number: 13, team_id: 1, player: { id: 203, name: 'Jorginho', display_name: 'Jorginho' } },
+        { type_id: 12, jersey_number: 23, team_id: 1, player: { id: 204, name: 'Nketiah',  display_name: 'Nketiah'  } },
+        // Starters — type_id: 11 (Away)
+        { type_id: 11, jersey_number: 1,  team_id: 2, player: { id: 301, name: 'Forster',  display_name: 'Forster'  } },
+        { type_id: 11, jersey_number: 5,  team_id: 2, player: { id: 302, name: 'Romero',   display_name: 'Romero'   } },
+        // Bench — type_id: 12 (Away)
+        { type_id: 12, jersey_number: 18, team_id: 2, player: { id: 303, name: 'Bissouma', display_name: 'Bissouma' } },
+    ],
+
+    // ── Events ───────────────────────────────────────────────────────────────
+    events: [
+        {
+            type_id: 14,
+            minute: 32,
+            player: { id: 202, name: 'Gabriel' },
+            assist: { id: 206, name: 'Ødegaard' },
+            detail: 'Header',
+        },
+        {
+            type_id: 16,
+            minute: 67,
+            player: { id: 201, name: 'Raya' },
+            assist: { id: 204, name: 'Nketiah' },
+            detail: 'Substitution',
+        },
+    ],
+};
+
 describe('MatchDetail - Industrial Battle Arena', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        // Route fetch calls to the correct mock based on URL
         global.fetch.mockImplementation((url) => {
             if (String(url).includes('/api/odds/sportmonks')) {
                 return Promise.resolve({
@@ -70,19 +124,10 @@ describe('MatchDetail - Industrial Battle Arena', () => {
                     json: async () => MOCK_SPORTMONKS_ODDS,
                 });
             }
-            // Default: match API
+            // Default: match API — return Sportmonks-shaped payload
             return Promise.resolve({
                 ok: true,
-                json: async () => ({
-                    response: [{
-                        fixture: { id: 123, date: '2026-02-01T15:00:00', status: { short: 'NS' } },
-                        teams: {
-                            home: { id: 1, name: 'Arsenal', logo: '/arsenal.png' },
-                            away: { id: 2, name: 'Tottenham', logo: '/tottenham.png' }
-                        },
-                        goals: { home: 0, away: 0 }
-                    }]
-                }),
+                json: async () => ({ response: [MOCK_SM_MATCH] }),
             });
         });
     });
@@ -108,12 +153,9 @@ describe('MatchDetail - Industrial Battle Arena', () => {
         const cardBtn = screen.getByTestId('card-c_match_result');
         fireEvent.click(cardBtn);
 
-        // 3. Verify Selection Panels appear with correct format (+250 not 2.50)
+        // 3. Verify Selection Panels appear with correct format (+210 not 2.10)
         await waitFor(() => expect(screen.getByTestId('panel-home')).toBeInTheDocument());
-
-        // Note: The UI format is "+210" (Int), not "2.10" (Float)
-        // Simulation odds for home is 2.10 -> 210 points
-        expect(screen.getByTestId('panel-home')).toHaveTextContent(/210/); // Checks for 210 in "+210"
+        expect(screen.getByTestId('panel-home')).toHaveTextContent(/210/);
     });
 
     // ===========================================
@@ -126,14 +168,11 @@ describe('MatchDetail - Industrial Battle Arena', () => {
         fireEvent.click(screen.getByTestId('card-c_match_result'));
 
         await waitFor(() => expect(screen.getByTestId('panel-away')).toBeInTheDocument());
-        fireEvent.click(screen.getByTestId('panel-away')); // Away odds ~2.90 -> 290 pts
+        fireEvent.click(screen.getByTestId('panel-away'));
 
-        // Wait for Staging Bar
         await waitFor(() => {
             const stagingBar = screen.getByTestId('staging-bar');
-            // displayLabel is set to the team name, e.g. 'Tottenham' for away click
             expect(stagingBar).toHaveTextContent(/Tottenham/i);
-            // Reward is rendered as "{reward} pts"
             expect(stagingBar).toHaveTextContent(/pts/i);
         });
     });
@@ -142,12 +181,10 @@ describe('MatchDetail - Industrial Battle Arena', () => {
     // RESOLUTION FLOW
     // ===========================================
     it('Resolution Flow: calls placeBet and shows Success Modal', async () => {
-        // Setup successful bet
         mockPlaceBet.mockResolvedValue({ success: true });
 
         renderMatchDetail();
 
-        // Flow: Click Card -> Click Home -> Click Confirm
         await waitFor(() => expect(screen.getByTestId('card-c_match_result')).toBeInTheDocument());
         fireEvent.click(screen.getByTestId('card-c_match_result'));
 
@@ -157,14 +194,66 @@ describe('MatchDetail - Industrial Battle Arena', () => {
         await waitFor(() => expect(screen.getByTestId('play-button')).toBeInTheDocument());
         fireEvent.click(screen.getByTestId('play-button'));
 
-        // ASSERT: Context Method called
         await waitFor(() => {
             expect(mockPlaceBet).toHaveBeenCalled();
             expect(mockConsumeCard).toHaveBeenCalledWith('c_match_result');
         });
 
-        // ASSERT: Success Modal (Locked In!)
         expect(screen.getByText(/Locked In!/i)).toBeInTheDocument();
+    });
+
+    // ===========================================
+    // LINEUPS — Sportmonks v3 schema
+    // ===========================================
+    it('Lineups: renders team names from Sportmonks participants', async () => {
+        renderMatchDetail();
+        await waitFor(() => expect(screen.getByText('Arsenal')).toBeInTheDocument());
+        expect(screen.getByText('Tottenham')).toBeInTheDocument();
+    });
+
+    // ===========================================
+    // SUBS TAB — type_id filtering
+    // ===========================================
+    it('Subs Tab: renders bench players filtered by type_id === 12', async () => {
+        renderMatchDetail();
+
+        // Wait for match to load
+        await waitFor(() => expect(screen.getByText('Arsenal')).toBeInTheDocument());
+
+        // Navigate to SUBS tab
+        const subsTab = screen.getByText('SUBS');
+        fireEvent.click(subsTab);
+
+        // Bench players (type_id 12): Jorginho, Nketiah, Bissouma
+        await waitFor(() => {
+            expect(screen.getByText('Jorginho')).toBeInTheDocument();
+            expect(screen.getByText('Nketiah')).toBeInTheDocument();
+            expect(screen.getByText('Bissouma')).toBeInTheDocument();
+        });
+
+        // Starters (type_id 11) should NOT appear in bench list
+        // (Gabriel and Romero are starters)
+        expect(screen.queryByTestId('sub-player-202')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('sub-player-302')).not.toBeInTheDocument();
+    });
+
+    // ===========================================
+    // EVENTS TAB — Sportmonks v3 schema
+    // ===========================================
+    it('Events Tab: renders goal scorer and assist from Sportmonks event shape', async () => {
+        renderMatchDetail();
+
+        await waitFor(() => expect(screen.getByText('Arsenal')).toBeInTheDocument());
+
+        const eventsTab = screen.getByText('EVENTS');
+        fireEvent.click(eventsTab);
+
+        await waitFor(() => {
+            // Goal event — player.name = 'Gabriel'
+            expect(screen.getByText('Gabriel')).toBeInTheDocument();
+            // Substitution player off — player.name = 'Raya'
+            expect(screen.getByText('Raya')).toBeInTheDocument();
+        });
     });
 
 });

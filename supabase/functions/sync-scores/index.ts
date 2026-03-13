@@ -91,21 +91,7 @@ function extractStateName(fixture: any): string {
 // ────────────────────────────────────────────────────
 // STATUS DERIVATION
 // ────────────────────────────────────────────────────
-type CustomStatus = 'UPCOMING' | 'PRE-LIVE' | 'LIVE' | 'COMPLETED';
 
-function deriveCustomStatus(
-  apiStatus: string,
-  kickoffTime: Date,
-  now: Date
-): CustomStatus {
-  if (TERMINAL_STATUSES.includes(apiStatus)) return 'COMPLETED';
-  if (IN_PLAY_STATUSES.includes(apiStatus))  return 'LIVE';
-
-  const msUntilKickoff = kickoffTime.getTime() - now.getTime();
-  if (msUntilKickoff <= LIVE_WINDOW_MS && msUntilKickoff > 0) return 'LIVE';
-  if (msUntilKickoff <= PRE_LIVE_WINDOW_MS)                   return 'PRE-LIVE';
-  return 'UPCOMING';
-}
 
 // ────────────────────────────────────────────────────
 // HELPERS
@@ -143,8 +129,6 @@ function buildPayload(
   isPreLive: boolean
 ): any {
   const apiStatus    = extractStateName(fixture);
-  const kickoffTime  = new Date(fixture.starting_at);
-  const customStatus = deriveCustomStatus(apiStatus, kickoffTime, now);
 
   const { homeTeam, awayTeam }     = extractParticipants(fixture);
   const { scoreHome, scoreAway }   = extractCurrentScore(fixture);
@@ -157,7 +141,6 @@ function buildPayload(
     home_logo:      homeTeam?.image_path ?? null,
     away_logo:      awayTeam?.image_path ?? null,
     status:         apiStatus,
-    custom_status:  customStatus,
     home_score:     scoreHome ?? 0,
     away_score:     scoreAway ?? 0,
     kickoff_time:   fixture.starting_at,
@@ -339,7 +322,6 @@ async function fixturesService(
 
     const payloads = supported.map((fixture: any) => {
       const apiStatus  = extractStateName(fixture);
-      const kickoff    = new Date(fixture.starting_at);
       const { homeTeam, awayTeam }   = extractParticipants(fixture);
       const { scoreHome, scoreAway } = extractCurrentScore(fixture);
 
@@ -349,7 +331,6 @@ async function fixturesService(
         kickoff_time:  fixture.starting_at,
         league_id:     fixture.league_id,
         status:        apiStatus,
-        custom_status: deriveCustomStatus(apiStatus, kickoff, now),
         home_team:     homeTeam?.name ?? 'Unknown',
         away_team:     awayTeam?.name ?? 'Unknown',
         home_logo:     homeTeam?.image_path ?? null,
@@ -483,7 +464,7 @@ async function liveScoresService(
       try {
         result.apiCalls++;
         const json = await smRequest(`/fixtures/${m.id}`, {
-          include: 'scores;state;participants;events',
+          include: 'scores;state;participants;events;statistics',
         });
         if (json.data) fgFixtures.push(json.data);
       } catch (err) {
@@ -588,7 +569,7 @@ async function liveScoresService(
         console.log(`[WATCHER] [LIVE] SINGLE mode: id=${liveTargets[0].id}`);
         result.apiCalls++;
         const json = await smRequest(`/fixtures/${liveTargets[0].id}`, {
-          include: 'scores;state;participants;events',
+          include: 'scores;state;participants;events;statistics',
         });
         if (json.data) liveFixtures.push(json.data);
       } else {
@@ -598,7 +579,7 @@ async function liveScoresService(
         console.log(`[WATCHER] [LIVE] MULTI mode: leagues=${uniqueLiveLeagues.join(',')}`);
         result.apiCalls++;
         const json = await smRequest('/livescores/inplay', {
-          include: 'scores;state;events;participants',
+          include: 'scores;state;events;participants;statistics',
           filters: `fixtureLeagues:${uniqueLiveLeagues.join(',')}`,
         });
         liveFixtures = json.data || [];
@@ -618,7 +599,7 @@ async function liveScoresService(
           try {
             result.apiCalls++;
             const ghostJson = await smRequest(`/fixtures/${ghost.id}`, {
-              include: 'scores;state;participants;events',
+              include: 'scores;state;participants;events;statistics',
             });
             if (ghostJson.data) liveFixtures.push(ghostJson.data);
           } catch (ghostErr) {
