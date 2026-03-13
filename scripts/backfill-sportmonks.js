@@ -10,6 +10,12 @@ import {
   getStandings,
   getTopScorers,
 } from '../lib/sportmonks.js';
+import {
+  ALL_MARKETS,
+  parseMatchResult,
+  parseTotalGoals,
+  parseFirstGoalscorer,
+} from '../lib/oddsParser.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -288,6 +294,38 @@ async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonSt
       if (matchErr) {
         console.warn(`  [matches] upsert warning for ${leagueName} ${chunk.from}–${chunk.to}: ${matchErr.message}`);
       }
+    }
+
+    // Pre-fetch and cache odds for upcoming (NS) fixtures only.
+    // Finished matches have no pre-match odds; skipping them avoids unnecessary
+    // API calls and rate-limit pressure.
+    const upcomingRows = matchRows.filter(r => r.status === 'NS');
+    if (upcomingRows.length > 0) {
+      const token = process.env.SPORTMONKS_API_TOKEN;
+      let oddsCount = 0;
+      for (const row of upcomingRows) {
+        try {
+          const url = `https://api.sportmonks.com/v3/football/odds/pre-match/fixtures/${row.id}?api_token=${token}&filters=markets:${ALL_MARKETS.join(',')}`;
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const json = await res.json();
+          const oddsData = json.data || [];
+          if (oddsData.length === 0) continue;
+          const oddsSnapshot = {
+            match_result:     parseMatchResult(oddsData),
+            total_goals:      parseTotalGoals(oddsData),
+            first_goalscorer: parseFirstGoalscorer(oddsData),
+          };
+          const { error: oddsErr } = await db
+            .from('matches')
+            .update({ odds: oddsSnapshot })
+            .eq('id', row.id);
+          if (!oddsErr) oddsCount++;
+        } catch (_) {
+          // Non-critical — MatchDetail falls back to live /api/odds/sportmonks fetch
+        }
+      }
+      console.log(`  ${leagueName}: odds cached for ${oddsCount}/${upcomingRows.length} upcoming fixtures`);
     }
 
     totalFixtures += rows.length;

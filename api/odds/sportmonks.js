@@ -1,4 +1,10 @@
 import 'dotenv/config';
+import {
+    ALL_MARKETS,
+    parseMatchResult,
+    parseTotalGoals,
+    parseFirstGoalscorer,
+} from '../../lib/oddsParser.js';
 
 // ── Sportmonks odds endpoint ─────────────────────────────────────────────────
 // GET /api/odds/sportmonks?fixture=<matches.id (Sportmonks fixture ID)>
@@ -10,6 +16,8 @@ import 'dotenv/config';
 //
 // matches.id now stores Sportmonks fixture IDs natively (migration 021).
 // No ID translation is needed.
+//
+// Bookmaker preference: Bet365 (id 2) — see lib/oddsParser.js for details.
 
 const BASE_URL = 'https://api.sportmonks.com/v3/football';
 
@@ -17,73 +25,6 @@ function getToken() {
     const token = process.env.SPORTMONKS_API_TOKEN;
     if (!token) throw new Error('Missing env var SPORTMONKS_API_TOKEN');
     return token;
-}
-
-// ── Market IDs ───────────────────────────────────────────────────────────────
-const MARKET_MATCH_RESULT = 1;
-const MARKET_OVER_UNDER = 80;
-const MARKET_FIRST_GOALSCORER = 8;
-
-const ALL_MARKETS = [MARKET_MATCH_RESULT, MARKET_OVER_UNDER, MARKET_FIRST_GOALSCORER];
-
-// ── Parsers ──────────────────────────────────────────────────────────────────
-
-function parseMatchResult(odds) {
-    const market = odds.filter(o => o.market_id === MARKET_MATCH_RESULT);
-    if (market.length === 0) return null;
-
-    // Pick lowest bookmaker_id as canonical (most consistent)
-    const bookmakers = [...new Set(market.map(o => o.bookmaker_id))].sort((a, b) => a - b);
-    const bookmaker = bookmakers[0];
-    const filtered = market.filter(o => o.bookmaker_id === bookmaker);
-
-    const home = filtered.find(o => o.label === 'Home');
-    const draw = filtered.find(o => o.label === 'Draw');
-    const away = filtered.find(o => o.label === 'Away');
-
-    return {
-        home: home ? parseFloat(home.value) : 0,
-        draw: draw ? parseFloat(draw.value) : 0,
-        away: away ? parseFloat(away.value) : 0,
-    };
-}
-
-function parseTotalGoals(odds) {
-    const market = odds.filter(o => o.market_id === MARKET_OVER_UNDER);
-    if (market.length === 0) return null;
-
-    // Filter to Over/Under 2.5 specifically
-    const bookmakers = [...new Set(market.map(o => o.bookmaker_id))].sort((a, b) => a - b);
-    const bookmaker = bookmakers[0];
-    const filtered = market.filter(o => o.bookmaker_id === bookmaker);
-
-    // total field contains the line (e.g. "2.5")
-    const over = filtered.find(o => o.label === 'Over' && String(o.total) === '2.5');
-    const under = filtered.find(o => o.label === 'Under' && String(o.total) === '2.5');
-
-    return {
-        over_2_5: over ? parseFloat(over.value) : 0,
-        under_2_5: under ? parseFloat(under.value) : 0,
-    };
-}
-
-function parseFirstGoalscorer(odds) {
-    const market = odds.filter(o => o.market_id === MARKET_FIRST_GOALSCORER);
-    if (market.length === 0) return null;
-
-    // Pick one bookmaker for consistency
-    const bookmakers = [...new Set(market.map(o => o.bookmaker_id))].sort((a, b) => a - b);
-    const bookmaker = bookmakers[0];
-    const filtered = market.filter(o => o.bookmaker_id === bookmaker);
-
-    // For goalscorer markets: label/name = player name, participants may contain player info
-    return filtered.map(o => ({
-        player_id: o.player_id ?? null,
-        player_name: o.name || o.label || 'Unknown',
-        odds: parseFloat(o.value) || 0,
-        participants: o.participants ?? null,
-    })).filter(p => p.odds > 0)
-      .sort((a, b) => a.odds - b.odds); // lowest odds first (most likely scorers)
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────
@@ -121,7 +62,7 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: 'No odds available for this fixture' });
         }
 
-        // Check pagination — fetch remaining pages if needed
+        // Fetch remaining pages if paginated
         let allOdds = [...odds];
         let pagination = json.pagination;
         while (pagination?.has_more) {
@@ -134,12 +75,23 @@ export default async function handler(req, res) {
             pagination = pageJson.pagination;
         }
 
+        const matchResult     = parseMatchResult(allOdds);
+        const totalGoals      = parseTotalGoals(allOdds);
+        const firstGoalscorer = parseFirstGoalscorer(allOdds);
+
+        // Surface which bookmaker was used (same across all markets when preferred is available)
+        const bookmaker_id = matchResult?.bookmaker_id
+            ?? totalGoals?.bookmaker_id
+            ?? firstGoalscorer?.[0]?.bookmaker_id
+            ?? null;
+
         const result = {
-            source: 'Sportmonks',
-            fixture_id: sportmonksId,
-            match_result: parseMatchResult(allOdds),
-            total_goals: parseTotalGoals(allOdds),
-            first_goalscorer: parseFirstGoalscorer(allOdds),
+            source:           'Sportmonks',
+            bookmaker_id,
+            fixture_id:       sportmonksId,
+            match_result:     matchResult,
+            total_goals:      totalGoals,
+            first_goalscorer: firstGoalscorer,
         };
 
         return res.status(200).json(result);
