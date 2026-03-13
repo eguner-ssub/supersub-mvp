@@ -36,11 +36,11 @@ const MatchHub = () => {
     setSelectedDate(newDate);
   };
 
-  const isLive = (status) => ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(status);
-  const isFinished = (status) => ['FT', 'AET', 'PEN'].includes(status);
+  const isLive = (status) => ['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'].includes(status);
+  const isFinished = (status) => ['FT', 'AET', 'FT_PEN', 'POSTPONED', 'CANCELLED', 'ABANDONED', 'AWARDED', 'WO'].includes(status);
 
   const displayedMatches = showLiveOnly
-    ? matches.filter(m => isLive(m.status || m.raw_data?.fixture?.status?.short))
+    ? matches.filter(m => isLive(m.status))
     : matches;
 
   return (

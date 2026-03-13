@@ -13,8 +13,8 @@
  */
 
 // ── Shared constants (mirrored from scripts/settle.js) ──────────────────────
-const FINISHED_STATUSES = ['FT', 'AET', 'PEN'];
-const VOID_STATUSES = ['PST', 'CANC', 'ABD', 'SUSP', 'INT', 'AWD', 'WO'];
+const FINISHED_STATUSES = ['FT', 'AET', 'FT_PEN'];
+const VOID_STATUSES = ['POSTPONED', 'CANCELLED', 'ABANDONED', 'SUSPENDED', 'AWARDED', 'WO'];
 const COUNTABLE_GOAL_DETAILS = ['Normal Goal', 'Penalty'];
 
 /**

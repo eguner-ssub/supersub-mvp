@@ -719,13 +719,13 @@ const MatchDetail = () => {
             {/* Center Block - Anchor (Fixed/Shrinkwrapped) */}
             <div className="w-auto flex-shrink-0 mx-2 flex flex-col items-center justify-center z-10">
               {/* Top: Status/Date */}
-              <span className={`text-[9px] font-bold tracking-widest uppercase mb-[2px] leading-none ${['1H', '2H', 'HT', 'ET', 'P'].includes(match.fixture.status.short)
+              <span className={`text-[9px] font-bold tracking-widest uppercase mb-[2px] leading-none ${['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'].includes(match.fixture.status.short)
                 ? 'text-[#39ff14]'
                 : 'text-zinc-400'
                 }`}>
                 {match.fixture.status.short === 'NS'
                   ? new Date(match.fixture.date).toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()
-                  : match.fixture.status.short
+                  : ({ INPLAY_1ST_HALF: '1H', HT: 'HT', INPLAY_2ND_HALF: '2H', INPLAY_ET: 'ET', INPLAY_ET_SECOND_HALF: 'ET', EXTRA_TIME_BREAK: 'BT', INPLAY_PENALTIES: 'PENS', BREAK: 'BT', FT: 'FT', AET: 'AET', FT_PEN: 'FT-P', POSTPONED: 'PST', CANCELLED: 'CANC', ABANDONED: 'ABD', AWARDED: 'AWD', WO: 'WO' }[match.fixture.status.short] ?? match.fixture.status.short)
                 }
               </span>
               {/* Bottom: Score */}

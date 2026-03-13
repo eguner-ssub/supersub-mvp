@@ -11,9 +11,9 @@ dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 // ── Status classifications ──────────────────────────────────────────────────
-const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
-const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'P', 'LIVE', 'BT'];
-const VOID_STATUSES = ['PST', 'CANC', 'ABD', 'SUSP', 'INT', 'AWD', 'WO'];
+const FINAL_STATUSES = ['FT', 'AET', 'FT_PEN'];
+const LIVE_STATUSES = ['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'];
+const VOID_STATUSES = ['POSTPONED', 'CANCELLED', 'ABANDONED', 'SUSPENDED', 'AWARDED', 'WO'];
 
 const isFinished = (status) => FINAL_STATUSES.includes(status);
 const isLive = (status) => LIVE_STATUSES.includes(status);

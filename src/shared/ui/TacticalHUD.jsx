@@ -35,14 +35,25 @@ const TacticalHUD = ({ homeTeam, awayTeam, status, elapsed, date }) => {
     // Deliberately excludes previousScore from deps — it's internal tracking state,
     // not an external trigger. Including it would cause an infinite re-render loop.
 
+    // Short display labels for Sportmonks developer_name status values
+    const STATUS_LABEL = {
+        INPLAY_1ST_HALF: '1H', HT: 'HT', INPLAY_2ND_HALF: '2H',
+        INPLAY_ET: 'ET', INPLAY_ET_SECOND_HALF: 'ET', EXTRA_TIME_BREAK: 'BT',
+        INPLAY_PENALTIES: 'PENS', BREAK: 'BT',
+        FT: 'FT', AET: 'AET', FT_PEN: 'FT-P',
+        POSTPONED: 'PST', CANCELLED: 'CANC', ABANDONED: 'ABD', AWARDED: 'AWD', WO: 'WO',
+    };
+
     // Status badge configuration
     const getStatusConfig = () => {
-        const liveStatuses = ['1H', '2H', 'HT', 'ET', 'P', 'LIVE'];
-        const postStatuses = ['FT', 'AET', 'PEN'];
+        const liveStatuses = ['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'];
+        const postStatuses = ['FT', 'AET', 'FT_PEN', 'POSTPONED', 'CANCELLED', 'ABANDONED', 'AWARDED', 'WO'];
+
+        const label = STATUS_LABEL[status] ?? status ?? 'NS';
 
         if (liveStatuses.includes(status)) {
             return {
-                label: status,
+                label,
                 color: 'text-[#fbbf24]', // Warning Yellow
                 border: 'border-[#39ff14]', // Toxic Green
                 glow: 'shadow-[0_0_8px_rgba(57,255,20,0.3)]'
@@ -51,7 +62,7 @@ const TacticalHUD = ({ homeTeam, awayTeam, status, elapsed, date }) => {
 
         if (postStatuses.includes(status)) {
             return {
-                label: status,
+                label,
                 color: 'text-zinc-500',
                 border: 'border-zinc-700',
                 glow: ''

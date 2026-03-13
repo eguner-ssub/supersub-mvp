@@ -34,7 +34,7 @@ const ManagerOffice = () => {
                 const data = await res.json();
 
                 if (data.response && Array.isArray(data.response)) {
-                    const liveStatuses = ['1H', 'HT', '2H', 'ET', 'P', 'LIVE'];
+                    const liveStatuses = ['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'];
 
                     const isAnyMatchLive = data.response.some(raw => {
                         const match = normalizeMatch(raw);

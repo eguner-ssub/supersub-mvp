@@ -122,7 +122,7 @@ describe('Match Result card', () => {
     it('PENDING: match still in progress (2H)', () => {
         expect(calculateResult(
             makeBet({ selection: 'HOME_WIN' }),
-            makeMatch({ status: '2H', home_score: 1, away_score: 0 })
+            makeMatch({ status: 'INPLAY_2ND_HALF', home_score: 1, away_score: 0 })
         ).status).toBe('PENDING');
     });
 
@@ -133,10 +133,10 @@ describe('Match Result card', () => {
         ).status).toBe('WON');
     });
 
-    it('WON: PEN recognised as finished', () => {
+    it('WON: FT_PEN recognised as finished', () => {
         expect(calculateResult(
             makeBet({ selection: 'AWAY_WIN' }),
-            makeMatch({ status: 'PEN', home_score: 0, away_score: 1 })
+            makeMatch({ status: 'FT_PEN', home_score: 0, away_score: 1 })
         ).status).toBe('WON');
     });
 
