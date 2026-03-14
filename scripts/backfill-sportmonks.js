@@ -270,19 +270,21 @@ async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonSt
       const { scoreHome, scoreAway } = extractCurrentScore(f);
       if (!homeTeam || !awayTeam) continue;
       matchRows.push({
-        id:            f.id,
-        league_id:     f.league_id ?? null,
-        date:          f.starting_at ? f.starting_at.split('T')[0] : null,
-        kickoff_time:  f.starting_at ?? null,
-        home_team:     homeTeam.name,
-        away_team:     awayTeam.name,
-        home_logo:     homeTeam.image_path ?? null,
-        away_logo:     awayTeam.image_path ?? null,
-        status:        extractStateName(f) || 'NS',
+        id: f.id,
+        league_id: f.league_id ?? null,
+        date: f.starting_at ? f.starting_at.split('T')[0] : null,
+        kickoff_time: f.starting_at ?? null,
+        home_team: homeTeam.name,
+        away_team: awayTeam.name,
+        home_logo: homeTeam.image_path ?? null,
+        away_logo: awayTeam.image_path ?? null,
+        home_team_id: homeTeam.id,
+        away_team_id: awayTeam.id,
+        status: extractStateName(f) || 'NS',
         custom_status: 'UPCOMING',
-        home_score:    scoreHome ?? 0,
-        away_score:    scoreAway ?? 0,
-        last_updated:  now,
+        home_score: scoreHome ?? 0,
+        away_score: scoreAway ?? 0,
+        last_updated: now,
         last_synced_at: now,
       });
     }
@@ -313,8 +315,8 @@ async function backfillFixtures(db, leagueName, smLeagueId, seasonUuid, seasonSt
           if (oddsData.length === 0) continue;
           const oddsSnapshot = {
             match_result: parseMatchResult(oddsData),
-            total_goals:  parseTotalGoals(oddsData),
-            goalscorers:  parseGoalscorers(oddsData),
+            total_goals: parseTotalGoals(oddsData),
+            goalscorers: parseGoalscorers(oddsData),
           };
           const { error: oddsErr } = await db
             .from('matches')
