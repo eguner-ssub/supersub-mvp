@@ -642,11 +642,8 @@ async function liveScoresService(
         }
 
         if (suppFixtures.length > 0) {
-          const suppLineupsMap = new Map<number, any>(
-            suppFixtures.map((f: any) => [f.id, lineupsMap.get(f.id) ?? null])
-          );
           await upsertFixtures(
-            supabase, suppFixtures, now, true, 'WATCHER/LIVE/LINEUP-SUPPLEMENT', result, suppLineupsMap
+            supabase, suppFixtures, now, true, 'WATCHER/LIVE/LINEUP-SUPPLEMENT', result
           );
         }
       }
