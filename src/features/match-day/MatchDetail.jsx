@@ -88,113 +88,112 @@ const AssistantDialogue = ({ activeTab }) => (
 const SM_BENCH_TYPE_ID = 12;
 
 const SubstitutesTab = ({ match, onStageSupersub }) => {
-  // Sportmonks: match.lineups is a single flat array across both teams.
-  // Each entry has: { team_id, type_id, jersey_number, player: { id, name, display_name }, ... }
   const allLineups = Array.isArray(match?.lineups) ? match.lineups : [];
   const benchPlayers = allLineups.filter((p) => p.type_id === SM_BENCH_TYPE_ID);
 
   if (benchPlayers.length === 0)
     return <p className="text-center text-white/30 text-xs uppercase tracking-widest py-12">No substitute data available</p>;
 
-  // Generate stable mock impact scores per player ID
-  const getImpact = (playerId) => {
-    const seed = (playerId * 2654435761) >>> 0;
-    return (seed % 100);
+  const homeId = match?.teams?.home?.id;
+  const awayId = match?.teams?.away?.id;
+
+  const homeBench = benchPlayers.filter(p => p.team_id === homeId);
+  const awayBench = benchPlayers.filter(p => p.team_id === awayId);
+
+  const renderBench = (side, teamId, teamName, teamLogo, players) => {
+    if (players.length === 0) return null;
+
+    return (
+      <div style={{ marginBottom: '24px' }}>
+        {/* Team Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+          {teamLogo && <img src={teamLogo} alt={teamName} style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
+          <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '12px', color: '#fff', textTransform: 'uppercase' }}>
+            {teamName} Bench
+          </span>
+        </div>
+
+        {/* Supersub CTA */}
+        <button
+          onClick={() => onStageSupersub && onStageSupersub(side, teamId, teamName)}
+          style={{
+            width: '100%',
+            padding: '10px 16px',
+            marginBottom: '14px',
+            background: 'rgba(0,0,0,0.80)',
+            border: '1.5px solid #00e5ff',
+            borderRadius: '12px',
+            color: '#00e5ff',
+            fontFamily: "'Montserrat', sans-serif",
+            fontWeight: 800,
+            fontSize: '12px',
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: '0 0 10px rgba(0,229,255,0.15)',
+          }}
+          onMouseEnter={(e) => { e.target.style.background = 'rgba(0,229,255,0.12)'; e.target.style.boxShadow = '0 0 20px rgba(0,229,255,0.3)'; }}
+          onMouseLeave={(e) => { e.target.style.background = 'rgba(0,0,0,0.80)'; e.target.style.boxShadow = '0 0 10px rgba(0,229,255,0.15)'; }}
+        >
+          ⚡ Use Supersub Card
+        </button>
+
+        {/* Bench list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {players.map((entry, i) => {
+            const playerName = entry.player_name || entry.player?.display_name || entry.player?.name || 'Unknown';
+            const jerseyNum = entry.jersey_number ?? '-';
+            const playerId = entry.player_id || entry.player?.id || i;
+
+            return (
+              <div
+                key={playerId}
+                data-testid={`sub-player-${playerId}`}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '8px 10px',
+                  background: 'rgba(255,255,255,0.03)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                  {/* Shirt Number */}
+                  <div style={{
+                    width: '28px', height: '28px', borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.08)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    <span style={{
+                      fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
+                      fontSize: '10px', color: 'rgba(255,255,255,0.6)',
+                    }}>
+                      {jerseyNum}
+                    </span>
+                  </div>
+                  {/* Name */}
+                  <span style={{
+                    fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
+                    fontSize: '11px', color: '#FFFFFF',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {playerName}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (
     <div style={{ padding: '0 12px' }}>
-      {/* Supersub CTA — spans both teams */}
-      <button
-        onClick={() => onStageSupersub && onStageSupersub('HOME', null, match?.teams?.home?.name || 'Home')}
-        style={{
-          width: '100%',
-          padding: '10px 16px',
-          marginBottom: '14px',
-          background: 'rgba(0,0,0,0.80)',
-          border: '1.5px solid #00e5ff',
-          borderRadius: '12px',
-          color: '#00e5ff',
-          fontFamily: "'Montserrat', sans-serif",
-          fontWeight: 800,
-          fontSize: '12px',
-          textTransform: 'uppercase',
-          letterSpacing: '1.5px',
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          boxShadow: '0 0 10px rgba(0,229,255,0.15)',
-        }}
-        onMouseEnter={(e) => { e.target.style.background = 'rgba(0,229,255,0.12)'; e.target.style.boxShadow = '0 0 20px rgba(0,229,255,0.3)'; }}
-        onMouseLeave={(e) => { e.target.style.background = 'rgba(0,0,0,0.80)'; e.target.style.boxShadow = '0 0 10px rgba(0,229,255,0.15)'; }}
-      >
-        ⚡ Use Supersub Card
-      </button>
-
-      {/* Bench list — all bench players across both teams */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {benchPlayers.map((entry, i) => {
-          // Sportmonks: player_name is a top-level field on the lineup record.
-          // entry.player nested object is only present if lineups.player sub-include was requested.
-          const playerName = entry.player_name || entry.player?.display_name || entry.player?.name || 'Unknown';
-          const jerseyNum  = entry.jersey_number ?? '-';
-          const playerId   = entry.player_id || entry.player?.id || i;
-          const impact     = getImpact(playerId);
-          return (
-            <div
-              key={playerId}
-              data-testid={`sub-player-${playerId}`}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '8px 10px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: '10px',
-                border: '1px solid rgba(255,255,255,0.05)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                {/* Shirt Number */}
-                <div style={{
-                  width: '28px', height: '28px', borderRadius: '50%',
-                  background: 'rgba(255,255,255,0.08)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                  <span style={{
-                    fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-                    fontSize: '10px', color: 'rgba(255,255,255,0.6)',
-                  }}>
-                    {jerseyNum}
-                  </span>
-                </div>
-                {/* Name */}
-                <span style={{
-                  fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-                  fontSize: '11px', color: '#FFFFFF',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {playerName}
-                </span>
-              </div>
-              {/* Impact Badge */}
-              <div style={{
-                padding: '3px 8px',
-                background: 'rgba(245,158,11,0.25)',
-                border: '1px solid rgba(245,158,11,0.6)',
-                borderRadius: '4px',
-                flexShrink: 0,
-              }}>
-                <span style={{
-                  fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
-                  fontSize: '11px', color: '#fbbf24',
-                  letterSpacing: '0.5px',
-                }}>
-                  {impact}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {renderBench('HOME', homeId, match?.teams?.home?.name || 'Home', match?.teams?.home?.logo, homeBench)}
+      {renderBench('AWAY', awayId, match?.teams?.away?.name || 'Away', match?.teams?.away?.logo, awayBench)}
     </div>
   );
 };
@@ -202,16 +201,8 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
 
 /* ─────────────────────────────────────────────────────────────
    EVENTS TAB — Tactical Timeline
-   Data source: match.events (Sportmonks v3 array stored in raw_data)
    ───────────────────────────────────────────────────────────── */
 
-// Verified Sportmonks V3 event type_id → icon mapping
-// Goals:   14 (Goal), 15 (Own Goal), 16 (Penalty Goal), 23 (Pen Shootout Goal)
-// Missed:  17 (Missed Penalty), 22 (Pen Shootout Miss)
-// Sub:     18 (Substitution)
-// Yellow:  19 (Yellow Card)
-// Red:     20 (Direct Red), 21 (Yellow-Red)
-// VAR:     10 (VAR Review)
 const getEventIcon = (typeId, detail) => {
   if (typeId === 14 || typeId === 15 || typeId === 16 || typeId === 23) return '⚽';
   if (typeId === 17 || typeId === 22) return '❌';
@@ -219,22 +210,18 @@ const getEventIcon = (typeId, detail) => {
   if (typeId === 19) return '🟨';
   if (typeId === 20 || typeId === 21) return '🟥';
   if (typeId === 10) return '🔍';
-  // Fallback: string-based type for payload drift resilience
   if (typeof typeId === 'string') {
     const t = typeId.toLowerCase();
-    if (t.includes('goal'))   return '⚽';
-    if (t.includes('sub'))    return '🔄';
+    if (t.includes('goal')) return '⚽';
+    if (t.includes('sub')) return '🔄';
     if (t.includes('yellow')) return '🟨';
-    if (t.includes('red'))    return '🟥';
-    if (t.includes('var'))    return '🔍';
+    if (t.includes('red')) return '🟥';
+    if (t.includes('var')) return '🔍';
   }
   return '•';
 };
 
 const EventsTab = ({ events: eventsProp }) => {
-  // Sportmonks v3 event shape per array entry:
-  //   { type_id, player: { name }, assist: { name }, time: { elapsed }, detail }
-  //   For subs: player = coming off, assist = coming on
   const events = Array.isArray(eventsProp) ? eventsProp : [];
 
   if (events.length === 0)
@@ -242,7 +229,6 @@ const EventsTab = ({ events: eventsProp }) => {
 
   return (
     <div style={{ padding: '0 12px', position: 'relative' }}>
-      {/* Central timeline line */}
       <div style={{
         position: 'absolute',
         left: '24px',
@@ -254,20 +240,12 @@ const EventsTab = ({ events: eventsProp }) => {
       }} />
 
       {events.map((evt, i) => {
-        // Sportmonks: type_id is the canonical discriminator; type.name is a string fallback
-        const typeId  = evt.type_id ?? evt.type;
-        const icon    = getEventIcon(typeId, evt.detail);
-        const isGoal  = typeId === 14 || (typeof typeId === 'string' && typeId.toLowerCase().includes('goal'));
-        // Time: Sportmonks stores elapsed minute as top-level integer (evt.minute).
-        // Fallback to nested evt.time.elapsed for any legacy API-Football format rows.
-        const minute  = evt.minute ?? evt.time?.elapsed ?? '?';
-        // Player name: Sportmonks stores player_name as a top-level field.
-        // evt.player nested object is only present with lineups.player sub-include.
-        const playerName  = evt.player_name || evt.player?.name  || evt.player?.display_name  || 'Unknown';
-        // For substitutions: evt.related_player_name = player coming on.
-        // For goals: evt.related_player_name = assister.
-        const assistName  = evt.related_player_name || evt.assist?.name  || evt.assist?.display_name  || null;
-        // Detail label: use the type string or detail field
+        const typeId = evt.type_id ?? evt.type;
+        const icon = getEventIcon(typeId, evt.detail);
+        const isGoal = typeId === 14 || (typeof typeId === 'string' && typeId.toLowerCase().includes('goal'));
+        const minute = evt.minute ?? evt.time?.elapsed ?? '?';
+        const playerName = evt.player_name || evt.player?.name || evt.player?.display_name || 'Unknown';
+        const assistName = evt.related_player_name || evt.assist?.name || evt.assist?.display_name || null;
         const detailLabel = evt.detail || (typeof evt.type === 'string' ? evt.type : '');
 
         return (
@@ -283,7 +261,6 @@ const EventsTab = ({ events: eventsProp }) => {
               marginLeft: '0',
             }}
           >
-            {/* Minute bubble */}
             <div style={{
               width: '48px',
               height: '28px',
@@ -304,12 +281,10 @@ const EventsTab = ({ events: eventsProp }) => {
               </span>
             </div>
 
-            {/* Icon */}
             <span style={{ fontSize: '16px', lineHeight: '28px', flexShrink: 0 }}>
               {icon}
             </span>
 
-            {/* Content */}
             <div style={{ flex: 1, minWidth: 0, paddingTop: '3px' }}>
               <span style={{
                 fontFamily: "'Montserrat', sans-serif",
@@ -333,7 +308,6 @@ const EventsTab = ({ events: eventsProp }) => {
               </span>
             </div>
 
-            {/* Team badge (Sportmonks: participant logo if available) */}
             {evt.participant?.image_path && (
               <img
                 src={evt.participant.image_path}
@@ -353,11 +327,8 @@ const EventsTab = ({ events: eventsProp }) => {
    STATS TAB — High-contrast comparison bars
    ───────────────────────────────────────────────────────────── */
 const StatsTab = ({ match }) => {
-  // Match detail includes statistics in match.statistics
-  // For now, use what's available or mock
   const stats = match?.statistics;
 
-  // Try to extract from API data, fallback to mocked
   const getStat = (statName) => {
     if (stats && stats.length >= 2) {
       const homeStat = stats[0]?.statistics?.find(s => s.type === statName);
@@ -372,15 +343,14 @@ const StatsTab = ({ match }) => {
     return null;
   };
 
-  // Only show real data — no fallbacks, no simulated values
   const possession = getStat('Ball Possession');
-  const shotsOn    = getStat('Shots on Goal');
+  const shotsOn = getStat('Shots on Goal');
   const shotsTotal = getStat('Total Shots');
 
   const statRows = [
-    possession && { label: 'Possession',       home: possession.home, away: possession.away, unit: '%', max: 100, isPercentage: true },
-    shotsOn    && { label: 'Shots on Target',  home: shotsOn.home,    away: shotsOn.away,    unit: '',  max: Math.max(shotsOn.home, shotsOn.away, 1),    isPercentage: false },
-    shotsTotal && { label: 'Total Shots',      home: shotsTotal.home, away: shotsTotal.away, unit: '',  max: Math.max(shotsTotal.home, shotsTotal.away, 1), isPercentage: false },
+    possession && { label: 'Possession', home: possession.home, away: possession.away, unit: '%', max: 100, isPercentage: true },
+    shotsOn && { label: 'Shots on Target', home: shotsOn.home, away: shotsOn.away, unit: '', max: Math.max(shotsOn.home, shotsOn.away, 1), isPercentage: false },
+    shotsTotal && { label: 'Total Shots', home: shotsTotal.home, away: shotsTotal.away, unit: '', max: Math.max(shotsTotal.home, shotsTotal.away, 1), isPercentage: false },
   ].filter(Boolean);
 
   const barStyle = (value, max, isHome) => ({
@@ -407,7 +377,6 @@ const StatsTab = ({ match }) => {
     <div style={{ padding: '0 12px' }}>
       {statRows.map((row, i) => (
         <div key={i} style={{ marginBottom: '18px' }}>
-          {/* Label */}
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
             marginBottom: '6px',
@@ -432,9 +401,7 @@ const StatsTab = ({ match }) => {
               {row.away}{row.unit}
             </span>
           </div>
-          {/* Bars */}
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            {/* Home bar (right-aligned) */}
             <div style={{
               flex: 1, height: '6px', borderRadius: '3px',
               background: 'rgba(255,255,255,0.12)',
@@ -442,12 +409,10 @@ const StatsTab = ({ match }) => {
             }}>
               <div style={barStyle(row.home, row.isPercentage ? row.max : Math.max(row.home, row.away, 1), true)} />
             </div>
-            {/* Divider */}
             <div style={{
               width: '2px', height: '14px', borderRadius: '1px',
               background: 'rgba(255,255,255,0.1)',
             }} />
-            {/* Away bar (left-aligned) */}
             <div style={{
               flex: 1, height: '6px', borderRadius: '3px',
               background: 'rgba(255,255,255,0.12)',
@@ -456,10 +421,8 @@ const StatsTab = ({ match }) => {
             </div>
           </div>
         </div>
-      ))
-      }
+      ))}
 
-      {/* Footer note */}
       <div style={{
         textAlign: 'center', paddingTop: '8px',
         borderTop: '1px solid rgba(255,255,255,0.05)',
@@ -472,7 +435,7 @@ const StatsTab = ({ match }) => {
           Matchday Programme • Statistical Breakdown
         </span>
       </div>
-    </div >
+    </div>
   );
 };
 
@@ -517,7 +480,6 @@ const MatchDetail = () => {
         setMatch(matchInfo);
 
         const status = matchInfo.fixture.status.short;
-        // Sportmonks developer_name states
         const IN_PLAY = ['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'];
         const FINISHED = ['FT', 'AET', 'FT_PEN', 'POSTPONED', 'CANCELLED', 'ABANDONED', 'AWARDED', 'WO', 'DELETED'];
         const phase = IN_PLAY.includes(status) ? 'LIVE' : (FINISHED.includes(status) ? 'POST' : 'PRE');
@@ -539,7 +501,7 @@ const MatchDetail = () => {
                 goals_under: tg.under_2_5 || 0,
                 goalscorers: oddsData.goalscorers || [],
               });
-              setActiveBookie(null); // no bookmaker name available from provider
+              setActiveBookie(null);
             } else {
               console.warn('[MatchDetail] No odds available for this fixture');
               setOdds(null);
@@ -574,7 +536,6 @@ const MatchDetail = () => {
   const handlePlay = async () => {
     if (!userProfile || !stagedBet) return;
 
-    // Build odds snapshot from current odds state for the specific card type
     let snapshot = null;
     if (odds) {
       const card = String(stagedBet.card).toLowerCase();
@@ -601,13 +562,9 @@ const MatchDetail = () => {
   };
 
   const handleStageSupersub = (side, teamId, teamName) => {
-    // side: 'HOME' | 'AWAY'
-    // teamId: integer — passed straight through to placeBet
     const count = getCardCount('c_supersub');
     if (count > 0) {
       setSelectedCard('c_supersub');
-      // Pre-stage the supersub bet with side and teamId already resolved.
-      // The Supersub UI just confirms — no second team selection needed.
       setStagedBet({
         card: 'c_supersub',
         selection: side,
@@ -620,8 +577,6 @@ const MatchDetail = () => {
     }
   };
 
-  // Split goalscorers evenly between Home and Away columns.
-  // odds.goalscorers: [{ player_id, player_name, odds }] from the API.
   const getScorerColumns = () => {
     const scorers = odds?.goalscorers;
     if (!scorers || scorers.length === 0) return [[], []];
@@ -635,28 +590,22 @@ const MatchDetail = () => {
 
   return (
     <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
-      {/* Dynamic Background with Cross-Fade */}
       <div className="absolute inset-0 z-0">
-        {/* LIVE State Background */}
         <img
           src="/assets/bg-tunnel-live.webp"
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${matchPhase === 'LIVE' ? 'opacity-100' : 'opacity-0'
             }`}
           alt="Live Match Tunnel"
         />
-
-        {/* PRE-MATCH / FINISHED State Background */}
         <img
           src="/assets/bg-tunnel-prepost.webp"
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${matchPhase === 'PRE' || matchPhase === 'POST' ? 'opacity-100' : 'opacity-0'
             }`}
           alt="Pre/Post Match Tunnel"
         />
-
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
       </div>
 
-      {/* Top Header */}
       <div className="absolute top-0 left-0 w-full px-4 pt-8 pb-4 flex justify-between items-center z-[60]">
         <button onClick={() => navigate('/match-hub')} className="w-10 h-10 bg-black/50 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white"><ArrowLeft className="w-5 h-5" /></button>
         <div className="flex flex-col items-end gap-1">
@@ -673,12 +622,9 @@ const MatchDetail = () => {
         </div>
       </div>
 
-      {/* Scoreboard - Strict Flex Model (Mobile Optimized) */}
       {match && (
         <div className="absolute top-16 w-full z-40">
           <div className="w-full h-16 flex items-center justify-between px-3 bg-black/80 backdrop-blur-md border-b border-white/10 relative">
-
-            {/* Left Block - Home (flex-1 with shrink-0 logo, flexible name) */}
             <div className="flex-1 flex items-center justify-start min-w-0 mr-2">
               <img
                 src={match.teams.home.logo}
@@ -689,10 +635,7 @@ const MatchDetail = () => {
                 {match.teams.home.name}
               </span>
             </div>
-
-            {/* Center Block - Anchor (Fixed/Shrinkwrapped) */}
             <div className="w-auto flex-shrink-0 mx-2 flex flex-col items-center justify-center z-10">
-              {/* Top: Status/Date */}
               <span className={`text-[9px] font-bold tracking-widest uppercase mb-[2px] leading-none ${['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'].includes(match.fixture.status.short)
                 ? 'text-[#39ff14]'
                 : 'text-zinc-400'
@@ -702,13 +645,10 @@ const MatchDetail = () => {
                   : ({ INPLAY_1ST_HALF: '1H', HT: 'HT', INPLAY_2ND_HALF: '2H', INPLAY_ET: 'ET', INPLAY_ET_SECOND_HALF: 'ET', EXTRA_TIME_BREAK: 'BT', INPLAY_PENALTIES: 'PENS', BREAK: 'BT', FT: 'FT', AET: 'AET', FT_PEN: 'FT-P', POSTPONED: 'PST', CANCELLED: 'CANC', ABANDONED: 'ABD', AWARDED: 'AWD', WO: 'WO' }[match.fixture.status.short] ?? match.fixture.status.short)
                 }
               </span>
-              {/* Bottom: Score */}
               <div className="text-lg font-black text-white font-mono leading-none">
                 {match.goals.home} - {match.goals.away}
               </div>
             </div>
-
-            {/* Right Block - Away (flex-1 with flexible name, shrink-0 logo) */}
             <div className="flex-1 flex items-center justify-end min-w-0 ml-2">
               <span className="text-xs font-bold text-white uppercase truncate text-right flex-grow">
                 {match.teams.away.name}
@@ -723,7 +663,6 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* ── TAB NAVIGATION BAR ── */}
       {match && (
         <div
           className="absolute w-full z-[35]"
@@ -763,7 +702,6 @@ const MatchDetail = () => {
                 }}
               >
                 {tab}
-                {/* Active underline */}
                 {activeTab === tab && (
                   <div style={{
                     position: 'absolute',
@@ -782,17 +720,15 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* ── SCROLLABLE TAB CONTENT ── */}
       {match && (
         <div
           className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
           style={{
-            top: '172px',        /* below scoreboard + tab bar */
-            bottom: matchPhase === 'POST' ? '0px' : '256px',  /* above shelf console or bottom */
+            top: '172px',
+            bottom: matchPhase === 'POST' ? '0px' : '256px',
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          {/* ── TACTICAL GLASS CONTAINER ── */}
           <div
             style={{
               margin: '8px 0',
@@ -805,14 +741,13 @@ const MatchDetail = () => {
               minHeight: '100%',
             }}
           >
-            {/* Assistant Dialogue — only shown when the active tab has real data */}
             {(() => {
               const hasTabData =
                 activeTab === 'LINEUP' ? (Array.isArray(match?.lineups) && match.lineups.length > 0) :
-                activeTab === 'SUBS'   ? (Array.isArray(match?.lineups) && match.lineups.length > 0) :
-                activeTab === 'EVENTS' ? (Array.isArray(match?.events)  && match.events.length  > 0) :
-                activeTab === 'STATS'  ? (Array.isArray(match?.statistics) && match.statistics.length >= 2) :
-                false;
+                  activeTab === 'SUBS' ? (Array.isArray(match?.lineups) && match.lineups.length > 0) :
+                    activeTab === 'EVENTS' ? (Array.isArray(match?.events) && match.events.length > 0) :
+                      activeTab === 'STATS' ? (Array.isArray(match?.statistics) && match.statistics.length >= 2) :
+                        false;
               return hasTabData ? (
                 <div style={{ padding: '0 12px', marginBottom: '0' }}>
                   <AssistantDialogue activeTab={activeTab} />
@@ -820,7 +755,6 @@ const MatchDetail = () => {
               ) : null;
             })()}
 
-            {/* Tab Content */}
             {activeTab === 'LINEUP' && (
               <MatchLineup
                 fixtureId={id}
@@ -848,14 +782,12 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* Card Selection Shelf - Active States Only (PRE-MATCH / LIVE) */}
       {(matchPhase === 'PRE' || matchPhase === 'LIVE') && (
         <div data-testid="card-shelf" className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
           <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
           <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 pointer-events-auto">
             {cardTypes.map(card => {
               const count = getCardCount(card.id);
-              // Supersub doesn't need odds — it's played from the SUBS tab directly
               const needsOdds = card.id !== 'c_supersub';
               const oddsDisabled = needsOdds && !odds;
               const inventoryDisabled = count === 0;
@@ -867,8 +799,6 @@ const MatchDetail = () => {
                   onClick={() => {
                     if (isDisabled) return;
                     if (card.id === 'c_supersub') {
-                      // Supersub requires team context — guide user to the SUBS tab
-                      // where they tap "Use Supersub Card" under a specific team.
                       setActiveTab('SUBS');
                       return;
                     }
@@ -876,19 +806,17 @@ const MatchDetail = () => {
                     setFlowState('selection');
                   }}
                   disabled={isDisabled}
-                  className={`relative transition-all duration-300 ${
-                    selectedCard === card.id
+                  className={`relative transition-all duration-300 ${selectedCard === card.id
                       ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
                       : inventoryDisabled
                         ? 'opacity-40 grayscale'
                         : oddsDisabled
                           ? 'opacity-50 saturate-50 cursor-not-allowed'
                           : 'hover:translate-y-[-8px]'
-                  }`}
+                    }`}
                 >
                   <div className="w-[5.5rem] h-[8.25rem] relative">
                     <div className="absolute inset-0 flex items-center justify-center z-10"><CardBase type={card.id} label={card.label} status="generic" variant="transparent" /></div>
-                    {/* Odds unavailable overlay — distinct from no-inventory state */}
                     {oddsDisabled && (
                       <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1">
                         <Lock className="w-5 h-5 text-red-400/80" />
@@ -904,14 +832,11 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* Match Termination Terminal - Terminated State (FINISHED) */}
       {matchPhase === 'POST' && <MatchTerminationTerminal />}
 
-      {/* SELECTION POPUPS - Block on Finished Matches */}
       {flowState === 'selection' && match && selectedCard && matchPhase !== 'POST' && (() => {
         const oddsUnavailable = !odds;
 
-        // Shared no-odds empty state
         const NoOddsState = () => (
           <div className="w-full max-w-lg bg-zinc-900/80 border border-white/10 rounded-3xl p-12 flex flex-col items-center gap-4 text-center">
             <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mb-2">
@@ -926,7 +851,6 @@ const MatchDetail = () => {
           <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
             <button onClick={handleReset} className="absolute top-8 right-8 text-white/50 hover:text-white"><X className="w-8 h-8" /></button>
 
-            {/* Match Result UI */}
             {selectedCard === 'c_match_result' && (
               oddsUnavailable ? <NoOddsState /> : (
                 <div className="grid grid-cols-3 gap-4 w-full max-w-lg">
@@ -949,7 +873,6 @@ const MatchDetail = () => {
               )
             )}
 
-            {/* Total Goals UI */}
             {selectedCard === 'c_total_goals' && (
               oddsUnavailable ? <NoOddsState /> : (
                 <div className="flex gap-6 w-full max-w-lg">
@@ -965,7 +888,6 @@ const MatchDetail = () => {
               )
             )}
 
-            {/* Player Score UI - Dual Column */}
             {selectedCard === 'c_player_score' && (
               oddsUnavailable ? <NoOddsState /> : (
                 <div className="w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
@@ -974,7 +896,6 @@ const MatchDetail = () => {
                     <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">Goalscorers</span>
                   </div>
                   <div className="grid grid-cols-2 h-[60vh]">
-                    {/* Home Column */}
                     <div className="border-r border-white/5 flex flex-col">
                       <div className="p-4 bg-black/20 flex items-center gap-2">
                         <img src={match.teams.home.logo} className="w-5 h-5 object-contain" alt="" />
@@ -991,7 +912,6 @@ const MatchDetail = () => {
                         ))}
                       </div>
                     </div>
-                    {/* Away Column */}
                     <div className="flex flex-col">
                       <div className="p-4 bg-black/20 flex items-center gap-2 justify-end">
                         <span className="text-zinc-400 text-[10px] font-black uppercase truncate">{match.teams.away.name}</span>
@@ -1010,15 +930,10 @@ const MatchDetail = () => {
                 </div>
               )
             )}
-
-            {/* Super Sub UI — removed: Supersub now stages directly from the SUBS tab
-                without entering the selection flow. Team side (HOME/AWAY) and team_id
-                are captured at the point of the "Use Supersub Card" button click. */}
           </div>
         );
       })()}
 
-      {/* STAGING PANEL - Block on Finished Matches */}
       {flowState === 'staging' && stagedBet && matchPhase !== 'POST' && (
         <div data-testid="staging-bar" className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
@@ -1034,7 +949,6 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {/* RESOLUTION MODAL */}
       {flowState === 'resolved' && (
         <div className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="text-center w-full max-w-sm border border-white/10 bg-zinc-900/50 p-10 rounded-[3rem] relative overflow-hidden shadow-2xl">
