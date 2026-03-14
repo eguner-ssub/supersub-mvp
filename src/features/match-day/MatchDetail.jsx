@@ -326,24 +326,44 @@ const EventsTab = ({ events: eventsProp }) => {
 const StatsTab = ({ match }) => {
   const stats = match?.statistics;
 
-  const getStat = (statId) => {
-    if (stats && stats.length >= 2) {
-      const homeStat = stats[0]?.statistics?.find(s => s.type_id === statId || s.type === statId);
-      const awayStat = stats[1]?.statistics?.find(s => s.type_id === statId || s.type === statId);
+  const getStat = (statIds, legacyString) => {
+    if (!stats || !Array.isArray(stats)) return null;
 
+    // Ensure statIds is an array for multiple ID checks
+    const idsToCheck = Array.isArray(statIds) ? statIds : [statIds];
+
+    // Legacy (API-Football / Grouped Arrays) fallback structure
+    if (stats[0]?.statistics) {
+      const homeStat = stats[0].statistics.find(s => idsToCheck.includes(Number(s.type_id)) || s.type === legacyString);
+      const awayStat = stats[1]?.statistics?.find(s => idsToCheck.includes(Number(s.type_id)) || s.type === legacyString);
       if (homeStat && awayStat) {
         return {
-          home: parseFloat(String(homeStat.value || homeStat.data?.value || 0).replace('%', '')),
-          away: parseFloat(String(awayStat.value || awayStat.data?.value || 0).replace('%', '')),
+          home: parseFloat(String(homeStat.value || 0).replace('%', '')),
+          away: parseFloat(String(awayStat.value || 0).replace('%', '')),
         };
       }
+      return null;
+    }
+
+    // Pure Sportmonks V3 Reality (Flat Array mapping via "location" string)
+    const homeStat = stats.find(s => idsToCheck.includes(Number(s.type_id)) && s.location === 'home');
+    const awayStat = stats.find(s => idsToCheck.includes(Number(s.type_id)) && s.location === 'away');
+
+    if (homeStat && awayStat) {
+      return {
+        // V3 places the actual metric inside a nested `data` object
+        home: parseFloat(String(homeStat.data?.value || homeStat.value || 0).replace('%', '')),
+        away: parseFloat(String(awayStat.data?.value || awayStat.value || 0).replace('%', '')),
+      };
     }
     return null;
   };
 
-  const possession = getStat(42) || getStat('Ball Possession');
-  const shotsOn = getStat(86) || getStat('Shots on Goal');
-  const shotsTotal = getStat(84) || getStat('Total Shots');
+  // Sportmonks V3 Type IDs mapped directly from your database payload:
+  // 45 = Ball Possession, 86 = Shots on Target, 42/84 = Total Shots
+  const possession = getStat([45], 'Ball Possession');
+  const shotsOn = getStat([86], 'Shots on Goal');
+  const shotsTotal = getStat([42, 84], 'Total Shots');
 
   const statRows = [
     possession && { label: 'Possession', home: possession.home, away: possession.away, unit: '%', max: 100, isPercentage: true },
@@ -805,12 +825,12 @@ const MatchDetail = () => {
                   }}
                   disabled={isDisabled}
                   className={`relative transition-all duration-300 ${selectedCard === card.id
-                      ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
-                      : inventoryDisabled
-                        ? 'opacity-40 grayscale'
-                        : oddsDisabled
-                          ? 'opacity-50 saturate-50 cursor-not-allowed'
-                          : 'hover:translate-y-[-8px]'
+                    ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
+                    : inventoryDisabled
+                      ? 'opacity-40 grayscale'
+                      : oddsDisabled
+                        ? 'opacity-50 saturate-50 cursor-not-allowed'
+                        : 'hover:translate-y-[-8px]'
                     }`}
                 >
                   <div className="w-[5.5rem] h-[8.25rem] relative">
