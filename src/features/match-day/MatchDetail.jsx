@@ -205,21 +205,28 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
    Data source: match.events (Sportmonks v3 array stored in raw_data)
    ───────────────────────────────────────────────────────────── */
 
-// Sportmonks event type_id values (common)
-// 14 = goal, 18 = yellowcard, 15 = redcard, 16 = substitution, 19 = VAR
+// Verified Sportmonks V3 event type_id → icon mapping
+// Goals:   14 (Goal), 15 (Own Goal), 16 (Penalty Goal), 23 (Pen Shootout Goal)
+// Missed:  17 (Missed Penalty), 22 (Pen Shootout Miss)
+// Sub:     18 (Substitution)
+// Yellow:  19 (Yellow Card)
+// Red:     20 (Direct Red), 21 (Yellow-Red)
+// VAR:     10 (VAR Review)
 const getEventIcon = (typeId, detail) => {
-  if (typeId === 14) return '⚽';
-  if (typeId === 15) return '🟥';
-  if (typeId === 18) return '🟨';
-  if (typeId === 16) return '🔄';
-  if (typeId === 19) return '📺';
-  // Fallback: string-based type for compatibility
+  if (typeId === 14 || typeId === 15 || typeId === 16 || typeId === 23) return '⚽';
+  if (typeId === 17 || typeId === 22) return '❌';
+  if (typeId === 18) return '🔄';
+  if (typeId === 19) return '🟨';
+  if (typeId === 20 || typeId === 21) return '🟥';
+  if (typeId === 10) return '🔍';
+  // Fallback: string-based type for payload drift resilience
   if (typeof typeId === 'string') {
     const t = typeId.toLowerCase();
     if (t.includes('goal'))   return '⚽';
-    if (t.includes('red'))    return '🟥';
-    if (t.includes('yellow')) return '🟨';
     if (t.includes('sub'))    return '🔄';
+    if (t.includes('yellow')) return '🟨';
+    if (t.includes('red'))    return '🟥';
+    if (t.includes('var'))    return '🔍';
   }
   return '•';
 };
