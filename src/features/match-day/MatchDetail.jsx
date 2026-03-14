@@ -81,27 +81,26 @@ const AssistantDialogue = ({ activeTab }) => (
 /* ─────────────────────────────────────────────────────────────
    SUBSTITUTES TAB
    ───────────────────────────────────────────────────────────── */
-
-// Sportmonks type_id reference:
-//   11 = starting eleven / starter
-//   12 = bench / substitute
 const SM_BENCH_TYPE_ID = 12;
 
 const SubstitutesTab = ({ match, onStageSupersub }) => {
   const allLineups = Array.isArray(match?.lineups) ? match.lineups : [];
-  const benchPlayers = allLineups.filter((p) => p.type_id === SM_BENCH_TYPE_ID);
+
+  // Coerce to string to defeat JSON serialization type mismatches
+  const benchPlayers = allLineups.filter((p) => String(p.type_id) === String(SM_BENCH_TYPE_ID));
 
   if (benchPlayers.length === 0)
     return <p className="text-center text-white/30 text-xs uppercase tracking-widest py-12">No substitute data available</p>;
 
-  const homeId = match?.teams?.home?.id;
-  const awayId = match?.teams?.away?.id;
+  // Pure Sportmonks Reality: Trust the match payload, but force string matching
+  const homeId = String(match?.teams?.home?.id);
+  const awayId = String(match?.teams?.away?.id);
 
-  const homeBench = benchPlayers.filter(p => p.team_id === homeId);
-  const awayBench = benchPlayers.filter(p => p.team_id === awayId);
+  const homeBench = benchPlayers.filter(p => String(p.team_id) === homeId);
+  const awayBench = benchPlayers.filter(p => String(p.team_id) === awayId);
 
   const renderBench = (side, teamId, teamName, teamLogo, players) => {
-    if (players.length === 0) return null;
+    if (!players || players.length === 0) return null;
 
     return (
       <div style={{ marginBottom: '24px' }}>
@@ -159,7 +158,6 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                  {/* Shirt Number */}
                   <div style={{
                     width: '28px', height: '28px', borderRadius: '50%',
                     background: 'rgba(255,255,255,0.08)',
@@ -173,7 +171,6 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
                       {jerseyNum}
                     </span>
                   </div>
-                  {/* Name */}
                   <span style={{
                     fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
                     fontSize: '11px', color: '#FFFFFF',
@@ -192,8 +189,8 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
 
   return (
     <div style={{ padding: '0 12px' }}>
-      {renderBench('HOME', homeId, match?.teams?.home?.name || 'Home', match?.teams?.home?.logo, homeBench)}
-      {renderBench('AWAY', awayId, match?.teams?.away?.name || 'Away', match?.teams?.away?.logo, awayBench)}
+      {renderBench('HOME', match?.teams?.home?.id, match?.teams?.home?.name || 'Home', match?.teams?.home?.logo, homeBench)}
+      {renderBench('AWAY', match?.teams?.away?.id, match?.teams?.away?.name || 'Away', match?.teams?.away?.logo, awayBench)}
     </div>
   );
 };
@@ -202,14 +199,14 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
 /* ─────────────────────────────────────────────────────────────
    EVENTS TAB — Tactical Timeline
    ───────────────────────────────────────────────────────────── */
-
 const getEventIcon = (typeId, detail) => {
   if (typeId === 14 || typeId === 15 || typeId === 16 || typeId === 23) return '⚽';
   if (typeId === 17 || typeId === 22) return '❌';
-  if (typeId === 18) return '🔄';
-  if (typeId === 19) return '🟨';
-  if (typeId === 20 || typeId === 21) return '🟥';
-  if (typeId === 10) return '🔍';
+  if (typeId === 18) return '🔄'; // Substitution
+  if (typeId === 19) return '🟨'; // Yellow Card
+  if (typeId === 20 || typeId === 21) return '🟥'; // Red / Yellow-Red
+  if (typeId === 10) return '🔍'; // VAR Review
+
   if (typeof typeId === 'string') {
     const t = typeId.toLowerCase();
     if (t.includes('goal')) return '⚽';
@@ -329,23 +326,24 @@ const EventsTab = ({ events: eventsProp }) => {
 const StatsTab = ({ match }) => {
   const stats = match?.statistics;
 
-  const getStat = (statName) => {
+  const getStat = (statId) => {
     if (stats && stats.length >= 2) {
-      const homeStat = stats[0]?.statistics?.find(s => s.type === statName);
-      const awayStat = stats[1]?.statistics?.find(s => s.type === statName);
+      const homeStat = stats[0]?.statistics?.find(s => s.type_id === statId || s.type === statId);
+      const awayStat = stats[1]?.statistics?.find(s => s.type_id === statId || s.type === statId);
+
       if (homeStat && awayStat) {
         return {
-          home: parseFloat(String(homeStat.value).replace('%', '')) || 0,
-          away: parseFloat(String(awayStat.value).replace('%', '')) || 0,
+          home: parseFloat(String(homeStat.value || homeStat.data?.value || 0).replace('%', '')),
+          away: parseFloat(String(awayStat.value || awayStat.data?.value || 0).replace('%', '')),
         };
       }
     }
     return null;
   };
 
-  const possession = getStat('Ball Possession');
-  const shotsOn = getStat('Shots on Goal');
-  const shotsTotal = getStat('Total Shots');
+  const possession = getStat(42) || getStat('Ball Possession');
+  const shotsOn = getStat(86) || getStat('Shots on Goal');
+  const shotsTotal = getStat(84) || getStat('Total Shots');
 
   const statRows = [
     possession && { label: 'Possession', home: possession.home, away: possession.away, unit: '%', max: 100, isPercentage: true },
