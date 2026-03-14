@@ -324,7 +324,22 @@ const EventsTab = ({ events: eventsProp }) => {
    STATS TAB — High-contrast comparison bars
    ───────────────────────────────────────────────────────────── */
 const StatsTab = ({ match }) => {
-  const stats = match?.statistics;
+  // 1. Aggressively locate and unwrap the stats array
+  let stats = match?.statistics || match?.raw_data?.statistics;
+
+  // Force parse if Supabase handed us a raw JSON string
+  if (typeof stats === 'string') {
+    try {
+      stats = JSON.parse(stats);
+    } catch (e) {
+      stats = [];
+    }
+  }
+
+  // Unwrap Sportmonks { data: [] } pagination layers if they exist
+  if (stats && !Array.isArray(stats) && Array.isArray(stats.data)) {
+    stats = stats.data;
+  }
 
   const getStat = (statIds, legacyString) => {
     if (!stats || !Array.isArray(stats)) return null;
@@ -336,10 +351,12 @@ const StatsTab = ({ match }) => {
     if (stats[0]?.statistics) {
       const homeStat = stats[0].statistics.find(s => idsToCheck.includes(Number(s.type_id)) || s.type === legacyString);
       const awayStat = stats[1]?.statistics?.find(s => idsToCheck.includes(Number(s.type_id)) || s.type === legacyString);
-      if (homeStat && awayStat) {
+
+      // 2. The Zero-Omission Fix: Only require ONE side to exist
+      if (homeStat || awayStat) {
         return {
-          home: parseFloat(String(homeStat.value || 0).replace('%', '')),
-          away: parseFloat(String(awayStat.value || 0).replace('%', '')),
+          home: homeStat ? parseFloat(String(homeStat.value || 0).replace('%', '')) : 0,
+          away: awayStat ? parseFloat(String(awayStat.value || 0).replace('%', '')) : 0,
         };
       }
       return null;
@@ -349,11 +366,12 @@ const StatsTab = ({ match }) => {
     const homeStat = stats.find(s => idsToCheck.includes(Number(s.type_id)) && s.location === 'home');
     const awayStat = stats.find(s => idsToCheck.includes(Number(s.type_id)) && s.location === 'away');
 
-    if (homeStat && awayStat) {
+    // The Zero-Omission Fix
+    if (homeStat || awayStat) {
       return {
-        // V3 places the actual metric inside a nested `data` object
-        home: parseFloat(String(homeStat.data?.value || homeStat.value || 0).replace('%', '')),
-        away: parseFloat(String(awayStat.data?.value || awayStat.value || 0).replace('%', '')),
+        // V3 places the actual metric inside a nested `data` object, with fallback to `.value`
+        home: homeStat ? parseFloat(String(homeStat.data?.value || homeStat.value || 0).replace('%', '')) : 0,
+        away: awayStat ? parseFloat(String(awayStat.data?.value || awayStat.value || 0).replace('%', '')) : 0,
       };
     }
     return null;
