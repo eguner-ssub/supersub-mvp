@@ -133,10 +133,11 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
       {/* Bench list — all bench players across both teams */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {benchPlayers.map((entry, i) => {
-          // Sportmonks: entry.player.name or entry.player.display_name, entry.jersey_number
-          const playerName = entry.player?.display_name || entry.player?.name || 'Unknown';
+          // Sportmonks: player_name is a top-level field on the lineup record.
+          // entry.player nested object is only present if lineups.player sub-include was requested.
+          const playerName = entry.player_name || entry.player?.display_name || entry.player?.name || 'Unknown';
           const jerseyNum  = entry.jersey_number ?? '-';
-          const playerId   = entry.player?.id || i;
+          const playerId   = entry.player_id || entry.player?.id || i;
           const impact     = getImpact(playerId);
           return (
             <div
@@ -250,11 +251,15 @@ const EventsTab = ({ events: eventsProp }) => {
         const typeId  = evt.type_id ?? evt.type;
         const icon    = getEventIcon(typeId, evt.detail);
         const isGoal  = typeId === 14 || (typeof typeId === 'string' && typeId.toLowerCase().includes('goal'));
-        // Time: Sportmonks stores elapsed minute in event.minute or event.time.elapsed
+        // Time: Sportmonks stores elapsed minute as top-level integer (evt.minute).
+        // Fallback to nested evt.time.elapsed for any legacy API-Football format rows.
         const minute  = evt.minute ?? evt.time?.elapsed ?? '?';
-        // Player name: Sportmonks uses player.name; assist/sub-on uses assist.name
-        const playerName  = evt.player?.name  || evt.player?.display_name  || 'Unknown';
-        const assistName  = evt.assist?.name  || evt.assist?.display_name  || null;
+        // Player name: Sportmonks stores player_name as a top-level field.
+        // evt.player nested object is only present with lineups.player sub-include.
+        const playerName  = evt.player_name || evt.player?.name  || evt.player?.display_name  || 'Unknown';
+        // For substitutions: evt.related_player_name = player coming on.
+        // For goals: evt.related_player_name = assister.
+        const assistName  = evt.related_player_name || evt.assist?.name  || evt.assist?.display_name  || null;
         // Detail label: use the type string or detail field
         const detailLabel = evt.detail || (typeof evt.type === 'string' ? evt.type : '');
 
