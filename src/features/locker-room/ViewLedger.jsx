@@ -37,8 +37,8 @@ const ViewLedger = () => {
         );
     }
 
-    const totalWon = settledBets.filter(b => b.status === 'WON').reduce((sum, b) => sum + b.potential_reward, 0);
-    const totalLost = settledBets.filter(b => b.status === 'LOST').reduce((sum, b) => sum + b.stake, 0);
+    const totalWon = settledBets.filter(b => b.settled_status === 'WON').reduce((sum, b) => sum + b.potential_reward, 0);
+    const totalLost = settledBets.filter(b => b.settled_status === 'LOST').reduce((sum, b) => sum + b.stake, 0);
     const netProfit = totalWon - totalLost;
 
     return (
@@ -96,11 +96,11 @@ const ViewLedger = () => {
                                 <h3 className="text-lg font-bold text-amber-900">{bet.team_name}</h3>
                                 <p className="text-sm text-amber-700">{formatBetSelection(bet)}</p>
                             </div>
-                            <div className={`px-3 py-1 rounded-full font-bold text-sm ${bet.status === 'WON'
+                            <div className={`px-3 py-1 rounded-full font-bold text-sm ${bet.settled_status === 'WON'
                                 ? 'bg-green-100 text-green-700 border border-green-300'
                                 : 'bg-red-100 text-red-700 border border-red-300'
                                 }`}>
-                                {bet.status}
+                                {bet.settled_status}
                             </div>
                         </div>
 
@@ -116,9 +116,9 @@ const ViewLedger = () => {
                             <div className="text-right">
                                 <p className="text-xs text-amber-600">Payout</p>
                                 <div className="flex items-center gap-1 justify-end">
-                                    <Coins className={`w-3 h-3 ${bet.status === 'WON' ? 'text-green-600' : 'text-red-600'}`} />
-                                    <p className={`text-sm font-bold ${bet.status === 'WON' ? 'text-green-600' : 'text-red-600'}`}>
-                                        {bet.status === 'WON' ? bet.potential_reward : 0}
+                                    <Coins className={`w-3 h-3 ${bet.settled_status === 'WON' ? 'text-green-600' : 'text-red-600'}`} />
+                                    <p className={`text-sm font-bold ${bet.settled_status === 'WON' ? 'text-green-600' : 'text-red-600'}`}>
+                                        {bet.settled_status === 'WON' ? bet.potential_reward : 0}
                                     </p>
                                 </div>
                             </div>
