@@ -19,17 +19,10 @@ export const usePredictions = (statusFilter = null) => {
         setLoading(true);
 
         try {
-            // JOIN: Linking predictions to the matches table for real-time scores
+            // Severed match dependency: Fetching strictly from predictions ledger
             let query = supabase
                 .from('predictions')
-                .select(`
-                    *,
-                    match:matches!match_id (
-                        home_score,
-                        away_score,
-                        status
-                    )
-                `)
+                .select('*')
                 .eq('user_id', userProfile.id)
                 .order('created_at', { ascending: false });
 
