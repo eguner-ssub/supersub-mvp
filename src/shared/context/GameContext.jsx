@@ -121,21 +121,38 @@ export const GameProvider = ({ children }) => {
       const isSupersub = String(cardType).toLowerCase().includes('supersub');
 
       let resolvedTeamId = teamId;
-      if (isSupersub && !resolvedTeamId) {
-        // Attempt to derive from selection ('HOME' or 'AWAY')
-        if (selection === 'HOME') {
-          resolvedTeamId = match.teams?.home?.id ?? match.home_team_id ?? null;
-        } else if (selection === 'AWAY') {
-          resolvedTeamId = match.teams?.away?.id ?? match.away_team_id ?? null;
+      if (!resolvedTeamId) {
+        // Derive Team ID for Supersub
+        if (isSupersub) {
+          if (selection === 'HOME' || String(selection).toUpperCase().includes('HOME')) {
+            resolvedTeamId = match.teams?.home?.id ?? match.home_team_id ?? null;
+          } else if (selection === 'AWAY' || String(selection).toUpperCase().includes('AWAY')) {
+            resolvedTeamId = match.teams?.away?.id ?? match.away_team_id ?? null;
+          }
+        }
+        // Derive Team ID for Match Result
+        else if (cardType === 'c_match_result') {
+          if (selection === 'HOME_WIN') {
+            resolvedTeamId = match.teams?.home?.id ?? match.home_team_id ?? null;
+          } else if (selection === 'AWAY_WIN') {
+            resolvedTeamId = match.teams?.away?.id ?? match.away_team_id ?? null;
+          }
+          // Note: If selection is 'DRAW', resolvedTeamId safely remains null.
         }
       }
 
-      // Enforce: Supersub selection must be 'HOME' or 'AWAY' (not HOME_WIN etc.)
-      // Normalize in case the call site passes a legacy format.
+      // Enforce: Supersub selection must be exactly 'HOME' or 'AWAY'
       let resolvedSelection = selection;
       if (isSupersub) {
         if (String(selection).toUpperCase().includes('HOME')) resolvedSelection = 'HOME';
         else if (String(selection).toUpperCase().includes('AWAY')) resolvedSelection = 'AWAY';
+      }
+
+      // Extract Player ID from Player Score selections (e.g., "SCORE_12345")
+      let resolvedPlayerId = null;
+      if (cardType === 'c_player_score' && String(resolvedSelection).startsWith('SCORE_')) {
+        const parts = String(resolvedSelection).split('_');
+        resolvedPlayerId = parts.length > 1 ? Number(parts[1]) : null;
       }
 
       const payload = {
@@ -152,6 +169,7 @@ export const GameProvider = ({ children }) => {
         // Always include team_id in the payload.
         // Non-Supersub cards send null — backend ignores it for those card types.
         team_id: resolvedTeamId,
+        player_id: resolvedPlayerId,
       };
 
       const { data, error } = await supabase
