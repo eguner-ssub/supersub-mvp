@@ -1,3 +1,12 @@
+// Aggressive string normalizer for Goalscorer matching
+const normalizeName = (name) => {
+    return String(name || '')
+        .normalize('NFD') // Deconstruct special characters
+        .replace(/[\u0300-\u036f]/g, '') // Strip accents (e.g., ü -> u)
+        .toLowerCase()
+        .replace(/^score_/, '') // Strip the legacy payload tag if present
+        .replace(/[^a-z]/g, ''); // Erase all spaces, hyphens, and punctuation
+};
 // v4.0.0 - DB-Only Settlement Engine
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -41,6 +50,7 @@ const COUNTABLE_GOAL_DETAILS = ['Normal Goal', 'Penalty'];
  * Requires: bet.team_id (integer) — the team the user backed.
  */
 export const settleSupersub = (bet, events) => {
+
     const teamId = bet.team_id;
 
     if (teamId == null) {
@@ -48,76 +58,36 @@ export const settleSupersub = (bet, events) => {
         return { status: 'LOST', points: 0 };
     }
 
-    const isPlayerLevel = bet.player_id != null;
-    const targetPlayerId = isPlayerLevel ? Number(bet.player_id) : null;
-
-    // Step 1: Build a map of players who actually came on for the selected team.
-    // In subst events, the incoming player is stored in `assist`.
-    // Map: playerId -> elapsed minute they came on.
+    // Step 1: Map players subbed ON for the backed team (type_id 18)
     const subsOnMap = new Map();
     for (const event of events) {
-        if (
-            event.type === 'subst' &&
-            event.team?.id === teamId &&
-            event.assist?.id != null
-        ) {
-            subsOnMap.set(event.assist.id, event.time?.elapsed ?? 0);
+        const isSub = event.type_id === 18 || event.type === 'subst';
+        const isBackedTeam = event.participant_id === teamId || event.team?.id === teamId;
+        const incomingPlayerId = event.player_id || event.assist?.id;
+
+        if (isSub && isBackedTeam && incomingPlayerId != null) {
+            const minute = event.minute || event.time?.elapsed || 0;
+            subsOnMap.set(incomingPlayerId, minute);
         }
     }
 
-    if (subsOnMap.size === 0) {
-        // No substitutions made for this team — can't win
-        return { status: 'LOST', points: 0 };
-    }
+    if (subsOnMap.size === 0) return { status: 'LOST', points: 0 };
 
-    // For player-level bets, the target player must be among the subs
-    if (isPlayerLevel && !subsOnMap.has(targetPlayerId)) {
-        return { status: 'LOST', points: 0 };
-    }
-
-    // Step 2: Check all goals scored by the selected team within 120 minutes.
-    // Counts: Normal Goal, Penalty. Excludes: Own Goal, shootout (elapsed > 120).
-    // A win triggers if the scorer OR the assister is a qualifying substitute.
+    // Step 2: Check if any of those specific subs scored a goal
     for (const event of events) {
-        if (
-            event.type === 'Goal' &&
-            COUNTABLE_GOAL_DETAILS.includes(event.detail) &&
-            event.team?.id === teamId &&
-            (event.time?.elapsed ?? 0) <= 120
-        ) {
-            const goalTime = event.time?.elapsed ?? 0;
-            const scorerId = event.player?.id;
-            const assistId = event.assist?.id;
+        const isGoal = event.type_id === 14 || event.type_id === 97 || event.type === 'Goal';
+        const isBackedTeam = event.participant_id === teamId || event.team?.id === teamId;
+        const time = event.minute || event.time?.elapsed || 0;
 
-            // Check scorer
+        if (isGoal && isBackedTeam && time <= 120) {
+            const scorerId = event.player_id || event.player?.id;
+
             if (scorerId != null) {
                 const subOnTime = subsOnMap.get(scorerId);
-                if (subOnTime !== undefined && goalTime >= subOnTime) {
-                    if (isPlayerLevel) {
-                        if (scorerId === targetPlayerId) {
-                            console.log(`  ⚡ Supersub player-level win (goal): player ${scorerId} subbed on at ${subOnTime}', scored at ${goalTime}'`);
-                            return { status: 'WON', points: 2500 };
-                        }
-                    } else {
-                        console.log(`  ⚡ Supersub team-level win (goal): player ${scorerId} subbed on at ${subOnTime}', scored at ${goalTime}'`);
-                        return { status: 'WON', points: 500 };
-                    }
-                }
-            }
-
-            // Check assister
-            if (assistId != null) {
-                const subOnTime = subsOnMap.get(assistId);
-                if (subOnTime !== undefined && goalTime >= subOnTime) {
-                    if (isPlayerLevel) {
-                        if (assistId === targetPlayerId) {
-                            console.log(`  ⚡ Supersub player-level win (assist): player ${assistId} subbed on at ${subOnTime}', assisted at ${goalTime}'`);
-                            return { status: 'WON', points: 2500 };
-                        }
-                    } else {
-                        console.log(`  ⚡ Supersub team-level win (assist): player ${assistId} subbed on at ${subOnTime}', assisted at ${goalTime}'`);
-                        return { status: 'WON', points: 500 };
-                    }
+                // Sub must have come on before or during the same minute as the goal
+                if (subOnTime !== undefined && time >= subOnTime) {
+                    console.log(`  ⚡ Supersub win: player ${scorerId} subbed on at ${subOnTime}', scored at ${time}'`);
+                    return { status: 'WON', points: 500 };
                 }
             }
         }
@@ -161,27 +131,22 @@ export const calculateResult = (bet, match, events = []) => {
 
     // 3. PLAYER SCORE — player must score a normal goal or penalty within 90 minutes
     if (type.includes('player_score')) {
-        // Prefer player_id column (migration 020); fall back to selection parsing
-        let playerId;
-        if (bet.player_id != null) {
-            playerId = Number(bet.player_id);
-        } else {
-            // Legacy format: selection = 'PLAYER_<id>'
-            const parts = selection.split('_');
-            playerId = parts.length > 1 ? Number(parts[1]) : NaN;
-        }
+        // Read directly from the existing `selection` column (e.g., "SCORE_Erling Haaland")
+        const betPlayerName = normalizeName(bet.selection);
 
-        if (isNaN(playerId)) {
-            console.warn(`⚠️  Player Score bet ${bet.id} has no valid player ID — marking LOST`);
+        if (!betPlayerName) {
+            console.warn(`⚠️  Player Score bet ${bet.id} has no valid selection name — marking LOST`);
             return { status: 'LOST', points: 0 };
         }
 
-        const didScore = events.some(
-            e => e.type === 'Goal' &&
-                COUNTABLE_GOAL_DETAILS.includes(e.detail) &&
-                Number(e.player?.id) === playerId &&
-                (e.time?.elapsed ?? 0) <= 90
-        );
+        const didScore = events.some(e => {
+            // Support Sportmonks v3 (14 = Goal, 97 = Penalty) or legacy string types
+            const isGoal = e.type_id === 14 || e.type_id === 97 || e.type === 'Goal';
+            const scorerName = normalizeName(e.player_name || e.player?.name);
+            const time = e.minute || e.time?.elapsed || 0;
+
+            return isGoal && scorerName === betPlayerName && time <= 90;
+        });
 
         return { status: didScore ? 'WON' : 'LOST', points: didScore ? oddsPoints : 0 };
     }

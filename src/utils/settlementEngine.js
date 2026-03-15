@@ -1,3 +1,12 @@
+// Aggressive string normalizer for Goalscorer matching
+const normalizeName = (name) => {
+    return String(name || '')
+        .normalize('NFD') // Deconstruct special characters
+        .replace(/[\u0300-\u036f]/g, '') // Strip accents (e.g., ü -> u)
+        .toLowerCase()
+        .replace(/^score_/, '') // Strip the legacy payload tag if present
+        .replace(/[^a-z]/g, ''); // Erase all spaces, hyphens, and punctuation
+};
 /**
  * Settlement Engine - Arcade Edition
  *
@@ -86,18 +95,20 @@ export const calculateBetResult = (cardType, selection, matchData) => {
         // Wins if the selected player scores a Normal Goal or Penalty within 90 minutes.
         // Excludes own goals and shootout penalties.
         case 'c_player_score': {
-            const playerId = Number(selection);
+            // Read directly from the existing `selection` column
+            const betPlayerName = normalizeName(selection);
 
-            if (isNaN(playerId)) {
-                return { status: 'LOST', points: 0, message: 'Invalid player ID' };
+            if (!betPlayerName) {
+                return { status: 'LOST', points: 0, message: 'Invalid player name' };
             }
 
-            const playerScored = events.some(e =>
-                e.type === 'Goal' &&
-                COUNTABLE_GOAL_DETAILS.includes(e.detail) &&
-                Number(e.player?.id) === playerId &&
-                (e.time?.elapsed ?? 0) <= 90
-            );
+            const playerScored = events.some(e => {
+                const isGoal = e.type_id === 14 || e.type_id === 97 || e.type === 'Goal';
+                const scorerName = normalizeName(e.player_name || e.player?.name);
+                const time = e.minute || e.time?.elapsed || 0;
+
+                return isGoal && scorerName === betPlayerName && time <= 90;
+            });
 
             const odds = matchData.odds?.player_score ?? 0;
 
@@ -113,72 +124,36 @@ export const calculateBetResult = (cardType, selection, matchData) => {
         // after their substitution minute, within 120 minutes.
         case 'c_supersub': {
             const backedTeamId = matchData.team_id ? Number(matchData.team_id) : null;
-            const isPlayerLevel = matchData.player_id != null;
-            const targetPlayerId = isPlayerLevel ? Number(matchData.player_id) : null;
-
             if (backedTeamId == null) {
                 return { status: 'LOST', points: 0, message: 'No team_id' };
             }
 
-            // Step 1: Build subsOnMap from substitution events (not lineups!)
-            // In subst events: assist.id = incoming player
             const subsOnMap = new Map();
             for (const event of events) {
-                if (
-                    event.type === 'subst' &&
-                    event.team?.id === backedTeamId &&
-                    event.assist?.id != null
-                ) {
-                    subsOnMap.set(event.assist.id, event.time?.elapsed ?? 0);
+                const isSub = event.type_id === 18 || event.type === 'subst';
+                const isBackedTeam = event.participant_id === backedTeamId || event.team?.id === backedTeamId;
+                const incomingPlayerId = event.player_id || event.assist?.id;
+
+                if (isSub && isBackedTeam && incomingPlayerId != null) {
+                    const minute = event.minute || event.time?.elapsed || 0;
+                    subsOnMap.set(incomingPlayerId, minute);
                 }
             }
 
-            if (subsOnMap.size === 0) {
-                return { status: 'LOST', points: 0 };
-            }
+            if (subsOnMap.size === 0) return { status: 'LOST', points: 0 };
 
-            // For player-level bets, the target player must be among the subs
-            if (isPlayerLevel && !subsOnMap.has(targetPlayerId)) {
-                return { status: 'LOST', points: 0 };
-            }
-
-            // Step 2: Check goals scored by the backed team within 120 minutes
             for (const event of events) {
-                if (
-                    event.type === 'Goal' &&
-                    COUNTABLE_GOAL_DETAILS.includes(event.detail) &&
-                    event.team?.id === backedTeamId &&
-                    (event.time?.elapsed ?? 0) <= 120
-                ) {
-                    const goalTime = event.time?.elapsed ?? 0;
-                    const scorerId = event.player?.id;
-                    const assistId = event.assist?.id;
+                const isGoal = event.type_id === 14 || event.type_id === 97 || event.type === 'Goal';
+                const isBackedTeam = event.participant_id === backedTeamId || event.team?.id === backedTeamId;
+                const time = event.minute || event.time?.elapsed || 0;
 
-                    // Check scorer
+                if (isGoal && isBackedTeam && time <= 120) {
+                    const scorerId = event.player_id || event.player?.id;
+
                     if (scorerId != null) {
                         const subOnTime = subsOnMap.get(scorerId);
-                        if (subOnTime !== undefined && goalTime >= subOnTime) {
-                            if (isPlayerLevel) {
-                                if (scorerId === targetPlayerId) {
-                                    return { status: 'WON', points: 2500 };
-                                }
-                            } else {
-                                return { status: 'WON', points: 500 };
-                            }
-                        }
-                    }
-
-                    // Check assister
-                    if (assistId != null) {
-                        const subOnTime = subsOnMap.get(assistId);
-                        if (subOnTime !== undefined && goalTime >= subOnTime) {
-                            if (isPlayerLevel) {
-                                if (assistId === targetPlayerId) {
-                                    return { status: 'WON', points: 2500 };
-                                }
-                            } else {
-                                return { status: 'WON', points: 500 };
-                            }
+                        if (subOnTime !== undefined && time >= subOnTime) {
+                            return { status: 'WON', points: 500 };
                         }
                     }
                 }
