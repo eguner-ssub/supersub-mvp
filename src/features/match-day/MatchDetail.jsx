@@ -324,70 +324,64 @@ const EventsTab = ({ events: eventsProp }) => {
    STATS TAB — High-contrast comparison bars
    ───────────────────────────────────────────────────────────── */
 const StatsTab = ({ match }) => {
-  // 1. Aggressively locate and unwrap the stats array
+  const { statDictionary } = useGame();
+  const [activeGroup, setActiveGroup] = useState('overall');
+
+  // 1. Aggressively locate and unwrap the flat stats array
   let stats = match?.statistics || match?.raw_data?.statistics;
-
-  // Force parse if Supabase handed us a raw JSON string
   if (typeof stats === 'string') {
-    try {
-      stats = JSON.parse(stats);
-    } catch (e) {
-      stats = [];
-    }
+    try { stats = JSON.parse(stats); } catch (e) { stats = []; }
   }
-
-  // Unwrap Sportmonks { data: [] } pagination layers if they exist
   if (stats && !Array.isArray(stats) && Array.isArray(stats.data)) {
     stats = stats.data;
   }
+  if (!Array.isArray(stats)) stats = [];
 
-  const getStat = (statIds, legacyString) => {
-    if (!stats || !Array.isArray(stats)) return null;
+  // 2. Aggregate raw stats by type_id (combining Home and Away)
+  const aggregatedStats = {};
 
-    // Ensure statIds is an array for multiple ID checks
-    const idsToCheck = Array.isArray(statIds) ? statIds : [statIds];
+  stats.forEach(stat => {
+    const typeId = Number(stat.type_id);
+    const location = stat.location;
+    const valRaw = stat.data?.value ?? stat.value;
+    const value = parseFloat(String(valRaw || 0).replace('%', ''));
 
-    // Legacy (API-Football / Grouped Arrays) fallback structure
-    if (stats[0]?.statistics) {
-      const homeStat = stats[0].statistics.find(s => idsToCheck.includes(Number(s.type_id)) || s.type === legacyString);
-      const awayStat = stats[1]?.statistics?.find(s => idsToCheck.includes(Number(s.type_id)) || s.type === legacyString);
-
-      // 2. The Zero-Omission Fix: Only require ONE side to exist
-      if (homeStat || awayStat) {
-        return {
-          home: homeStat ? parseFloat(String(homeStat.value || 0).replace('%', '')) : 0,
-          away: awayStat ? parseFloat(String(awayStat.value || 0).replace('%', '')) : 0,
-        };
-      }
-      return null;
+    if (!aggregatedStats[typeId]) {
+      aggregatedStats[typeId] = { home: 0, away: 0, typeId };
     }
+    if (location === 'home') aggregatedStats[typeId].home = value;
+    if (location === 'away') aggregatedStats[typeId].away = value;
+  });
 
-    // Pure Sportmonks V3 Reality (Flat Array mapping via "location" string)
-    const homeStat = stats.find(s => idsToCheck.includes(Number(s.type_id)) && s.location === 'home');
-    const awayStat = stats.find(s => idsToCheck.includes(Number(s.type_id)) && s.location === 'away');
+  // 3. Categorize stats strictly using the global dictionary for the active tab
+  const currentStats = [];
 
-    // The Zero-Omission Fix
-    if (homeStat || awayStat) {
-      return {
-        // V3 places the actual metric inside a nested `data` object, with fallback to `.value`
-        home: homeStat ? parseFloat(String(homeStat.data?.value || homeStat.value || 0).replace('%', '')) : 0,
-        away: awayStat ? parseFloat(String(awayStat.data?.value || awayStat.value || 0).replace('%', '')) : 0,
-      };
-    }
-    return null;
-  };
+  Object.values(aggregatedStats).forEach(stat => {
+    const dictEntry = statDictionary?.[stat.typeId];
 
-  // Sportmonks V3 Type IDs mapped directly from your database payload:
-  // 45 = Ball Possession, 86 = Shots on Target, 42/84 = Total Shots
-  const possession = getStat([45], 'Ball Possession');
-  const shotsOn = getStat([86], 'Shots on Goal');
-  const shotsTotal = getStat([42, 84], 'Total Shots');
+    // Silent drop for unknown "ghost" IDs
+    if (!dictEntry) return;
 
-  const statRows = [
-    possession && { label: 'Possession', home: possession.home, away: possession.away, unit: '%', max: 100, isPercentage: true },
-    shotsOn && { label: 'Shots on Target', home: shotsOn.home, away: shotsOn.away, unit: '', max: Math.max(shotsOn.home, shotsOn.away, 1), isPercentage: false },
-    shotsTotal && { label: 'Total Shots', home: shotsTotal.home, away: shotsTotal.away, unit: '', max: Math.max(shotsTotal.home, shotsTotal.away, 1), isPercentage: false },
-  ].filter(Boolean);
+    // Don't render a bar if both teams have 0
+    if (stat.home === 0 && stat.away === 0) return;
+
+    const group = dictEntry.stat_group?.toLowerCase();
+
+    // Only process stats that belong to the currently active tab
+    if (group !== activeGroup) return;
+
+    const isPercentage = dictEntry.name.includes('%') || dictEntry.name.toLowerCase().includes('possession');
+    const max = isPercentage ? 100 : Math.max(stat.home, stat.away, 1);
+
+    currentStats.push({
+      label: dictEntry.name.replace(' %', ''),
+      home: stat.home,
+      away: stat.away,
+      unit: isPercentage ? '%' : '',
+      max,
+      isPercentage
+    });
+  });
 
   const barStyle = (value, max, isHome) => ({
     height: '6px',
@@ -399,77 +393,92 @@ const StatsTab = ({ match }) => {
     marginRight: isHome ? '0' : 'auto',
   });
 
-  if (statRows.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '40px 12px', color: 'rgba(255,255,255,0.35)' }}>
-        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>
-          Stats not yet available
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ padding: '0 12px' }}>
-      {statRows.map((row, i) => (
-        <div key={i} style={{ marginBottom: '18px' }}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-            marginBottom: '6px',
-          }}>
-            <span style={{
-              fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
-              fontSize: '13px', color: '#00e5ff',
-            }}>
-              {row.home}{row.unit}
-            </span>
-            <span style={{
-              fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-              fontSize: '10px', color: '#A0A0A0',
-              textTransform: 'uppercase', letterSpacing: '1.5px',
-            }}>
-              {row.label}
-            </span>
-            <span style={{
-              fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
-              fontSize: '13px', color: '#f59e0b',
-            }}>
-              {row.away}{row.unit}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <div style={{
-              flex: 1, height: '6px', borderRadius: '3px',
-              background: 'rgba(255,255,255,0.12)',
-              display: 'flex', justifyContent: 'flex-end',
-            }}>
-              <div style={barStyle(row.home, row.isPercentage ? row.max : Math.max(row.home, row.away, 1), true)} />
-            </div>
-            <div style={{
-              width: '2px', height: '14px', borderRadius: '1px',
-              background: 'rgba(255,255,255,0.1)',
-            }} />
-            <div style={{
-              flex: 1, height: '6px', borderRadius: '3px',
-              background: 'rgba(255,255,255,0.12)',
-            }}>
-              <div style={barStyle(row.away, row.isPercentage ? row.max : Math.max(row.home, row.away, 1), false)} />
-            </div>
-          </div>
-        </div>
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingTop: '4px' }}>
 
-      <div style={{
-        textAlign: 'center', paddingTop: '8px',
-        borderTop: '1px solid rgba(255,255,255,0.05)',
-      }}>
-        <span style={{
-          fontFamily: "'Montserrat', sans-serif", fontWeight: 600,
-          fontSize: '8px', color: 'rgba(255,255,255,0.35)',
-          textTransform: 'uppercase', letterSpacing: '2px',
-        }}>
-          Matchday Programme • Statistical Breakdown
-        </span>
+      {/* Sub-tabs Navigation */}
+      <div style={{ display: 'flex', gap: '8px', padding: '0 12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }}>
+        {['overall', 'offensive', 'defensive'].map(group => (
+          <button
+            key={group}
+            onClick={() => setActiveGroup(group)}
+            style={{
+              flex: 1,
+              padding: '8px 0',
+              background: activeGroup === group ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${activeGroup === group ? '#00e5ff' : 'transparent'}`,
+              borderRadius: '8px',
+              color: activeGroup === group ? '#00e5ff' : 'rgba(255,255,255,0.5)',
+              fontFamily: "'Montserrat', sans-serif",
+              fontWeight: 800,
+              fontSize: '9px',
+              textTransform: 'uppercase',
+              letterSpacing: '1.5px',
+              transition: 'all 0.2s',
+            }}
+          >
+            {group}
+          </button>
+        ))}
+      </div>
+
+      {/* Render Active Category */}
+      <div style={{ padding: '0 12px', paddingBottom: '16px' }}>
+        {currentStats.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px 0', color: 'rgba(255,255,255,0.3)' }}>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>
+              No {activeGroup} stats recorded
+            </p>
+          </div>
+        ) : (
+          currentStats.map((row, i) => (
+            <div key={i} style={{ marginBottom: '18px' }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                marginBottom: '6px',
+              }}>
+                <span style={{
+                  fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
+                  fontSize: '13px', color: '#00e5ff',
+                }}>
+                  {row.home}{row.unit}
+                </span>
+                <span style={{
+                  fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
+                  fontSize: '10px', color: '#A0A0A0',
+                  textTransform: 'uppercase', letterSpacing: '1.5px',
+                }}>
+                  {row.label}
+                </span>
+                <span style={{
+                  fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
+                  fontSize: '13px', color: '#f59e0b',
+                }}>
+                  {row.away}{row.unit}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <div style={{
+                  flex: 1, height: '6px', borderRadius: '3px',
+                  background: 'rgba(255,255,255,0.12)',
+                  display: 'flex', justifyContent: 'flex-end',
+                }}>
+                  <div style={barStyle(row.home, row.isPercentage ? row.max : Math.max(row.home, row.away, 1), true)} />
+                </div>
+                <div style={{
+                  width: '2px', height: '14px', borderRadius: '1px',
+                  background: 'rgba(255,255,255,0.1)',
+                }} />
+                <div style={{
+                  flex: 1, height: '6px', borderRadius: '3px',
+                  background: 'rgba(255,255,255,0.12)',
+                }}>
+                  <div style={barStyle(row.away, row.isPercentage ? row.max : Math.max(row.home, row.away, 1), false)} />
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

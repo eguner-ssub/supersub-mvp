@@ -1,0 +1,666 @@
+[
+  {
+    "id": 34,
+    "name": "Corners",
+    "code": "corners",
+    "developer_name": "CORNERS",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 40,
+    "name": "Captain",
+    "code": "captain",
+    "developer_name": "CAPTAIN",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 41,
+    "name": "Shots Off Target",
+    "code": "shots-off-target",
+    "developer_name": "SHOTS_OFF_TARGET",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 42,
+    "name": "Shots Total",
+    "code": "shots-total",
+    "developer_name": "SHOTS_TOTAL",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 43,
+    "name": "Attacks",
+    "code": "attacks",
+    "developer_name": "ATTACKS",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 44,
+    "name": "Dangerous Attacks",
+    "code": "dangerous-attacks",
+    "developer_name": "DANGEROUS_ATTACKS",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 45,
+    "name": "Ball Possession %",
+    "code": "ball-possession",
+    "developer_name": "BALL_POSSESSION",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 46,
+    "name": "Ball Safe",
+    "code": "ball-safe",
+    "developer_name": "BALL_SAFE",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 47,
+    "name": "Penalties",
+    "code": "penalties",
+    "developer_name": "PENALTIES",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 49,
+    "name": "Shots Insidebox",
+    "code": "shots-insidebox",
+    "developer_name": "SHOTS_INSIDEBOX",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 50,
+    "name": "Shots Outsidebox",
+    "code": "shots-outsidebox",
+    "developer_name": "SHOTS_OUTSIDEBOX",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 51,
+    "name": "Offsides",
+    "code": "offsides",
+    "developer_name": "OFFSIDES",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 52,
+    "name": "Goals",
+    "code": "goals",
+    "developer_name": "GOALS",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 53,
+    "name": "Goal Kicks",
+    "code": "goals-kicks",
+    "developer_name": "GOAL_KICKS",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 54,
+    "name": "Goal Attempts",
+    "code": "goal-attempts",
+    "developer_name": "GOAL_ATTEMPTS",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 55,
+    "name": "Free Kicks",
+    "code": "free-kicks",
+    "developer_name": "FREE_KICKS",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 56,
+    "name": "Fouls",
+    "code": "fouls",
+    "developer_name": "FOULS",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 57,
+    "name": "Saves",
+    "code": "saves",
+    "developer_name": "SAVES",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 58,
+    "name": "Shots Blocked",
+    "code": "shots-blocked",
+    "developer_name": "SHOTS_BLOCKED",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 59,
+    "name": "Substitutions",
+    "code": "substitutions",
+    "developer_name": "SUBSTITUTIONS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 60,
+    "name": "Throwins",
+    "code": "throwins",
+    "developer_name": "THROWINS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 61,
+    "name": "Beats",
+    "code": "beats",
+    "developer_name": "BEATS",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 62,
+    "name": "Long Passes",
+    "code": "long-passes",
+    "developer_name": "LONG_PASSES",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 63,
+    "name": "Short Passes",
+    "code": "short-passes",
+    "developer_name": "SHORT_PASSES",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 64,
+    "name": "Hit Woodwork",
+    "code": "hit-woodwork",
+    "developer_name": "HIT_WOODWORK",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 65,
+    "name": "Successful Headers",
+    "code": "successful-headers",
+    "developer_name": "SUCCESSFUL_HEADERS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 66,
+    "name": "Successful Interceptions",
+    "code": "successful-interceptions",
+    "developer_name": "SUCCESSFUL_INTERCEPTIONS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 67,
+    "name": "Successful Centers",
+    "code": "successful-centers",
+    "developer_name": "SUCCESSFUL_CENTERS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 68,
+    "name": "Substitutions Overtime",
+    "code": "substitutions-overtime",
+    "developer_name": "SUBSTITUTIONS_OVERTIME",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 69,
+    "name": "Offsides Overtime",
+    "code": "offsides-overtime",
+    "developer_name": "OFFSIDES_OVERTIME",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 70,
+    "name": "Headers",
+    "code": "headers",
+    "developer_name": "HEADERS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 71,
+    "name": "Last Substituttion",
+    "code": "last-substituttion",
+    "developer_name": "LAST_SUBSTITUTION",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 72,
+    "name": "First Substitution",
+    "code": "first-substitution",
+    "developer_name": "FIRST_SUBSTITUTION",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 73,
+    "name": "Successful Center",
+    "code": "successful-center",
+    "developer_name": "SUCCESSFUL_CENTER",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 74,
+    "name": "Yellowcards Overtime",
+    "code": "yellowcards-overtime",
+    "developer_name": "YELLOWCARDS_OVERTIME",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 75,
+    "name": "Corners Overtime",
+    "code": "corners-overtime",
+    "developer_name": "CORNERS_OVERTIME",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 76,
+    "name": "Goalkeeper Comes Out",
+    "code": "goalkeeper-comes-out",
+    "developer_name": "GOALKEEPER_COME_OUTS",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 77,
+    "name": "Challenges",
+    "code": "challenges",
+    "developer_name": "CHALLENGES",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 78,
+    "name": "Tackles",
+    "code": "tackles",
+    "developer_name": "TACKLES",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 79,
+    "name": "Assists",
+    "code": "assists",
+    "developer_name": "ASSISTS",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 80,
+    "name": "Passes",
+    "code": "passes",
+    "developer_name": "PASSES",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 81,
+    "name": "Successful Passes",
+    "code": "successful-passes",
+    "developer_name": "SUCCESSFUL_PASSES",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 82,
+    "name": "Successful Passes Percentage",
+    "code": "successful-passes-percentage",
+    "developer_name": "SUCCESSFUL_PASSES_PERCENTAGE",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 83,
+    "name": "Redcards",
+    "code": "redcards",
+    "developer_name": "REDCARDS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 84,
+    "name": "Yellowcards",
+    "code": "yellowcards",
+    "developer_name": "YELLOWCARDS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 85,
+    "name": "Yellowred Cards",
+    "code": "yellowred-cards",
+    "developer_name": "YELLOWRED_CARDS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 86,
+    "name": "Shots On Target",
+    "code": "shots-on-target",
+    "developer_name": "SHOTS_ON_TARGET",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 87,
+    "name": "Injuries",
+    "code": "injuries",
+    "developer_name": "INJURIES",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 88,
+    "name": "Goals Conceded",
+    "code": "goals-conceded",
+    "developer_name": "GOALS_CONCEDED",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 91,
+    "name": "First Offside",
+    "code": "first-offside",
+    "developer_name": "FIRST_OFFSIDE",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 92,
+    "name": "Last Offside",
+    "code": "last-offside",
+    "developer_name": "LAST_OFFSIDE",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 94,
+    "name": "Dispossessed",
+    "code": "dispossessed",
+    "developer_name": "DISPOSSESSED",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 95,
+    "name": "Offsides Provoked",
+    "code": "offsides-provoked",
+    "developer_name": "OFFSIDES_PROVOKED",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 96,
+    "name": "Fouls Drawn",
+    "code": "fouls-drawn",
+    "developer_name": "FOULS_DRAWN",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 97,
+    "name": "Blocked Shots",
+    "code": "blocked-shots",
+    "developer_name": "BLOCKED_SHOTS",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 98,
+    "name": "Total Crosses",
+    "code": "total-crosses",
+    "developer_name": "TOTAL_CROSSES",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 99,
+    "name": "Accurate Crosses",
+    "code": "accurate-crosses",
+    "developer_name": "ACCURATE_CROSSES",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 100,
+    "name": "Interceptions",
+    "code": "interceptions",
+    "developer_name": "INTERCEPTIONS",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 101,
+    "name": "Clearances",
+    "code": "clearances",
+    "developer_name": "CLEARANCES",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 102,
+    "name": "Clearances Won",
+    "code": "clearances-won",
+    "developer_name": "CLEARANCES_WON",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 103,
+    "name": "Punches",
+    "code": "punches",
+    "developer_name": "PUNCHES",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 104,
+    "name": "Saves Insidebox",
+    "code": "saves-insidebox",
+    "developer_name": "SAVES_INSIDE_BOX",
+    "model_type": "statistic",
+    "stat_group": "defensive"
+  },
+  {
+    "id": 105,
+    "name": "Total Duels",
+    "code": "total-duels",
+    "developer_name": "TOTAL_DUELS",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 106,
+    "name": "Duels Won",
+    "code": "duels-won",
+    "developer_name": "DUELS_WON",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 107,
+    "name": "Aerials Won",
+    "code": "aeriels-won",
+    "developer_name": "AERIALS_WON",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 108,
+    "name": "Dribble Attempts",
+    "code": "dribble-attempts",
+    "developer_name": "DRIBBLED_ATTEMPTS",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 109,
+    "name": "Successful Dribbles",
+    "code": "successful-dribbles",
+    "developer_name": "SUCCESSFUL_DRIBBLES",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 110,
+    "name": "Dribbled Past",
+    "code": "dribbled-past",
+    "developer_name": "DRIBBLED_PAST",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 111,
+    "name": "Penalties Scored",
+    "code": "penalties-scored",
+    "developer_name": "PENALTIES_SCORED",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 112,
+    "name": "Penalties Missed",
+    "code": "penalties-missed",
+    "developer_name": "PENALTIES_MISSES",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 113,
+    "name": "Penalties Saved",
+    "code": "penalties-saved",
+    "developer_name": "PENALTIES_SAVED",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 114,
+    "name": "Penalties Committed",
+    "code": "penalties-committed",
+    "developer_name": "PENALTIES_COMMITTED",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 115,
+    "name": "Penalties Won",
+    "code": "penalties-won",
+    "developer_name": "PENALTIES_WON",
+    "model_type": "statistic",
+    "stat_group": "offensive"
+  },
+  {
+    "id": 116,
+    "name": "Accurate Passes",
+    "code": "accurate-passes",
+    "developer_name": "ACCURATE_PASSES",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 117,
+    "name": "Key Passes",
+    "code": "key-passes",
+    "developer_name": "KEY_PASSES",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 118,
+    "name": "Rating",
+    "code": "rating",
+    "developer_name": "RATING",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 119,
+    "name": "Minutes Played",
+    "code": "minutes-played",
+    "developer_name": "MINUTES_PLAYED",
+    "model_type": "statistic",
+    "stat_group": "NULL"
+  },
+  {
+    "id": 120,
+    "name": "Touches",
+    "code": "touches",
+    "developer_name": "TOUCHES",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 121,
+    "name": "Turn Over",
+    "code": "turn-over",
+    "developer_name": "TURN_OVER",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 122,
+    "name": "Long Balls",
+    "code": "long-balls",
+    "developer_name": "LONG_BALLS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 123,
+    "name": "Long Balls Won",
+    "code": "long-balls-won",
+    "developer_name": "LONG_BALLS_WON",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 124,
+    "name": "Through Balls",
+    "code": "through-balls",
+    "developer_name": "THROUGH_BALLS",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  },
+  {
+    "id": 125,
+    "name": "Through Balls Won",
+    "code": "through-balls-won",
+    "developer_name": "THROUGH_BALLS_WON",
+    "model_type": "statistic",
+    "stat_group": "overall"
+  }
+]

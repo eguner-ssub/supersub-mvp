@@ -8,6 +8,7 @@ export const useGame = () => useContext(GameContext);
 export const GameProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [statDictionary, setStatDictionary] = useState(null);
   const activeRequestId = useRef(0);
 
   const loadProfile = async (session) => {
@@ -171,7 +172,29 @@ export const GameProvider = ({ children }) => {
     setUserProfile(prev => ({ ...prev, energy: newEnergy }));
     await supabase.from('profiles').update({ energy: newEnergy }).eq('id', userProfile.id);
   };
+  // GLOBAL APP STATE: Load the Sportmonks Dictionary immediately on mount
+  useEffect(() => {
+    const fetchGlobalDictionary = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('reference_cache')
+          .select('value')
+          .like('key', 'type:%');
 
+        if (!error && data) {
+          const dict = {};
+          data.forEach(row => {
+            const val = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+            dict[val.id] = val;
+          });
+          setStatDictionary(dict);
+        }
+      } catch (err) {
+        console.error("Failed to load stat dictionary:", err);
+      }
+    };
+    fetchGlobalDictionary();
+  }, []);
   useEffect(() => {
     let mounted = true;
     async function initSession() {
@@ -186,6 +209,6 @@ export const GameProvider = ({ children }) => {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  const value = { userProfile, loading, supabase, placeBet, consumeCard, spendEnergy, updateInventory, loadProfile };
+  const value = { userProfile, loading, statDictionary, supabase, placeBet, consumeCard, spendEnergy, updateInventory, loadProfile };
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 };
