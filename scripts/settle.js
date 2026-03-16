@@ -24,9 +24,9 @@ const FINAL_STATUSES = ['FT', 'AET', 'FT_PEN'];
 const LIVE_STATUSES = ['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'];
 const VOID_STATUSES = ['POSTPONED', 'CANCELLED', 'ABANDONED', 'SUSPENDED', 'AWARDED', 'WO'];
 
-const isFinished = (status) => FINAL_STATUSES.includes(status);
-const isLive = (status) => LIVE_STATUSES.includes(status);
-const isVoid = (status) => VOID_STATUSES.includes(status);
+export const isFinished = (status) => FINAL_STATUSES.includes(status);
+export const isLive = (status) => LIVE_STATUSES.includes(status);
+export const isVoid = (status) => VOID_STATUSES.includes(status);
 
 // ── Goal filter shared across card types ────────────────────────────────────
 const COUNTABLE_GOAL_DETAILS = ['Normal Goal', 'Penalty'];
