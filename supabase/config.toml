@@ -404,3 +404,10 @@ entrypoint = "./functions/sync-fpl/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/sync-fpl/*.html" ]
+
+[functions.settle]
+enabled = true
+verify_jwt = false
+import_map = "./functions/settle/deno.json"
+entrypoint = "./functions/settle/index.ts"
+schedule = "*/3 * * * *"
