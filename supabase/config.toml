@@ -410,4 +410,4 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/settle/deno.json"
 entrypoint = "./functions/settle/index.ts"
-schedule = "*/3 * * * *"
+# schedule removed — cron-job.org calls api/settle (Vercel) every 3 minutes instead
