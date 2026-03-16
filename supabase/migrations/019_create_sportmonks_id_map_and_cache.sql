@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS sportmonks_id_map (
   PRIMARY KEY (internal_id, entity_type)
 );
 
-CREATE INDEX idx_id_map_sportmonks ON sportmonks_id_map(entity_type, sportmonks_id);
-CREATE INDEX idx_id_map_api_football ON sportmonks_id_map(entity_type, api_football_id)
+CREATE INDEX IF NOT EXISTS idx_id_map_sportmonks ON sportmonks_id_map(entity_type, sportmonks_id);
+CREATE INDEX IF NOT EXISTS idx_id_map_api_football ON sportmonks_id_map(entity_type, api_football_id)
   WHERE api_football_id IS NOT NULL;
 
 -- Reference cache for Sportmonks state IDs, type IDs, etc.

@@ -1,7 +1,7 @@
 -- Sportmonks migration: top_scorers table
 
 CREATE TABLE IF NOT EXISTS top_scorers (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sportmonks_id INTEGER NOT NULL, -- Sportmonks player ID
   player_name TEXT NOT NULL,
   season_id UUID NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
@@ -15,4 +15,4 @@ CREATE TABLE IF NOT EXISTS top_scorers (
 );
 
 -- Index for leaderboard queries
-CREATE INDEX idx_top_scorers_season_goals ON top_scorers(season_id, goals DESC);
+CREATE INDEX IF NOT EXISTS idx_top_scorers_season_goals ON top_scorers(season_id, goals DESC);

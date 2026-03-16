@@ -20,8 +20,13 @@ ALTER TABLE profiles RENAME COLUMN coins TO points;
 COMMENT ON COLUMN profiles.points IS 'Accumulated points balance — credited on each WON settlement via settle_prediction RPC';
 
 -- ── 2. Replace settle_prediction ─────────────────────────────────────────────
+-- DROP both overloads first — CREATE OR REPLACE cannot change a return type,
+-- so we drop explicitly. Safe here because migration 002 has already run.
 
-CREATE OR REPLACE FUNCTION settle_prediction(
+DROP FUNCTION IF EXISTS settle_prediction(UUID, TEXT);
+DROP FUNCTION IF EXISTS settle_prediction(UUID, TEXT, INTEGER);
+
+CREATE FUNCTION settle_prediction(
   p_prediction_id UUID,
   p_new_status    TEXT,
   p_points        INTEGER DEFAULT 0

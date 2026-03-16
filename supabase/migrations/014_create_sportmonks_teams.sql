@@ -1,7 +1,7 @@
 -- Sportmonks migration: teams table
 
 CREATE TABLE IF NOT EXISTS teams (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sportmonks_id INTEGER UNIQUE NOT NULL,
   name TEXT NOT NULL,
   short_name TEXT,

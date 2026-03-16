@@ -1,7 +1,7 @@
 -- Sportmonks migration: standings table
 
 CREATE TABLE IF NOT EXISTS standings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   season_id UUID NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   position INTEGER,
@@ -18,4 +18,4 @@ CREATE TABLE IF NOT EXISTS standings (
 );
 
 -- Index for ordered standings queries
-CREATE INDEX idx_standings_season_position ON standings(season_id, position);
+CREATE INDEX IF NOT EXISTS idx_standings_season_position ON standings(season_id, position);

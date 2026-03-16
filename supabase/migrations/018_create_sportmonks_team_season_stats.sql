@@ -1,7 +1,7 @@
 -- Sportmonks migration: team_season_stats table
 
 CREATE TABLE IF NOT EXISTS team_season_stats (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   season_id UUID NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
   matches_played INTEGER DEFAULT 0,

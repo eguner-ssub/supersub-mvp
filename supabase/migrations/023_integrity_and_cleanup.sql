@@ -20,11 +20,17 @@ CREATE INDEX IF NOT EXISTS idx_predictions_match_id
 -- without violating the constraint mid-flight.
 -- Safe to add: predictions was truncated in migration 021 (no orphaned rows).
 
-ALTER TABLE predictions
-    ADD CONSTRAINT fk_predictions_match
-    FOREIGN KEY (match_id) REFERENCES matches(id)
-    ON DELETE CASCADE
-    DEFERRABLE INITIALLY DEFERRED;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'fk_predictions_match'
+  ) THEN
+    ALTER TABLE predictions
+      ADD CONSTRAINT fk_predictions_match
+      FOREIGN KEY (match_id) REFERENCES matches(id)
+      ON DELETE CASCADE
+      DEFERRABLE INITIALLY DEFERRED;
+  END IF;
+END $$;
 
 -- ── 3. Drop predictions.api_football_team_id ─────────────────────────────────
 -- Added in migration 020 as a renamed legacy column. No current code reads or

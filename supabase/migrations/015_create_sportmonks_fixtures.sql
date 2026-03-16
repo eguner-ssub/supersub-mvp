@@ -1,7 +1,7 @@
 -- Sportmonks migration: fixtures table
 
 CREATE TABLE IF NOT EXISTS fixtures (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sportmonks_id INTEGER UNIQUE NOT NULL,
   season_id UUID NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
   home_team_id UUID NOT NULL REFERENCES teams(id),
@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS fixtures (
 );
 
 -- Indexes
-CREATE INDEX idx_fixtures_season_id ON fixtures(season_id);
-CREATE INDEX idx_fixtures_scheduled_at ON fixtures(scheduled_at);
-CREATE INDEX idx_fixtures_status ON fixtures(status);
-CREATE INDEX idx_fixtures_home_team ON fixtures(home_team_id);
-CREATE INDEX idx_fixtures_away_team ON fixtures(away_team_id);
+CREATE INDEX IF NOT EXISTS idx_fixtures_season_id ON fixtures(season_id);
+CREATE INDEX IF NOT EXISTS idx_fixtures_scheduled_at ON fixtures(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_fixtures_status ON fixtures(status);
+CREATE INDEX IF NOT EXISTS idx_fixtures_home_team ON fixtures(home_team_id);
+CREATE INDEX IF NOT EXISTS idx_fixtures_away_team ON fixtures(away_team_id);
