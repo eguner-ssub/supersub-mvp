@@ -50,7 +50,7 @@ describe('App Routing (The Bouncer)', () => {
 
   it('allows full users to access /manager-office', async () => {
     useGame.mockReturnValue({
-      userProfile: { id: '123', club_name: 'Test FC', energy: 5, max_energy: 5, coins: 100 },
+      userProfile: { id: '123', club_name: 'Test FC', energy: 5, max_energy: 5, points: 100 },
       loading: false,
     });
 
@@ -66,7 +66,7 @@ describe('App Routing (The Bouncer)', () => {
 
   it('redirects root / to default view for full users', async () => {
     useGame.mockReturnValue({
-      userProfile: { id: '123', club_name: 'Test FC', energy: 5, max_energy: 5, coins: 100 },
+      userProfile: { id: '123', club_name: 'Test FC', energy: 5, max_energy: 5, points: 100 },
       loading: false,
     });
 

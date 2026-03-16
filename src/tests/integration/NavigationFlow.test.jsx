@@ -10,7 +10,7 @@ vi.mock('../../shared/context/GameContext', () => ({
         userProfile: {
             id: 'test-user',
             club_name: 'Test FC',
-            coins: 1000,
+            points: 1000,
             energy: 3,
             max_energy: 3,
             inventory: ['c_match_result']

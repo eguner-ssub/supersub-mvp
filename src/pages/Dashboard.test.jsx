@@ -28,7 +28,7 @@ describe('Dashboard (The Living Room)', () => {
     club_name: 'Antigravity FC',
     energy: 3,
     max_energy: 5,
-    coins: 1000,
+    points: 1000,
   };
 
   const mockSpendEnergy = vi.fn();

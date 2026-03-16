@@ -241,23 +241,17 @@ async function settle() {
 
             console.log(`✅ Settling bet ${bet.id} (${bet.card_type}): ${result.status} — ${result.points} pts`);
 
-            // Use settle_prediction RPC — handles coin payout atomically for WON bets
+            // settle_prediction RPC atomically: sets status, writes points_awarded,
+            // and credits both coins (potential_reward) and points to the profile.
             const { error: settleErr } = await supabase.rpc('settle_prediction', {
                 p_prediction_id: bet.id,
                 p_new_status: result.status,
+                p_points: result.points,
             });
 
             if (settleErr) {
                 console.error(`❌ Settlement RPC error for bet ${bet.id}:`, settleErr.message);
                 continue;
-            }
-
-            // Write points_awarded separately (RPC doesn't handle this yet)
-            if (result.points > 0) {
-                await supabase
-                    .from('predictions')
-                    .update({ points_awarded: result.points })
-                    .eq('id', bet.id);
             }
 
             settled++;

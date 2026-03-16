@@ -656,7 +656,7 @@ const MatchDetail = () => {
         <div className="flex flex-col items-end gap-1">
           <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5">
             <Coins className="w-4 h-4 text-yellow-400" />
-            <span className="text-white font-bold text-sm">{userProfile.coins ?? 0}</span>
+            <span className="text-white font-bold text-sm">{userProfile.points ?? 0}</span>
           </div>
           {activeBookie && (
             <div className="px-2 py-0.5 rounded-full bg-black/40 border border-white/5 flex items-center gap-1.5">

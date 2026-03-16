@@ -38,7 +38,7 @@ describe('ManagerOffice Simulation Drill', () => {
     it('renders the Quiet Office correctly', () => {
         // Setup Mock Data
         mockUseGame.mockReturnValue({
-            userProfile: { energy: 3, max_energy: 5, coins: 100, club_name: 'Test FC' },
+            userProfile: { energy: 3, max_energy: 5, points: 100, club_name: 'Test FC' },
         });
 
         render(<ManagerOffice />);
@@ -59,7 +59,7 @@ describe('ManagerOffice Simulation Drill', () => {
     // ============================================================================
     it('navigates to Scouting when Laptop (Workstation) is clicked', () => {
         mockUseGame.mockReturnValue({
-            userProfile: { energy: 3, max_energy: 5, coins: 100 }
+            userProfile: { energy: 3, max_energy: 5, points: 100 }
         });
 
         render(<ManagerOffice />);
@@ -73,7 +73,7 @@ describe('ManagerOffice Simulation Drill', () => {
 
     it('navigates to Leaderboard when Tablet (Live Ops) is clicked', () => {
         mockUseGame.mockReturnValue({
-            userProfile: { energy: 3, max_energy: 5, coins: 100 }
+            userProfile: { energy: 3, max_energy: 5, points: 100 }
         });
 
         render(<ManagerOffice />);
@@ -86,7 +86,7 @@ describe('ManagerOffice Simulation Drill', () => {
 
     it('navigates to Inbox when Phone (Intel) is clicked', () => {
         mockUseGame.mockReturnValue({
-            userProfile: { energy: 3, max_energy: 5, coins: 100 }
+            userProfile: { energy: 3, max_energy: 5, points: 100 }
         });
 
         render(<ManagerOffice />);
@@ -99,7 +99,7 @@ describe('ManagerOffice Simulation Drill', () => {
 
     it('navigates to History when Bookcase (Archives) is clicked', () => {
         mockUseGame.mockReturnValue({
-            userProfile: { energy: 3, max_energy: 5, coins: 100 }
+            userProfile: { energy: 3, max_energy: 5, points: 100 }
         });
 
         render(<ManagerOffice />);
@@ -118,7 +118,7 @@ describe('ManagerOffice Simulation Drill', () => {
             userProfile: {
                 energy: 2,
                 max_energy: 5,
-                coins: 1500,
+                points: 1500,
                 club_name: 'Arsenal FC'
             },
         });

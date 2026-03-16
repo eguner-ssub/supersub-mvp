@@ -27,7 +27,7 @@ describe('MatchDetail - Prediction Flow with Toggles', () => {
         id: '123',
         club_name: 'Test FC',
         name: 'Test Manager',
-        coins: 1000,
+        points: 1000,
         energy: 3,
         max_energy: 5,
         inventory: ['c_match_result', 'c_match_result', 'c_total_goals']

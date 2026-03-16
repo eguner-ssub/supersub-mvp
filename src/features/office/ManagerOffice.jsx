@@ -15,7 +15,7 @@ const ManagerOffice = () => {
 
     const energy = userProfile?.energy || 0;
     const maxEnergy = userProfile?.max_energy || 3;
-    const coins = userProfile?.coins || 0;
+    const coins = userProfile?.points || 0;
     const clubName = userProfile?.club_name || userProfile?.name || "Manager";
 
     /**

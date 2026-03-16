@@ -21,7 +21,7 @@ describe('E2E Betting Flow - Complete Integration Test', () => {
     const mockUserProfile = {
         id: 'user-123',
         name: 'Test Manager',
-        coins: 500,
+        points: 500,
         energy: 3,
         max_energy: 100,
         inventory: ['c_match_result', 'c_match_result'],

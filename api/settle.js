@@ -177,21 +177,17 @@ export default async function handler(req, res) {
         const events     = Array.isArray(match.events) ? match.events : [];
         const calcResult = calculateResult(bet, match, events);
 
+        // settle_prediction RPC atomically: sets status, writes points_awarded,
+        // and credits both coins (potential_reward) and points to the profile.
         const { error: settleErr } = await supabase.rpc('settle_prediction', {
           p_prediction_id: bet.id,
           p_new_status: calcResult.status,
+          p_points: calcResult.points,
         });
 
         if (settleErr) {
           result.errors.push(`Settlement error for bet ${bet.id}: ${settleErr.message}`);
           continue;
-        }
-
-        if (calcResult.points > 0) {
-          await supabase
-            .from('predictions')
-            .update({ points_awarded: calcResult.points })
-            .eq('id', bet.id);
         }
 
         result.settled++;

@@ -18,7 +18,7 @@ describe('E2E Full Flow - Zero to Hero Journey (Integration Tests)', () => {
             id: 'user-123',
             name: 'Test Manager',
             club_name: "Test FC",
-            coins: 500,
+            points: 500,
             energy: 0,
             max_energy: 5,
             inventory: ['c_match_result']
@@ -116,7 +116,7 @@ describe('E2E Full Flow - Zero to Hero Journey (Integration Tests)', () => {
         const { userProfile } = useGame();
 
         expect(userProfile.energy).toBe(0);
-        expect(userProfile.coins).toBe(500);
+        expect(userProfile.points).toBe(500);
         expect(userProfile.inventory).toContain('c_match_result');
         expect(userProfile.inventory.length).toBe(1);
     });

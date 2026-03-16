@@ -18,7 +18,7 @@ describe('Settlement System Tests', () => {
     const mockUserProfile = {
         id: 'user-123',
         name: 'Test Manager',
-        coins: 1000
+        points: 1000
     };
 
     const mockSupabase = {
@@ -45,7 +45,7 @@ describe('Settlement System Tests', () => {
 
     // Test A: RPC Logic Verification
     it('Test A: calls settle_prediction RPC with correct parameters for WON status', async () => {
-        const mockRpcResponse = { data: [{ success: true, new_coins: 1250 }], error: null };
+        const mockRpcResponse = { data: [{ success: true, new_points: 1250 }], error: null };
         mockSupabase.rpc.mockResolvedValue(mockRpcResponse);
 
         await mockSupabase.rpc('settle_prediction', {

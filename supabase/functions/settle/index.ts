@@ -179,21 +179,17 @@ async function settle(supabase: ReturnType<typeof createClient>) {
 
       console.log(`✅ Bet ${bet.id} (${bet.card_type}): ${calcResult.status} — ${calcResult.points} pts`);
 
+      // settle_prediction RPC atomically: sets status, writes points_awarded,
+      // and credits both coins (potential_reward) and points to the profile.
       const { error: settleErr } = await supabase.rpc('settle_prediction', {
         p_prediction_id: bet.id,
         p_new_status: calcResult.status,
+        p_points: calcResult.points,
       });
 
       if (settleErr) {
         result.errors.push(`Settlement RPC error for bet ${bet.id}: ${settleErr.message}`);
         continue;
-      }
-
-      if (calcResult.points > 0) {
-        await supabase
-          .from('predictions')
-          .update({ points_awarded: calcResult.points })
-          .eq('id', bet.id);
       }
 
       result.settled++;

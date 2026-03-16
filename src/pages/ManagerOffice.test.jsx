@@ -22,7 +22,7 @@ describe('ManagerOffice', () => {
     const mockProfile = {
         energy: 5,
         max_energy: 5,
-        coins: 1000,
+        points: 1000,
         club_name: 'Antigravity FC'
     };
 
