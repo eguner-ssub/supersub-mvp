@@ -15,6 +15,7 @@ ALTER TABLE predictions ADD CONSTRAINT valid_status
   CHECK (status IN ('PENDING', 'LIVE', 'WON', 'LOST', 'SETTLED'));
 
 ALTER TABLE predictions DROP CONSTRAINT IF EXISTS predictions_match_id_fkey;
+ALTER TABLE predictions DROP CONSTRAINT IF EXISTS fk_predictions_match;
 
 INSERT INTO predictions
   (id, user_id, match_id, team_name, selection, odds, stake, potential_reward, status, created_at, updated_at, card_type, match_title, settled_status, points_awarded, player_id)
