@@ -2,10 +2,31 @@
 --
 -- Bug: The RPC was writing 'WON'/'LOST' to predictions.status.
 -- Correct schema (confirmed from live data):
---   predictions.status       → lifecycle: PENDING | LIVE | SETTLED
+--   predictions.status         → lifecycle: PENDING | LIVE | SETTLED
 --   predictions.settled_status → outcome:   WON | LOST
 --
 -- Fix: status always becomes 'SETTLED', settled_status receives the outcome.
+
+-- ── 1. Add settled_status column if not already present (idempotent) ──────────
+ALTER TABLE predictions
+    ADD COLUMN IF NOT EXISTS settled_status TEXT DEFAULT NULL;
+
+-- ── 2. Fix dirty data: rows settled by old cron have status='WON'/'LOST' ──────
+--    Must run BEFORE the constraint is re-added, otherwise ADD CONSTRAINT fails.
+UPDATE predictions
+SET status = 'SETTLED'
+WHERE status IN ('WON', 'LOST');
+
+-- ── 3. Fix valid_status constraint ────────────────────────────────────────────
+--    Old: CHECK (status IN ('PENDING', 'LIVE', 'WON', 'LOST'))
+--    New: CHECK (status IN ('PENDING', 'LIVE', 'SETTLED'))
+--    WON/LOST no longer belong in status — they go to settled_status.
+ALTER TABLE predictions DROP CONSTRAINT IF EXISTS valid_status;
+ALTER TABLE predictions
+    ADD CONSTRAINT valid_status
+    CHECK (status IN ('PENDING', 'LIVE', 'SETTLED'));
+
+-- ── 4. Replace settle_prediction RPC ─────────────────────────────────────────
 
 DROP FUNCTION IF EXISTS settle_prediction(UUID, TEXT);
 DROP FUNCTION IF EXISTS settle_prediction(UUID, TEXT, INTEGER);
