@@ -151,14 +151,14 @@ async function fetchAllTopScorers(smSeasonId, typeId) {
 
 async function syncTopScorers(db, smSeasonId, seasonUuid, teamCache) {
   // The /topscorers endpoint returns ALL stat types mixed together (goals, assists,
-  // tackles, clearances, etc.). Fetch each type separately via topScorerTypes filter:
-  //   type_id 52 = Goal
-  //   type_id 79 = Assist
-  // entry.total is the count for the requested type — not always goals.
+  // red cards, yellow cards, etc.). Fetch each type separately via seasontopscorerTypes filter:
+  //   type_id 208 = Goals  (code: goal-topscorer)
+  //   type_id 209 = Assists (code: assist-topscorer)
+  // entry.total is the count for the requested type.
   // Fetch goals first, then assists sequentially to avoid concurrent pagination
   // hammering the rate limit.
-  const goalEntries   = await fetchAllTopScorers(smSeasonId, 52);
-  const assistEntries = await fetchAllTopScorers(smSeasonId, 79);
+  const goalEntries   = await fetchAllTopScorers(smSeasonId, 208);
+  const assistEntries = await fetchAllTopScorers(smSeasonId, 209);
 
   // Build assist lookup: playerSmId → assist total
   const assistMap = new Map(

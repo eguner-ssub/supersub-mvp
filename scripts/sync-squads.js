@@ -20,17 +20,17 @@ import { createClient } from '@supabase/supabase-js';
 import { request, getTeamsBySeason, getSquad } from '../lib/sportmonks.js';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // ── League config ─────────────────────────────────────────────────────────────
 // Adding a league later = uncomment one line. No other code changes needed.
 const LEAGUES = [
-  { leagueId: 8,   seasonId: 25583, name: 'Premier League'  },
-  // { leagueId: 9,   seasonId: 25648, name: 'Championship'    },
-  // { leagueId: 82,  seasonId: 25646, name: 'Bundesliga'      },
-  // { leagueId: 564, seasonId: 25659, name: 'La Liga'         },
-  // { leagueId: 384, seasonId: 25533, name: 'Serie A'         },
+  { leagueId: 8, seasonId: 25583, name: 'Premier League' },
+  { leagueId: 9, seasonId: 25648, name: 'Championship' },
+  { leagueId: 82, seasonId: 25646, name: 'Bundesliga' },
+  { leagueId: 564, seasonId: 25659, name: 'La Liga' },
+  { leagueId: 384, seasonId: 25533, name: 'Serie A' },
 ];
 
 // Base URL for /v3/my/* endpoints (different from the /v3/football/* base)
@@ -75,7 +75,7 @@ async function main() {
   // ── Counters for end-of-run summary ───────────────────────────────────────
   let totalChecked = 0;
   let totalSkipped = 0;
-  let totalSynced  = 0;
+  let totalSynced = 0;
   let totalPlayers = 0;
 
   // ── Step 1–8: Process each configured league ───────────────────────────────
@@ -107,8 +107,8 @@ async function main() {
     // Step 3–8: Process each team
     for (const apiTeam of apiTeams) {
       totalChecked++;
-      const teamSmId       = apiTeam.id;
-      const apiLastPlayed  = apiTeam.last_played_at ?? null;
+      const teamSmId = apiTeam.id;
+      const apiLastPlayed = apiTeam.last_played_at ?? null;
       const storedLastPlayed = dbMap.get(teamSmId) ?? null;
 
       // Step 3: Skip team if last_played_at is unchanged since the last sync
@@ -137,7 +137,7 @@ async function main() {
       const statsRows = [];
 
       for (const entry of players) {
-        const player   = entry.player || {};
+        const player = entry.player || {};
         const playerId = entry.player_id ?? player.id;
         if (!playerId) continue;
 
@@ -146,16 +146,16 @@ async function main() {
 
         // ── Step 5: Build player_squad_cache row ───────────────────────────
         squadRows.push({
-          player_id:     playerId,
-          player_name:   playerName,
-          team_id:       teamSmId,
-          team_name:     apiTeam.name,
-          league_id:     league.leagueId,
-          season_id:     league.seasonId,
-          position_id:   entry.position_id   ?? null,
+          player_id: playerId,
+          player_name: playerName,
+          team_id: teamSmId,
+          team_name: apiTeam.name,
+          league_id: league.leagueId,
+          season_id: league.seasonId,
+          position_id: entry.position_id ?? null,
           jersey_number: entry.jersey_number ?? null,
-          image_path:    player.image_path   ?? null,
-          last_updated:  new Date().toISOString(),
+          image_path: player.image_path ?? null,
+          last_updated: new Date().toISOString(),
         });
 
         // ── Step 6: Parse stats from details array ─────────────────────────
@@ -174,14 +174,14 @@ async function main() {
         }
 
         statsRows.push({
-          player_id:      playerId,
-          season_id:      league.seasonId,
-          goals:          statMap['goals']           ?? 0,
-          assists:        statMap['assists']          ?? 0,
-          minutes_played: statMap['minutes-played']  ?? 0,
-          appearances:    statMap['appearances']      ?? 0,
-          raw_stats:      statMap,   // full code→value map persisted for future use
-          last_updated:   new Date().toISOString(),
+          player_id: playerId,
+          season_id: league.seasonId,
+          goals: statMap['goals'] ?? 0,
+          assists: statMap['assists'] ?? 0,
+          minutes_played: statMap['minutes-played'] ?? 0,
+          appearances: statMap['appearances'] ?? 0,
+          raw_stats: statMap,   // full code→value map persisted for future use
+          last_updated: new Date().toISOString(),
         });
       }
 

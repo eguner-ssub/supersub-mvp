@@ -1,10 +1,27 @@
 import 'dotenv/config';
+import { createClient } from '@supabase/supabase-js';
 import {
     ALL_MARKETS,
     parseMatchResult,
     parseTotalGoals,
     parseGoalscorers,
 } from '../../lib/oddsParser.js';
+
+// ── Lazy Supabase Client ─────────────────────────────────────────────────────
+let _supabase = null;
+
+function getSupabaseClient() {
+    if (_supabase) return _supabase;
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+        throw new Error(
+            `Missing env vars – SUPABASE_URL: ${url ? '✓' : '✗'}, SUPABASE_SERVICE_ROLE_KEY: ${key ? '✓' : '✗'}`
+        );
+    }
+    _supabase = createClient(url, key);
+    return _supabase;
+}
 
 // ── Sportmonks odds endpoint ─────────────────────────────────────────────────
 // GET /api/odds/sportmonks?fixture=<matches.id (Sportmonks fixture ID)>
@@ -77,7 +94,37 @@ export default async function handler(req, res) {
 
         const matchResult  = parseMatchResult(allOdds);
         const totalGoals   = parseTotalGoals(allOdds);
-        const goalscorers  = parseGoalscorers(allOdds);
+        let   goalscorers  = parseGoalscorers(allOdds);
+
+        // ── Enrich goalscorers with team data from player_squad_cache ────────
+        // The odds payload only has player names — no team info.  Look up each
+        // name in the squad cache to attach team_id and team_name so the frontend
+        // can split scorers by team.  Unmatched players get null (kept, not dropped).
+        if (goalscorers && goalscorers.length > 0) {
+            try {
+                const db = getSupabaseClient();
+                const playerNames = goalscorers.map(g => g.player_name);
+
+                const { data: squadRows } = await db
+                    .from('player_squad_cache')
+                    .select('player_name, team_id, team_name')
+                    .in('player_name', playerNames);
+
+                const teamLookup = new Map(
+                    (squadRows || []).map(r => [r.player_name, { team_id: r.team_id, team_name: r.team_name }])
+                );
+
+                goalscorers = goalscorers.map(g => ({
+                    ...g,
+                    team_id:   teamLookup.get(g.player_name)?.team_id   ?? null,
+                    team_name: teamLookup.get(g.player_name)?.team_name ?? null,
+                }));
+            } catch (enrichErr) {
+                // Non-fatal: return scorers without team data rather than failing the request
+                console.error('[Sportmonks Odds] Squad cache enrichment failed:', enrichErr.message);
+                goalscorers = goalscorers.map(g => ({ ...g, team_id: null, team_name: null }));
+            }
+        }
 
         // Surface which bookmaker was used (same across all markets when preferred is available)
         const bookmaker_id = matchResult?.bookmaker_id

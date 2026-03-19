@@ -502,6 +502,7 @@ const MatchDetail = () => {
   const [selectedCard, setSelectedCard] = useState(null);
   const [stagedBet, setStagedBet] = useState(null);
   const [activeTab, setActiveTab] = useState('LINEUP');
+  const [selectedScorerTeam, setSelectedScorerTeam] = useState('home');
 
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result' },
@@ -622,16 +623,19 @@ const MatchDetail = () => {
     }
   };
 
-  const getScorerColumns = () => {
-    const scorers = odds?.goalscorers;
-    if (!scorers || scorers.length === 0) return [[], []];
-    const midpoint = Math.ceil(scorers.length / 2);
-    return [scorers.slice(0, midpoint), scorers.slice(midpoint)];
-  };
+  // Reset scorer team tab when card selection changes
+  useEffect(() => { setSelectedScorerTeam('home'); }, [selectedCard]);
 
   if (gameLoading || !userProfile) return <div className="bg-black h-[100dvh] flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500 w-8 h-8" /></div>;
 
-  const [leftScorers, rightScorers] = getScorerColumns();
+  // ── Scorer lists split by team using backend-enriched team_id ──────────
+  const allScorers   = odds?.goalscorers || [];
+  const homeTeamId   = match?.teams?.home?.id;
+  const awayTeamId   = match?.teams?.away?.id;
+  const homeScorers  = allScorers.filter(s => s.team_id === homeTeamId);
+  const awayScorers  = allScorers.filter(s => s.team_id === awayTeamId);
+  const otherScorers = allScorers.filter(s => s.team_id == null);
+  const visibleScorers = selectedScorerTeam === 'home' ? homeScorers : awayScorers;
 
   return (
     <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
@@ -935,42 +939,57 @@ const MatchDetail = () => {
 
             {selectedCard === 'c_player_score' && (
               oddsUnavailable ? <NoOddsState /> : (
-                <div className="w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
-                  <div className="bg-zinc-800/50 p-6 border-b border-white/5 flex justify-between items-center">
-                    <h3 className="text-white font-black uppercase tracking-tighter text-xl">Select Scorer</h3>
-                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">Goalscorers</span>
+                <div className="w-full max-w-lg bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
+                  {/* Header */}
+                  <div className="bg-zinc-800/50 px-6 py-5 border-b border-white/5">
+                    <h3 className="text-white font-black uppercase tracking-tighter text-xl">Pick a Player to Score</h3>
                   </div>
-                  <div className="grid grid-cols-2 h-[60vh]">
-                    <div className="border-r border-white/5 flex flex-col">
-                      <div className="p-4 bg-black/20 flex items-center gap-2">
-                        <img src={match.teams.home.logo} className="w-5 h-5 object-contain" alt="" />
-                        <span className="text-zinc-400 text-[10px] font-black uppercase truncate">{match.teams.home.name}</span>
-                      </div>
-                      <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
-                        {leftScorers.length === 0 && rightScorers.length === 0 ? (
-                          <p className="text-zinc-600 text-[10px] text-center pt-4 uppercase tracking-widest">No players available</p>
-                        ) : leftScorers.map((player) => (
-                          <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
-                            <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.player_name}</span></div>
-                            <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
+
+                  {/* Home / Away team selector — badge on top, name below */}
+                  <div className="grid grid-cols-2 gap-2 p-4 border-b border-white/5">
+                    <button
+                      onClick={() => setSelectedScorerTeam('home')}
+                      className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl border transition-all ${selectedScorerTeam === 'home' ? 'bg-white/10 border-emerald-500/50' : 'bg-white/5 border-transparent hover:bg-white/[0.07]'}`}
+                    >
+                      <img src={match.teams.home.logo} className="w-10 h-10 object-contain" alt="" />
+                      <span className={`text-[11px] font-black uppercase text-center leading-tight ${selectedScorerTeam === 'home' ? 'text-white' : 'text-zinc-400'}`}>{match.teams.home.name}</span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedScorerTeam('away')}
+                      className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl border transition-all ${selectedScorerTeam === 'away' ? 'bg-white/10 border-emerald-500/50' : 'bg-white/5 border-transparent hover:bg-white/[0.07]'}`}
+                    >
+                      <img src={match.teams.away.logo} className="w-10 h-10 object-contain" alt="" />
+                      <span className={`text-[11px] font-black uppercase text-center leading-tight ${selectedScorerTeam === 'away' ? 'text-white' : 'text-zinc-400'}`}>{match.teams.away.name}</span>
+                    </button>
+                  </div>
+
+                  {/* Player list for selected team */}
+                  <div className="h-[55vh] overflow-y-auto p-4 space-y-2 scrollbar-hide">
+                    {visibleScorers.length === 0 && otherScorers.length === 0 ? (
+                      <p className="text-zinc-600 text-[10px] text-center pt-4 uppercase tracking-widest">No players available</p>
+                    ) : (
+                      <>
+                        {visibleScorers.map((player) => (
+                          <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 transition-all">
+                            <span className="text-white font-bold text-sm truncate">{player.player_name}</span>
+                            <span className="text-yellow-400 font-black text-sm whitespace-nowrap ml-3">+{Math.floor(player.odds * 100)} pts</span>
                           </button>
                         ))}
-                      </div>
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="p-4 bg-black/20 flex items-center gap-2 justify-end">
-                        <span className="text-zinc-400 text-[10px] font-black uppercase truncate">{match.teams.away.name}</span>
-                        <img src={match.teams.away.logo} className="w-5 h-5 object-contain" alt="" />
-                      </div>
-                      <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
-                        {rightScorers.map((player) => (
-                          <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 group transition-all">
-                            <div className="flex items-center gap-3"><User className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400" /><span className="text-white font-bold text-xs truncate max-w-[100px]">{player.player_name}</span></div>
-                            <span className="text-yellow-400 font-black text-sm">+{Math.floor(player.odds * 100)}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+
+                        {/* Unmatched players (no team data in squad cache) */}
+                        {otherScorers.length > 0 && (
+                          <>
+                            <div className="pt-3 pb-1"><span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Other</span></div>
+                            {otherScorers.map((player) => (
+                              <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 transition-all">
+                                <span className="text-white font-bold text-sm truncate">{player.player_name}</span>
+                                <span className="text-yellow-400 font-black text-sm whitespace-nowrap ml-3">+{Math.floor(player.odds * 100)} pts</span>
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               )
