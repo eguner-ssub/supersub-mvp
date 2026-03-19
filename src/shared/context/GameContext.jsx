@@ -227,14 +227,17 @@ export const GameProvider = ({ children }) => {
       ads_watched: 0,
     };
 
+    // Upsert instead of insert so re-submitting the onboarding form (e.g. after
+    // a partial failure or page refresh) doesn't crash with a duplicate-key 409.
+    // ignoreDuplicates:false means existing rows are updated, preserving idempotency.
     const { data, error } = await supabase
       .from('profiles')
-      .insert([profileData])
+      .upsert([profileData], { onConflict: 'id', ignoreDuplicates: false })
       .select()
       .single();
 
     if (error) {
-      console.error('createProfile: insert failed', error.message);
+      console.error('createProfile: upsert failed', error.message);
       return { success: false, error: error.message };
     }
 
