@@ -411,25 +411,41 @@ async function backfillStandings(db, leagueName, smSeasonId, seasonUuid, teamCac
 }
 
 async function backfillTopScorers(db, leagueName, smSeasonId, seasonUuid, teamCache) {
-  // Paginate through all top scorer pages until has_more is false
-  const scorers = [];
-  let page = 1;
+  // The /topscorers endpoint returns ALL stat types mixed together (goals, assists,
+  // tackles, clearances, etc.). We must request each type separately via the
+  // topScorerTypes filter:
+  //   type_id 52 = Goal
+  //   type_id 79 = Assist
+  // entry.total is the count for whatever type was requested — not always goals.
 
-  while (true) {
-    const res = await api(getTopScorers, smSeasonId, page);
-    const pageData = res.data || [];
-    scorers.push(...pageData);
-
-    const hasMore = res.pagination?.has_more ?? false;
-    if (!hasMore || pageData.length === 0) break;
-    page++;
+  async function fetchAllPages(typeId) {
+    const results = [];
+    let page = 1;
+    while (true) {
+      const res = await api(getTopScorers, smSeasonId, page, typeId);
+      const pageData = res.data || [];
+      results.push(...pageData);
+      if (!(res.pagination?.has_more) || pageData.length === 0) break;
+      page++;
+    }
+    return results;
   }
 
-  console.log(`  ${leagueName}: fetched ${scorers.length} top scorers across ${page} page(s)`);
+  const goalEntries   = await fetchAllPages(52); // type 52 = Goal
+  const assistEntries = await fetchAllPages(79); // type 79 = Assist
+
+  console.log(`  ${leagueName}: fetched ${goalEntries.length} goal entries, ${assistEntries.length} assist entries`);
+
+  // Build assist lookup: playerSmId → assist total
+  const assistMap = new Map();
+  for (const e of assistEntries) {
+    const id = e.player_id || e.player?.id;
+    if (id) assistMap.set(id, e.total ?? 0);
+  }
 
   const rows = [];
 
-  for (const entry of scorers) {
+  for (const entry of goalEntries) {
     const player = entry.player || {};
     const participant = entry.participant || {};
     const playerSmId = entry.player_id || player.id;
@@ -460,14 +476,14 @@ async function backfillTopScorers(db, leagueName, smSeasonId, seasonUuid, teamCa
 
     rows.push({
       sportmonks_id: playerSmId,
-      player_name: playerName,
-      season_id: seasonUuid,
-      team_id: teamUuid,
-      goals: entry.total ?? 0,
-      assists: entry.assists ?? 0,
-      penalties: entry.penalties ?? 0,
-      minutes_played: entry.minutes_played ?? 0,
-      updated_at: new Date().toISOString(),
+      player_name:   playerName,
+      season_id:     seasonUuid,
+      team_id:       teamUuid,
+      goals:         entry.total ?? 0,            // entry.total is goals (type 52 filtered)
+      assists:       assistMap.get(playerSmId) ?? 0, // from dedicated type 79 pass
+      penalties:     0,                           // not available from this endpoint
+      minutes_played: 0,                          // not available from this endpoint
+      updated_at:    new Date().toISOString(),
     });
   }
 
@@ -488,8 +504,8 @@ async function backfillTopScorers(db, leagueName, smSeasonId, seasonUuid, teamCa
     if (error) throw new Error(`Top scorers upsert failed (${leagueName}): ${error.message}`);
   }
 
-  console.log(`  ${leagueName}: ${dedupedRows.length} top scorers (${rows.length} raw)`);
-  return rows.length;
+  console.log(`  ${leagueName}: ${dedupedRows.length} top scorers upserted`);
+  return dedupedRows.length;
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────

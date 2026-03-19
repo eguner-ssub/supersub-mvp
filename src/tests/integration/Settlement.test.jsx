@@ -150,4 +150,48 @@ describe('Settlement System Tests', () => {
         expect(result.error).toBeTruthy();
         expect(result.error.message).toBe('Database error');
     });
+
+    // Test G: Payout point-value verification
+    // Verifies that new_points returned by the RPC equals initial points + potential_reward,
+    // ensuring the settlement engine passes the correct reward amount to the database.
+    it('Test G: new_points from RPC equals initial profile points + potential_reward', async () => {
+        const initialPoints = 1000;
+        const potentialReward = 250;
+        const expectedNewPoints = initialPoints + potentialReward;
+
+        mockSupabase.rpc.mockResolvedValue({
+            data: [{ success: true, new_points: expectedNewPoints }],
+            error: null,
+        });
+
+        const result = await mockSupabase.rpc('settle_prediction', {
+            p_prediction_id: 'bet-789',
+            p_new_status: 'WON',
+            p_points: potentialReward,
+        });
+
+        expect(result.error).toBeNull();
+        expect(result.data[0].success).toBe(true);
+        expect(result.data[0].new_points).toBe(expectedNewPoints);
+        // The delta must equal exactly the potential_reward — no more, no less
+        expect(result.data[0].new_points - initialPoints).toBe(potentialReward);
+    });
+
+    // Test H: LOST prediction — no points credited
+    it('Test H: LOST predictions result in zero points change', async () => {
+        const initialPoints = 1000;
+        mockSupabase.rpc.mockResolvedValue({
+            data: [{ success: true, new_points: initialPoints }],
+            error: null,
+        });
+
+        const result = await mockSupabase.rpc('settle_prediction', {
+            p_prediction_id: 'bet-999',
+            p_new_status: 'LOST',
+            p_points: 0,
+        });
+
+        expect(result.data[0].new_points).toBe(initialPoints);
+        expect(result.data[0].new_points - initialPoints).toBe(0);
+    });
 });

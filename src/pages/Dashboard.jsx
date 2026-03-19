@@ -10,7 +10,7 @@ import WinModal from '../components/WinModal';
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userProfile, updateInventory, loading, supabase, checkActiveBets, loadProfile, spendEnergy, gainEnergy } = useGame();
+  const { userProfile, updateInventory, loading, supabase, loadProfile, spendEnergy, gainEnergy } = useGame();
 
   // --- LOCAL STATE ---
   const [showBagOverlay, setShowBagOverlay] = useState(false);

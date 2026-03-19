@@ -3,18 +3,32 @@ import { Zap, X } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 
 const ViewFridge = () => {
-    const { userProfile } = useGame();
+    const { userProfile, consumeCard, gainEnergy } = useGame();
     const [showDrinkPopup, setShowDrinkPopup] = useState(false);
     const [showToast, setShowToast] = useState(false);
+    const [isDrinking, setIsDrinking] = useState(false);
 
-    // Get consumables from userProfile or default to 0
-    const energyDrinks = userProfile?.consumables?.energy_drinks || 0;
+    // Energy drinks are stored in the inventory table under card_id 'c_energy_drink'.
+    const energyDrinks = userProfile?.inventoryMap?.['c_energy_drink'] || 0;
 
-    const handleDrink = () => {
-        console.log('✅ Energy Drink consumed!');
-        setShowDrinkPopup(false);
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3000);
+    const handleDrink = async () => {
+        if (energyDrinks <= 0 || isDrinking) return;
+
+        setIsDrinking(true);
+        try {
+            // Decrement the item from inventory, then restore 3 energy.
+            const consumed = await consumeCard('c_energy_drink');
+            if (consumed) {
+                await gainEnergy(3);
+                setShowDrinkPopup(false);
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+            }
+        } catch (err) {
+            console.error('Energy drink failed:', err);
+        } finally {
+            setIsDrinking(false);
+        }
     };
 
     return (
@@ -86,9 +100,10 @@ const ViewFridge = () => {
                         {/* Drink Button */}
                         <button
                             onClick={handleDrink}
-                            className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 shadow-lg"
+                            disabled={energyDrinks <= 0 || isDrinking}
+                            className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            DRINK
+                            {isDrinking ? 'DRINKING...' : energyDrinks <= 0 ? 'NONE LEFT' : 'DRINK'}
                         </button>
                     </div>
                 </div>

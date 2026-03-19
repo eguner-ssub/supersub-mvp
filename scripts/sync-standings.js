@@ -122,15 +122,54 @@ async function syncStandings(db, smSeasonId, seasonUuid, teamCache) {
   return rows.length;
 }
 
+// ── Pagination helper ────────────────────────────────────────────────────────
+
+/**
+ * Fetch every page of top scorers for a given stat type and return the merged
+ * entry array.  Sportmonks paginates at 25 rows per page; without this loop
+ * only the first 25 players are ever written to the DB.
+ */
+async function fetchAllTopScorers(smSeasonId, typeId) {
+  const all = [];
+  let page = 1;
+
+  while (true) {
+    const res = await getTopScorers(smSeasonId, page, typeId);
+    const entries = res.data || [];
+    all.push(...entries);
+
+    if (!res.pagination?.has_more) break;
+    page++;
+    // 500 ms between pages to stay well under Sportmonks rate limits
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  return all;
+}
+
 // ── Top scorers sync ────────────────────────────────────────────────────────
 
 async function syncTopScorers(db, smSeasonId, seasonUuid, teamCache) {
-  const res = await getTopScorers(smSeasonId);
-  const scorers = res.data || [];
+  // The /topscorers endpoint returns ALL stat types mixed together (goals, assists,
+  // tackles, clearances, etc.). Fetch each type separately via topScorerTypes filter:
+  //   type_id 52 = Goal
+  //   type_id 79 = Assist
+  // entry.total is the count for the requested type — not always goals.
+  // Fetch goals first, then assists sequentially to avoid concurrent pagination
+  // hammering the rate limit.
+  const goalEntries   = await fetchAllTopScorers(smSeasonId, 52);
+  const assistEntries = await fetchAllTopScorers(smSeasonId, 79);
+
+  // Build assist lookup: playerSmId → assist total
+  const assistMap = new Map(
+    assistEntries
+      .map((e) => [e.player_id || e.player?.id, e.total ?? 0])
+      .filter(([id]) => id != null)
+  );
 
   const rows = [];
 
-  for (const entry of scorers) {
+  for (const entry of goalEntries) {
     const player = entry.player || {};
     const participant = entry.participant || {};
     const playerSmId = entry.player_id || player.id;
@@ -147,15 +186,15 @@ async function syncTopScorers(db, smSeasonId, seasonUuid, teamCache) {
       player.display_name || player.common_name || player.name || `Player ${playerSmId}`;
 
     rows.push({
-      sportmonks_id: playerSmId,
-      player_name: playerName,
-      season_id: seasonUuid,
-      team_id: teamUuid,
-      goals: entry.total ?? 0,
-      assists: entry.assists ?? 0,
-      penalties: entry.penalties ?? 0,
-      minutes_played: entry.minutes_played ?? 0,
-      updated_at: new Date().toISOString(),
+      sportmonks_id:  playerSmId,
+      player_name:    playerName,
+      season_id:      seasonUuid,
+      team_id:        teamUuid,
+      goals:          entry.total ?? 0,              // entry.total is goals (type 52 filtered)
+      assists:        assistMap.get(playerSmId) ?? 0, // from dedicated type 79 pass
+      penalties:      0,                             // not available from this endpoint
+      minutes_played: 0,                             // not available from this endpoint
+      updated_at:     new Date().toISOString(),
     });
   }
 

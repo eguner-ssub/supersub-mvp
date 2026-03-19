@@ -11,6 +11,7 @@ export const mockUserProfile = {
   energy: 5,
   max_energy: 5,
   inventory: ['c_match_result', 'c_total_goals'],
+  inventoryMap: { c_energy_drink: 2, c_match_result: 1 },
 };
 
 // Default mock context value factory function
@@ -19,6 +20,10 @@ export const createMockGameContextValue = (overrides = {}) => ({
   loading: false,
   createProfile: vi.fn(),
   spendEnergy: vi.fn(),
+  gainEnergy: vi.fn(),
+  consumeCard: vi.fn(),
+  placeBet: vi.fn(),
+  loadProfile: vi.fn(),
   updateInventory: vi.fn(),
   ...overrides,
 });

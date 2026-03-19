@@ -21,6 +21,9 @@ export default defineConfig(({ mode }) => {
       setupFiles: './vitest.setup.js',
       include: [
         'src/tests/integration/**/*.test.jsx',
+        'src/pages/**/*.test.jsx',
+        'src/components/**/*.test.jsx',
+        'src/features/**/*.test.jsx',
         'api/__tests__/**/*.test.js',
         'lib/__tests__/**/*.test.js',
       ],

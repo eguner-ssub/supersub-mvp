@@ -190,6 +190,58 @@ export const GameProvider = ({ children }) => {
     setUserProfile(prev => ({ ...prev, energy: newEnergy }));
     await supabase.from('profiles').update({ energy: newEnergy }).eq('id', userProfile.id);
   };
+
+  /**
+   * GAIN ENERGY
+   * Increments the user's energy by `amount`, capped at max_energy.
+   * Used by: ad reward flow (Training), energy drink flow (Dashboard/ViewFridge).
+   */
+  const gainEnergy = async (amount) => {
+    if (!userProfile) return;
+    const maxEnergy = userProfile.max_energy || 5;
+    const newEnergy = Math.min(userProfile.energy + amount, maxEnergy);
+    setUserProfile(prev => ({ ...prev, energy: newEnergy }));
+    await supabase.from('profiles').update({ energy: newEnergy }).eq('id', userProfile.id);
+  };
+
+  /**
+   * CREATE PROFILE
+   * Called once during onboarding after the user signs the manager contract.
+   * Inserts the initial profile row and seeds the signing-bonus values.
+   * On success, updates userProfile in context so Onboarding switches to the
+   * "Welcome Aboard" screen immediately without a page reload.
+   */
+  const createProfile = async (clubName) => {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('createProfile: no authenticated user', authError?.message);
+      return { success: false, error: authError?.message || 'No authenticated user' };
+    }
+
+    const profileData = {
+      id: user.id,
+      club_name: clubName,
+      points: 500,      // signing bonus
+      energy: 3,        // signing bonus
+      max_energy: 5,
+      ads_watched: 0,
+    };
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert([profileData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('createProfile: insert failed', error.message);
+      return { success: false, error: error.message };
+    }
+
+    // Immediately reflect in context so Onboarding re-renders to the bonus screen.
+    setUserProfile({ ...data, inventoryMap: {} });
+    return { success: true, data };
+  };
   // GLOBAL APP STATE: Load the Sportmonks Dictionary immediately on mount
   useEffect(() => {
     const fetchGlobalDictionary = async () => {
@@ -227,6 +279,6 @@ export const GameProvider = ({ children }) => {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  const value = { userProfile, loading, statDictionary, supabase, placeBet, consumeCard, spendEnergy, updateInventory, loadProfile };
+  const value = { userProfile, loading, statDictionary, supabase, placeBet, consumeCard, spendEnergy, gainEnergy, updateInventory, loadProfile, createProfile };
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 };

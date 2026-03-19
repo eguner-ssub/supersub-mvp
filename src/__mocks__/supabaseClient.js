@@ -23,6 +23,7 @@ export const supabase = {
       error: null
     })),
     signOut: vi.fn(() => Promise.resolve({ error: null })),
+    signInWithOtp: vi.fn(() => Promise.resolve({ error: null })),
   },
   from: vi.fn(() => ({
     select: vi.fn(() => ({
