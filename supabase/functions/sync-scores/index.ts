@@ -107,6 +107,88 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
+// ────────────────────────────────────────────────────
+// COACH HELPERS
+// ────────────────────────────────────────────────────
+
+/**
+ * Scan the lineups array for coach entries (identified by having a coach_id field)
+ * and return the home and away coach objects.
+ *
+ * Coach lineup entry shape:
+ *   { coach_id: number, coach: { name, common_name, image_path }, team_id: number }
+ */
+function extractCoachesFromLineups(
+  lineups: any[],
+  homeTeamId: number | null,
+  awayTeamId: number | null
+): { homeCoach: any | null; awayCoach: any | null } {
+  let homeCoach: any = null;
+  let awayCoach = null;
+
+  for (const entry of lineups || []) {
+    if (entry.coach_id == null) continue;
+
+    const teamId = entry.team_id ?? null;
+    const coachData = {
+      id:             entry.coach_id,
+      name:           entry.coach?.name ?? `Coach ${entry.coach_id}`,
+      common_name:    entry.coach?.common_name ?? null,
+      image_path:     entry.coach?.image_path ?? null,
+      current_team_id: teamId,
+    };
+
+    if (teamId === homeTeamId) {
+      homeCoach = coachData;
+    } else if (teamId === awayTeamId) {
+      awayCoach = coachData;
+    } else if (!homeCoach) {
+      homeCoach = coachData;
+    } else if (!awayCoach) {
+      awayCoach = coachData;
+    }
+  }
+
+  return { homeCoach, awayCoach };
+}
+
+/**
+ * Upsert a single coach record to the coaches table.
+ * Returns the coach id on success, null on failure.
+ */
+async function upsertCoach(
+  supabase: ReturnType<typeof createClient>,
+  coach: any,
+  now: Date
+): Promise<number | null> {
+  if (!coach || coach.id == null) return null;
+
+  const { error } = await supabase
+    .from('coaches')
+    .upsert(
+      {
+        id:              coach.id,
+        name:            coach.name,
+        common_name:     coach.common_name ?? null,
+        image_path:      coach.image_path ?? null,
+        current_team_id: coach.current_team_id ?? null,
+        last_updated:    now.toISOString(),
+      },
+      { onConflict: 'id' }
+    );
+
+  if (error) {
+    console.error(`[COACH] Upsert failed for coach id=${coach.id}: ${error.message}`);
+    return null;
+  }
+
+  return coach.id;
+}
+
+// ────────────────────────────────────────────────────
+// PAYLOAD BUILDER
+// ────────────────────────────────────────────────────
+
 /**
  * Build a full upsert payload from a raw Sportmonks fixture object.
  *
@@ -126,7 +208,9 @@ function buildPayload(
   existingFinishedAt: string | null,
   existingStartedAt: string | null,
   existingLineups: any,
-  isPreLive: boolean
+  isPreLive: boolean,
+  homeCoachId: number | null = null,
+  awayCoachId: number | null = null
 ): any {
   const apiStatus    = extractStateName(fixture);
 
@@ -151,6 +235,10 @@ function buildPayload(
     last_synced_at: now.toISOString(),
     raw_data:       fixture,
   };
+
+  // Coach IDs — only set when we have them to avoid overwriting stored values
+  if (homeCoachId != null) payload.home_coach_id = homeCoachId;
+  if (awayCoachId != null) payload.away_coach_id = awayCoachId;
 
   // Stamp started_at on first transition into any in-play status
   if (IN_PLAY_STATUSES.includes(apiStatus) && !existingStartedAt) {
@@ -225,13 +313,30 @@ async function upsertFixtures(
       ? (externalLineupsMap.get(fixture.id) ?? null)
       : (existing?.lineups ?? null);
 
+    // ── Coach extraction — parse lineups for coach entries and upsert ──
+    const { homeTeam, awayTeam } = extractParticipants(fixture);
+    const lineupSource = (fixture.lineups && Array.isArray(fixture.lineups) && fixture.lineups.length > 0)
+      ? fixture.lineups
+      : (existingLineups ?? []);
+
+    const { homeCoach, awayCoach } = extractCoachesFromLineups(
+      lineupSource,
+      homeTeam?.id ?? null,
+      awayTeam?.id ?? null
+    );
+
+    const homeCoachId = await upsertCoach(supabase, homeCoach, now);
+    const awayCoachId = await upsertCoach(supabase, awayCoach, now);
+
     payloads.push(buildPayload(
       fixture,
       now,
       existing?.finished_at || null,
       existing?.started_at  || null,
       existingLineups,
-      itemIsPreLive
+      itemIsPreLive,
+      homeCoachId,
+      awayCoachId
     ));
   }
 
