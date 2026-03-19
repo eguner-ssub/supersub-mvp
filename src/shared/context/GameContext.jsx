@@ -170,6 +170,7 @@ export const GameProvider = ({ children }) => {
         // Non-Supersub cards send null — backend ignores it for those card types.
         team_id: resolvedTeamId,
         player_id: resolvedPlayerId,
+        league_id: match.league_id ?? null,
       };
 
       const { data, error } = await supabase

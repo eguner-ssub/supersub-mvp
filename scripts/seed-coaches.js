@@ -22,11 +22,13 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // ── League config ─────────────────────────────────────────────────────────────
+// Season IDs must match sync-squads.js — these are the SportMonks season IDs
+// that have team registration data for the current season.
 const LEAGUES = [
   { id: 8,   season: 25583, name: 'Premier League' },
-  { id: 9,   season: 25603, name: 'Championship' },
-  { id: 82,  season: 25565, name: 'Bundesliga' },
-  { id: 564, season: 25648, name: 'La Liga' },
+  { id: 9,   season: 25648, name: 'Championship' },
+  { id: 82,  season: 25646, name: 'Bundesliga' },
+  { id: 564, season: 25659, name: 'La Liga' },
   { id: 384, season: 25533, name: 'Serie A' },
 ];
 
@@ -84,9 +86,16 @@ async function main() {
 
       if (!activeCoach) continue;
 
+      // Sportmonks coaches use display_name, not name — build a fallback chain
+      const coachName =
+        activeCoach.display_name ||
+        activeCoach.common_name ||
+        [activeCoach.firstname, activeCoach.lastname].filter(Boolean).join(' ') ||
+        `Coach ${activeCoach.id}`;
+
       coachRows.push({
         id:             activeCoach.id,
-        name:           activeCoach.name,
+        name:           coachName,
         common_name:    activeCoach.common_name ?? null,
         firstname:      activeCoach.firstname ?? null,
         lastname:       activeCoach.lastname ?? null,
