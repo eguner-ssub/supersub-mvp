@@ -1,8 +1,4 @@
 {
-  "crons": [
-    { "path": "/api/cron/sync-coaches", "schedule": "0 */2 * * *" },
-    { "path": "/api/cron/refresh-leaderboards", "schedule": "*/30 * * * *" }
-  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
