@@ -140,7 +140,7 @@ export default function Dashboard() {
         {/* A. WHITEBOARD (Bets) — center back wall */}
         <div
           onClick={handleWhiteboardClick}
-          className="absolute top-[25%] left-[15%] w-[70%] h-[30%] z-10 cursor-pointer active:scale-95 transition-transform"
+          className="absolute top-[30%] left-[18%] w-[64%] h-[22%] z-10 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-whiteboard"
         >
           <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
@@ -151,7 +151,7 @@ export default function Dashboard() {
         {/* B. TABLET — left side of bench */}
         <div
           onClick={handleTabletClick}
-          className="absolute top-[58%] left-[5%] w-[30%] h-[12%] z-10 cursor-pointer active:scale-95 transition-transform"
+          className="absolute top-[55%] left-[12%] w-[20%] h-[7%] z-10 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-tablet"
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
@@ -162,7 +162,7 @@ export default function Dashboard() {
         {/* C. ENERGY DRINKS — right side of bench */}
         <div
           onClick={handleDrinkClick}
-          className="absolute top-[58%] left-[62%] w-[30%] h-[12%] z-10 cursor-pointer active:scale-95 transition-transform"
+          className="absolute top-[55%] left-[62%] w-[23%] h-[7%] z-10 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-drinks"
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
@@ -178,7 +178,7 @@ export default function Dashboard() {
         <div
           onClick={handleBagClick}
           className={`
-            absolute top-[74%] left-[25%] w-[52%] h-[13%] z-20 cursor-pointer rounded-2xl
+            absolute top-[74%] left-[28%] w-[54%] h-[14%] z-20 cursor-pointer rounded-2xl
             active:scale-95 transition-transform duration-100
             ${(highlightBag || dailyRewardAvailable) ? 'animate-pulse ring-4 ring-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.3)]' : ''}
           `}
@@ -192,7 +192,7 @@ export default function Dashboard() {
         {/* E. CONES (Training) — floor left, ends at 87% */}
         <div
           onClick={() => navigate('/training')}
-          className="absolute top-[70%] left-[0%] w-[25%] h-[17%] z-30 cursor-pointer active:scale-95 transition-transform"
+          className="absolute top-[68%] left-[5%] w-[23%] h-[14%] z-30 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-training"
         >
           <div className="absolute -top-4 right-2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
