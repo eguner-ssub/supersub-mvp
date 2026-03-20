@@ -79,6 +79,145 @@ const AssistantDialogue = ({ activeTab }) => (
 
 
 /* ─────────────────────────────────────────────────────────────
+   MOCK DATA — Pre-match analysis & live insights (Backend WIP)
+   ───────────────────────────────────────────────────────────── */
+const PREMATCH_ANALYSIS_MOCK = {
+  greeting: "Hi Boss. I've been studying the opposition all week. Here's what I've found.",
+  sections: [
+    { title: 'Form Guide', content: 'Home team are unbeaten in their last 5 home games (W3 D2). Away side struggling on the road with just 1 win in 6.' },
+    { title: 'Key Matchup', content: 'Watch the battle between the home #10 and the away holding midfielder. If the playmaker gets space, expect chances.' },
+    { title: 'Goals Market', content: 'Both teams have seen Over 2.5 goals in 4 of their last 5 matches. The head-to-head average is 3.2 goals per game.' },
+    { title: 'Prediction', content: "This has goals written all over it. Back the home side if you're feeling confident, but the Over 2.5 market looks solid too." },
+  ],
+};
+
+const LIVE_INSIGHTS_MOCK = {
+  greeting: "Boss, the match is underway. Here's what I'm seeing.",
+  benchPotential: 'Away team has strong options on the bench — their #14 has scored 3 goals as a substitute this season.',
+  subAnalysis: 'Home manager typically makes first substitution around the 60th minute. Watch for the attacking midfielder to come on.',
+};
+
+/* ─────────────────────────────────────────────────────────────
+   PREMATCH ANALYSIS — full-page assistant report (no lineups)
+   ───────────────────────────────────────────────────────────── */
+const PrematchAnalysis = ({ data }) => (
+  <div style={{ padding: '0 12px' }}>
+    {/* Assistant greeting */}
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '10px',
+        marginBottom: '14px',
+        padding: '10px 14px',
+        background: '#f5f0e8',
+        borderRadius: '14px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
+      }}
+    >
+      <img
+        src="/assets/assistant-head.png"
+        alt="Tactical Expert"
+        style={{
+          width: '44px', height: '44px', borderRadius: '50%',
+          objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)',
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          Tactical Expert
+        </span>
+        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
+          {data.greeting}
+        </p>
+      </div>
+    </div>
+
+    {/* Analysis sections */}
+    {data.sections.map((section, i) => (
+      <div
+        key={i}
+        style={{
+          background: 'rgba(245, 240, 232, 0.08)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '12px',
+          padding: '14px 16px',
+          marginBottom: '10px',
+        }}
+      >
+        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '10px', color: '#00e5ff', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '6px' }}>
+          {section.title}
+        </p>
+        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 500, fontSize: '12px', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, margin: 0 }}>
+          {section.content}
+        </p>
+      </div>
+    ))}
+  </div>
+);
+
+/* ─────────────────────────────────────────────────────────────
+   LIVE SUPERSUB PANEL — replaces card shelf during live
+   ───────────────────────────────────────────────────────────── */
+const LiveSupersubPanel = ({ insights, onUseSupersubCard, supersubCount }) => (
+  <div
+    className="fixed bottom-0 w-full z-50"
+    style={{
+      background: 'rgba(24, 24, 27, 0.95)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
+      borderTop: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: '20px 20px 0 0',
+      padding: '14px 16px',
+    }}
+  >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {/* Live insights (full width) */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+        <img
+          src="/assets/assistant-head.png"
+          alt="Tactical Expert"
+          style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid rgba(255,255,255,0.1)' }}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '8px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            Live Insights
+          </span>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '10px', color: 'rgba(255,255,255,0.7)', margin: '3px 0 4px', lineHeight: 1.4 }}>
+            {insights.benchPotential}
+          </p>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 500, fontSize: '9px', color: 'rgba(255,255,255,0.4)', margin: 0, lineHeight: 1.4 }}>
+            {insights.subAnalysis}
+          </p>
+        </div>
+      </div>
+
+      {/* Supersub CTA (full width) */}
+      <button
+        onClick={onUseSupersubCard}
+        disabled={supersubCount === 0}
+        style={{
+          width: '100%',
+          padding: '10px 16px',
+          background: supersubCount > 0 ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.05)',
+          border: `1.5px solid ${supersubCount > 0 ? '#00e5ff' : 'rgba(255,255,255,0.1)'}`,
+          borderRadius: '12px',
+          color: supersubCount > 0 ? '#00e5ff' : 'rgba(255,255,255,0.25)',
+          fontFamily: "'Montserrat', sans-serif",
+          fontWeight: 800,
+          fontSize: '11px',
+          textTransform: 'uppercase',
+          letterSpacing: '1.5px',
+          cursor: supersubCount > 0 ? 'pointer' : 'not-allowed',
+        }}
+      >
+        ⚡ Use Supersub Card
+      </button>
+    </div>
+  </div>
+);
+
+/* ─────────────────────────────────────────────────────────────
    SUBSTITUTES TAB
    ───────────────────────────────────────────────────────────── */
 const SM_BENCH_TYPE_ID = 12;
@@ -626,6 +765,12 @@ const MatchDetail = () => {
   // Reset scorer team tab when card selection changes
   useEffect(() => { setSelectedScorerTeam('home'); }, [selectedCard]);
 
+  // ── Derived view state ────────────────────────────────────────
+  const lineupsAnnounced = match?.lineups && Array.isArray(match.lineups) && match.lineups.length > 0;
+  const viewState = matchPhase === 'PRE'
+    ? (lineupsAnnounced ? 'PRE_LINEUPS' : 'PRE_NO_LINEUPS')
+    : matchPhase; // 'LIVE' or 'POST'
+
   if (gameLoading || !userProfile) return <div className="bg-black h-[100dvh] flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500 w-8 h-8" /></div>;
 
   // ── Scorer lists split by team using backend-enriched team_id ──────────
@@ -712,7 +857,7 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {match && (
+      {match && viewState !== 'PRE_NO_LINEUPS' && (
         <div
           className="absolute w-full z-[35]"
           style={{ top: '132px' }}
@@ -769,12 +914,40 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {match && (
+      {/* PRE_NO_LINEUPS: Full-page assistant analysis, no tabs */}
+      {match && viewState === 'PRE_NO_LINEUPS' && (
+        <div
+          className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
+          style={{
+            top: '132px',
+            bottom: '256px',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          <div
+            style={{
+              margin: '8px 0',
+              background: 'rgba(18,18,18,0.75)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              borderLeft: '1px solid rgba(255,255,255,0.10)',
+              borderRight: '1px solid rgba(255,255,255,0.10)',
+              padding: '16px 0',
+              minHeight: '100%',
+            }}
+          >
+            <PrematchAnalysis data={PREMATCH_ANALYSIS_MOCK} />
+          </div>
+        </div>
+      )}
+
+      {/* PRE_LINEUPS / LIVE: Tabbed content */}
+      {match && (viewState === 'PRE_LINEUPS' || viewState === 'LIVE') && (
         <div
           className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
           style={{
             top: '172px',
-            bottom: matchPhase === 'POST' ? '0px' : '256px',
+            bottom: viewState === 'LIVE' ? '140px' : '256px',
             WebkitOverflowScrolling: 'touch',
           }}
         >
@@ -831,7 +1004,70 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {(matchPhase === 'PRE' || matchPhase === 'LIVE') && (
+      {/* POST: Full-height content, no tabs (handled by MatchTerminationTerminal below) */}
+      {match && viewState === 'POST' && (
+        <div
+          className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
+          style={{
+            top: '172px',
+            bottom: '0px',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          <div
+            style={{
+              margin: '8px 0',
+              background: 'rgba(18,18,18,0.75)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              borderLeft: '1px solid rgba(255,255,255,0.10)',
+              borderRight: '1px solid rgba(255,255,255,0.10)',
+              padding: '16px 0',
+              minHeight: '100%',
+            }}
+          >
+            {(() => {
+              const hasTabData =
+                activeTab === 'LINEUP' ? (Array.isArray(match?.lineups) && match.lineups.length > 0) :
+                  activeTab === 'SUBS' ? (Array.isArray(match?.lineups) && match.lineups.length > 0) :
+                    activeTab === 'EVENTS' ? (Array.isArray(match?.events) && match.events.length > 0) :
+                      activeTab === 'STATS' ? (Array.isArray(match?.statistics) && match.statistics.length >= 2) :
+                        false;
+              return hasTabData ? (
+                <div style={{ padding: '0 12px', marginBottom: '0' }}>
+                  <AssistantDialogue activeTab={activeTab} />
+                </div>
+              ) : null;
+            })()}
+
+            {activeTab === 'LINEUP' && (
+              <MatchLineup
+                fixtureId={id}
+                matchPhase={matchPhase}
+                fixtureDate={match.fixture?.date}
+                activeTab={activeTab}
+              />
+            )}
+
+            {activeTab === 'SUBS' && (
+              <SubstitutesTab
+                match={match}
+                onStageSupersub={handleStageSupersub}
+              />
+            )}
+
+            {activeTab === 'EVENTS' && (
+              <EventsTab events={match?.events} />
+            )}
+
+            {activeTab === 'STATS' && (
+              <StatsTab match={match} />
+            )}
+          </div>
+        </div>
+      )}
+
+      {(viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS') && (
         <div data-testid="card-shelf" className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
           <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
           <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 pointer-events-auto">
@@ -879,6 +1115,19 @@ const MatchDetail = () => {
             })}
           </div>
         </div>
+      )}
+
+      {viewState === 'LIVE' && (
+        <LiveSupersubPanel
+          insights={LIVE_INSIGHTS_MOCK}
+          onUseSupersubCard={() => {
+            setActiveTab('SUBS');
+            const homeId = match?.teams?.home?.id;
+            const homeName = match?.teams?.home?.name;
+            handleStageSupersub('home', homeId, homeName);
+          }}
+          supersubCount={getCardCount('c_supersub')}
+        />
       )}
 
       {matchPhase === 'POST' && <MatchTerminationTerminal />}
