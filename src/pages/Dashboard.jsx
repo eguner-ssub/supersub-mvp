@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGame } from '../shared/context/GameContext';
-import { Zap, Coins, Loader2, ShoppingBag, X, ClipboardList, TrendingUp, Cone } from 'lucide-react';
+import { Zap, Coins, Loader2, ShoppingBag, X, TrendingUp, Cone } from 'lucide-react';
 import gameDataRaw from '../data/gameData.json';
 import { getCardConfig } from '../utils/cardConfig';
 import CardBase from '../shared/ui/CardBase';
@@ -78,11 +78,7 @@ export default function Dashboard() {
   };
 
   const handleTabletClick = () => {
-    if (!trainingCompletedToday) {
-      navigate('/training');
-    } else {
-      navigate('/inbox');
-    }
+    navigate('/leaderboard');
   };
 
   const handleDrinkClick = () => {
@@ -196,7 +192,7 @@ export default function Dashboard() {
         data-testid="hotspot-tablet"
       >
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
-          <ClipboardList className={`w-3.5 h-3.5 ${!trainingCompletedToday ? 'text-yellow-400' : 'text-gray-400'}`} />
+          <TrendingUp className="w-3.5 h-3.5 text-green-400" />
         </div>
       </div>
 

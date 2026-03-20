@@ -26,6 +26,7 @@ import CardTest from './pages/CardTest';
 import CardLab from './pages/CardLab';
 import GenericLab from './features/inventory/GenericLab';
 import ComingSoon from './pages/ComingSoon';
+import Leaderboard from './pages/Leaderboard';
 import FPLMarket from './pages/FPLMarket';
 import ViewLedger from './features/locker-room/ViewLedger';
 import APIDebugger from './features/debug/APIDebugger';
@@ -124,7 +125,7 @@ export const AppRoutes = () => {
       <Route path="/scouting" element={<ProtectedRoute><FPLMarket /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><ViewLedger /></ProtectedRoute>} />
       <Route path="/inbox" element={<ProtectedRoute><ComingSoon title="Manager Inbox" message="Social features are currently locked." /></ProtectedRoute>} />
-      <Route path="/leaderboard" element={<ProtectedRoute><ComingSoon title="Global Rankings" message="Competition season hasn't started yet." /></ProtectedRoute>} />
+      <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
 
       <Route path="/card-showcase" element={<CardShowcase />} />
       <Route path="/card-base-demo" element={<CardBaseDemo />} />
