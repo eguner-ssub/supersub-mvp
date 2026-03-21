@@ -840,6 +840,23 @@ const MatchDetail = () => {
 
   // ── Derived view state ────────────────────────────────────────
   const lineupsAnnounced = match?.lineups && Array.isArray(match.lineups) && match.lineups.length > 0;
+  // ── Live polling: refresh match data every 60s while LIVE ─────────────
+  useEffect(() => {
+    if (matchPhase !== 'LIVE' || !id) return;
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/matches?id=${id}`);
+        const data = await res.json();
+        if (data.response?.length) {
+          setMatch(normalizeMatch(data.response[0]));
+        }
+      } catch (e) {
+        console.warn('[MatchDetail] Live poll error:', e);
+      }
+    }, 60_000);
+    return () => clearInterval(poll);
+  }, [matchPhase, id]);
+
   const viewState = matchPhase === 'PRE'
     ? (lineupsAnnounced ? 'PRE_LINEUPS' : 'PRE_NO_LINEUPS')
     : matchPhase; // 'LIVE' or 'POST'
