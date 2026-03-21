@@ -893,9 +893,6 @@ const MatchDetail = () => {
 
   // ── Derived view state ────────────────────────────────────────
   const lineupsAnnounced = match?.lineups && Array.isArray(match.lineups) && match.lineups.length > 0;
-  const hasAnyCard = cardTypes.some(c => getCardCount(c.id) > 0);
-  const shelfVisible = (viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS') && hasAnyCard;
-  const contentBottom = viewState === 'LIVE' ? '140px' : shelfVisible ? '256px' : '0px';
   // ── Realtime: subscribe to match row updates while LIVE ───────────────
   useEffect(() => {
     if (matchPhase !== 'LIVE' || !id || !supabase) return;
@@ -919,6 +916,10 @@ const MatchDetail = () => {
   const viewState = matchPhase === 'PRE'
     ? (lineupsAnnounced ? 'PRE_LINEUPS' : 'PRE_NO_LINEUPS')
     : matchPhase; // 'LIVE' or 'POST'
+
+  const hasAnyCard = cardTypes.some(c => getCardCount(c.id) > 0);
+  const shelfVisible = (viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS') && hasAnyCard;
+  const contentBottom = viewState === 'LIVE' ? '140px' : shelfVisible ? '256px' : '0px';
 
   if (gameLoading || !userProfile) return <div className="bg-black h-[100dvh] flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500 w-8 h-8" /></div>;
 
