@@ -909,7 +909,9 @@ const MatchDetail = () => {
                 }`}>
                 {match.fixture.status.short === 'NS'
                   ? new Date(match.fixture.date).toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()
-                  : ({ INPLAY_1ST_HALF: '1H', HT: 'HT', INPLAY_2ND_HALF: '2H', INPLAY_ET: 'ET', INPLAY_ET_SECOND_HALF: 'ET', EXTRA_TIME_BREAK: 'BT', INPLAY_PENALTIES: 'PENS', BREAK: 'BT', FT: 'FT', AET: 'AET', FT_PEN: 'FT-P', POSTPONED: 'PST', CANCELLED: 'CANC', ABANDONED: 'ABD', AWARDED: 'AWD', WO: 'WO' }[match.fixture.status.short] ?? match.fixture.status.short)
+                  : (['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES'].includes(match.fixture.status.short) && match.fixture.status.elapsed)
+                    ? `${match.fixture.status.elapsed}'`
+                    : ({ INPLAY_1ST_HALF: '1H', HT: 'HT', INPLAY_2ND_HALF: '2H', INPLAY_ET: 'ET', INPLAY_ET_SECOND_HALF: 'ET', EXTRA_TIME_BREAK: 'BT', INPLAY_PENALTIES: 'PENS', BREAK: 'BT', FT: 'FT', AET: 'AET', FT_PEN: 'FT-P', POSTPONED: 'PST', CANCELLED: 'CANC', ABANDONED: 'ABD', AWARDED: 'AWD', WO: 'WO' }[match.fixture.status.short] ?? match.fixture.status.short)
                 }
               </span>
               <div className="text-lg font-black text-white font-mono leading-none">

@@ -88,6 +88,16 @@ function extractStateName(fixture: any): string {
   return fixture.state?.developer_name || 'NS';
 }
 
+function extractCurrentMinute(fixture: any): number | null {
+  const periods: any[] = fixture.periods || [];
+  // Find the currently ticking period
+  const ticking = periods.find((p: any) => p.ticking === true);
+  if (ticking?.minutes != null) return ticking.minutes;
+  // Fallback: highest minutes value from any period (most recent)
+  const minutes = periods.map((p: any) => p.minutes).filter((m: any) => m != null);
+  return minutes.length > 0 ? Math.max(...minutes) : null;
+}
+
 // ────────────────────────────────────────────────────
 // STATUS DERIVATION
 // ────────────────────────────────────────────────────
@@ -268,6 +278,12 @@ function buildPayload(
   if (fixture.statistics && Array.isArray(fixture.statistics) && fixture.statistics.length > 0) {
     payload.statistics = fixture.statistics;
   }
+
+  // Current match minute from periods include
+  const minute = extractCurrentMinute(fixture);
+  if (minute != null) payload.match_minute = minute;
+  // Clear minute when match is finished
+  if (TERMINAL_STATUSES.includes(apiStatus)) payload.match_minute = null;
 
   return payload;
 }
@@ -573,7 +589,7 @@ async function liveScoresService(
       try {
         result.apiCalls++;
         const json = await smRequest(`/fixtures/${m.id}`, {
-          include: 'scores;state;participants;events;statistics',
+          include: 'scores;state;participants;events;statistics;periods',
         });
         if (json.data) fgFixtures.push(json.data);
       } catch (err) {
@@ -678,7 +694,7 @@ async function liveScoresService(
         console.log(`[WATCHER] [LIVE] SINGLE mode: id=${liveTargets[0].id}`);
         result.apiCalls++;
         const json = await smRequest(`/fixtures/${liveTargets[0].id}`, {
-          include: 'scores;state;participants;events;statistics',
+          include: 'scores;state;participants;events;statistics;periods',
         });
         if (json.data) liveFixtures.push(json.data);
       } else {
@@ -688,7 +704,7 @@ async function liveScoresService(
         console.log(`[WATCHER] [LIVE] MULTI mode: leagues=${uniqueLiveLeagues.join(',')}`);
         result.apiCalls++;
         const json = await smRequest('/livescores/inplay', {
-          include: 'scores;state;events;participants;statistics',
+          include: 'scores;state;events;participants;statistics;periods',
           filters: `fixtureLeagues:${uniqueLiveLeagues.join(',')}`,
         });
         liveFixtures = json.data || [];
@@ -708,7 +724,7 @@ async function liveScoresService(
           try {
             result.apiCalls++;
             const ghostJson = await smRequest(`/fixtures/${ghost.id}`, {
-              include: 'scores;state;participants;events;statistics',
+              include: 'scores;state;participants;events;statistics;periods',
             });
             if (ghostJson.data) liveFixtures.push(ghostJson.data);
           } catch (ghostErr) {

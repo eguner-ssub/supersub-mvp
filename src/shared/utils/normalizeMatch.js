@@ -24,7 +24,7 @@ export function normalizeMatch(raw) {
             date: raw.kickoff_time || raw.date || null,
             status: {
                 short: raw.status || 'NS',
-                elapsed: raw.elapsed ?? null,
+                elapsed: raw.match_minute ?? raw.elapsed ?? null,
             },
         },
 
