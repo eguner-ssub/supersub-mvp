@@ -269,35 +269,52 @@ export const GameProvider = ({ children }) => {
     };
     fetchGlobalDictionary();
   }, []);
+  // Auth init — loads profile on mount and on auth state changes
   useEffect(() => {
     let mounted = true;
-    let realtimeChannel = null;
-
     async function initSession() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (mounted && session) {
-        await loadProfile(session);
-        subscribeRealtime(session.user.id);
-      } else if (mounted) {
-        setLoading(false);
-      }
+      if (mounted && session) await loadProfile(session);
+      else if (mounted) setLoading(false);
     }
+    initSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) { activeRequestId.current += 1; loadProfile(session); }
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
+  }, []);
 
-    function subscribeRealtime(userId) {
-      realtimeChannel = supabase
-        .channel(`user-data-${userId}`)
-        // Profile changes (points, energy, coins, etc.)
+  // Realtime subscriptions — fires whenever the logged-in user changes
+  useEffect(() => {
+    if (!userProfile?.id) return;
+
+    const channelRef = { current: null };
+
+    const cleanupChannel = async () => {
+      if (channelRef.current) {
+        const old = channelRef.current;
+        channelRef.current = null;
+        await supabase.removeChannel(old);
+      }
+    };
+
+    const initRealtime = async () => {
+      await cleanupChannel();
+
+      const channel = supabase
+        .channel(`user-data-${userProfile.id}`)
+        // Profile row changes (points, energy, coins, etc.)
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userProfile.id}` },
           (payload) => {
             setUserProfile(prev => prev ? { ...prev, ...payload.new } : prev);
           }
         )
-        // Inventory changes (card counts added/updated manually or via settlement)
+        // Inventory row changes (card counts — manual edits, settlement, rewards)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'inventory', filter: `user_id=eq.${userId}` },
+          { event: '*', schema: 'public', table: 'inventory', filter: `user_id=eq.${userProfile.id}` },
           (payload) => {
             if (payload.eventType === 'DELETE') {
               setUserProfile(prev => {
@@ -315,26 +332,21 @@ export const GameProvider = ({ children }) => {
             }
           }
         )
-        .subscribe();
-    }
+        .subscribe((status) => {
+          console.log(`📡 [Realtime] user-data channel: ${status}`);
+        });
 
-    initSession();
+      channelRef.current = channel;
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-      // Clean up previous channel before re-subscribing for new session
-      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
-      activeRequestId.current += 1;
-      loadProfile(session);
-      if (session) subscribeRealtime(session.user.id);
-    });
+    initRealtime();
 
     return () => {
-      mounted = false;
-      subscription.unsubscribe();
-      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+      setTimeout(() => {
+        if (channelRef.current) supabase.removeChannel(channelRef.current);
+      }, 100);
     };
-  }, []);
+  }, [userProfile?.id]);
 
   const value = { userProfile, loading, statDictionary, supabase, placeBet, consumeCard, spendEnergy, gainEnergy, updateInventory, loadProfile, createProfile };
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
