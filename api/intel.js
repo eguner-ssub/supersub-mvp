@@ -95,8 +95,6 @@ async function buildLiveInsights(supabase, match) {
 
   const homeThreat = findDangerousBench(homeBench, homeTeam);
   const awayThreat = findDangerousBench(awayBench, awayTeam);
-  const benchPotential = [homeThreat, awayThreat].filter(Boolean).join(' ') ||
-    'No notable supersub threats on either bench this season.';
 
   // Resolve coach IDs — use match columns if set, otherwise look up from coaches table
   let homeCoachId = match.home_coach_id;
@@ -140,11 +138,9 @@ async function buildLiveInsights(supabase, match) {
 
   const homeLine = buildSubLine(homeTeam, homeSubEvents, homeFirstSubMinute, homePattern);
   const awayLine = buildSubLine(awayTeam, awaySubEvents, awayFirstSubMinute, awayPattern);
-  const subAnalysis = [homeLine, awayLine].filter(Boolean).join(' ') ||
-    'Substitution data unavailable.';
 
-  // Contextual greeting based on current score events
-  const goalEvents = events.filter(e => e.type_id === 16 || e.type_id === 17); // goal / own goal
+  // Contextual greeting based on current match events
+  const goalEvents = events.filter(e => e.type_id === 16 || e.type_id === 17);
   let greeting = `Hi Boss. The match is underway.`;
   if (goalEvents.length > 0) {
     const last = goalEvents[goalEvents.length - 1];
@@ -154,7 +150,24 @@ async function buildLiveInsights(supabase, match) {
     greeting = `Hi Boss. Changes are being made. Here's the supersub picture.`;
   }
 
-  return { greeting, benchPotential, subAnalysis };
+  // Build carousel insight cards — each is a standalone item
+  const insights = [];
+
+  if (homeThreat) insights.push({ type: 'bench', text: homeThreat });
+  if (awayThreat) insights.push({ type: 'bench', text: awayThreat });
+  if (!homeThreat && !awayThreat) {
+    insights.push({ type: 'bench', text: 'No notable supersub threats on either bench this season.' });
+  }
+  if (homeLine) insights.push({ type: 'sub', text: homeLine });
+  if (awayLine) insights.push({ type: 'sub', text: awayLine });
+
+  // Legacy flat fields for backwards compatibility
+  const benchPotential = [homeThreat, awayThreat].filter(Boolean).join(' ') ||
+    'No notable supersub threats on either bench this season.';
+  const subAnalysis = [homeLine, awayLine].filter(Boolean).join(' ') ||
+    'Substitution data unavailable.';
+
+  return { greeting, insights, benchPotential, subAnalysis };
 }
 
 /**

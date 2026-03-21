@@ -157,65 +157,116 @@ const PrematchAnalysis = ({ data }) => (
 );
 
 /* ─────────────────────────────────────────────────────────────
-   LIVE SUPERSUB PANEL — replaces card shelf during live
+   LIVE SUPERSUB PANEL — swipeable insight carousel
    ───────────────────────────────────────────────────────────── */
-const LiveSupersubPanel = ({ insights, onUseSupersubCard, supersubCount }) => (
-  <div
-    className="fixed bottom-0 w-full z-50"
-    style={{
-      background: 'rgba(24, 24, 27, 0.95)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      borderTop: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '20px 20px 0 0',
-      padding: '14px 16px',
-    }}
-  >
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      {/* Live insights (full width) */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-        <img
-          src="/assets/assistant-head.png"
-          alt="Tactical Expert"
-          style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid rgba(255,255,255,0.1)' }}
-        />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '8px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            Live Insights
-          </span>
-          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '10px', color: 'rgba(255,255,255,0.7)', margin: '3px 0 4px', lineHeight: 1.4 }}>
-            {insights.benchPotential}
-          </p>
-          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 500, fontSize: '9px', color: 'rgba(255,255,255,0.4)', margin: 0, lineHeight: 1.4 }}>
-            {insights.subAnalysis}
-          </p>
-        </div>
-      </div>
+const INSIGHT_ICONS = { bench: '⚡', sub: '🔄' };
 
-      {/* Supersub CTA (full width) */}
-      <button
-        onClick={onUseSupersubCard}
-        disabled={supersubCount === 0}
-        style={{
-          width: '100%',
-          padding: '10px 16px',
-          background: supersubCount > 0 ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.05)',
-          border: `1.5px solid ${supersubCount > 0 ? '#00e5ff' : 'rgba(255,255,255,0.1)'}`,
-          borderRadius: '12px',
-          color: supersubCount > 0 ? '#00e5ff' : 'rgba(255,255,255,0.25)',
-          fontFamily: "'Montserrat', sans-serif",
-          fontWeight: 800,
-          fontSize: '11px',
-          textTransform: 'uppercase',
-          letterSpacing: '1.5px',
-          cursor: supersubCount > 0 ? 'pointer' : 'not-allowed',
-        }}
-      >
-        ⚡ Use Supersub Card
-      </button>
+const LiveSupersubPanel = ({ insights, onUseSupersubCard, supersubCount }) => {
+  const [current, setCurrent] = React.useState(0);
+  const touchStartX = React.useRef(null);
+
+  // Normalise to array — support both new (insights array) and legacy flat shape
+  const cards = React.useMemo(() => {
+    if (insights?.insights?.length) return insights.insights;
+    const fallback = [];
+    if (insights?.benchPotential) fallback.push({ type: 'bench', text: insights.benchPotential });
+    if (insights?.subAnalysis)    fallback.push({ type: 'sub',   text: insights.subAnalysis });
+    return fallback.length ? fallback : [{ type: 'bench', text: 'Loading insights…' }];
+  }, [insights]);
+
+  const total = cards.length;
+  const goTo = (i) => setCurrent(Math.max(0, Math.min(i, total - 1)));
+
+  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const onTouchEnd   = (e) => {
+    if (touchStartX.current === null) return;
+    const delta = touchStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(delta) > 40) goTo(current + (delta > 0 ? 1 : -1));
+    touchStartX.current = null;
+  };
+
+  const card = cards[current];
+
+  return (
+    <div
+      className="fixed bottom-0 w-full z-50"
+      style={{
+        background: 'rgba(24, 24, 27, 0.95)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '20px 20px 0 0',
+        padding: '14px 16px',
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+        {/* Carousel insight */}
+        <div
+          style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', userSelect: 'none' }}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          <img
+            src="/assets/assistant-head.png"
+            alt="Tactical Expert"
+            style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid rgba(255,255,255,0.1)' }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '8px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                {INSIGHT_ICONS[card.type]} Live Insights
+              </span>
+              {total > 1 && (
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  {cards.map((_, i) => (
+                    <div
+                      key={i}
+                      onClick={() => goTo(i)}
+                      style={{
+                        width: i === current ? '14px' : '5px',
+                        height: '5px',
+                        borderRadius: '3px',
+                        background: i === current ? '#00e5ff' : 'rgba(255,255,255,0.2)',
+                        transition: 'all 0.2s ease',
+                        cursor: 'pointer',
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '10px', color: 'rgba(255,255,255,0.8)', margin: '4px 0 0', lineHeight: 1.5 }}>
+              {card.text}
+            </p>
+          </div>
+        </div>
+
+        {/* Supersub CTA */}
+        <button
+          onClick={onUseSupersubCard}
+          disabled={supersubCount === 0}
+          style={{
+            width: '100%',
+            padding: '10px 16px',
+            background: supersubCount > 0 ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.05)',
+            border: `1.5px solid ${supersubCount > 0 ? '#00e5ff' : 'rgba(255,255,255,0.1)'}`,
+            borderRadius: '12px',
+            color: supersubCount > 0 ? '#00e5ff' : 'rgba(255,255,255,0.25)',
+            fontFamily: "'Montserrat', sans-serif",
+            fontWeight: 800,
+            fontSize: '11px',
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            cursor: supersubCount > 0 ? 'pointer' : 'not-allowed',
+          }}
+        >
+          ⚡ Use Supersub Card
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* ─────────────────────────────────────────────────────────────
    SUBSTITUTES TAB
