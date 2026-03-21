@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp, Zap, Coins, ArrowLeft } from 'lucide-react';
+import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 import { normalizeMatch } from '../../shared/utils/normalizeMatch';
 
@@ -12,11 +12,6 @@ const ManagerOffice = () => {
     // Separate loaded state for each image to enable crossfade
     const [packedLoaded, setPackedLoaded] = useState(false);
     const [emptyLoaded, setEmptyLoaded] = useState(false);
-
-    const energy = userProfile?.energy || 0;
-    const maxEnergy = userProfile?.max_energy || 3;
-    const coins = userProfile?.points || 0;
-    const clubName = userProfile?.club_name || userProfile?.name || "Manager";
 
     /**
      * EFFECT: Global Live Match Check

@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Shirt } from 'lucide-react';
+import GameHeader from './GameHeader';
 
 export default function NavigationShell({ children }) {
     const location = useLocation();
@@ -59,6 +60,9 @@ export default function NavigationShell({ children }) {
             <div className="w-full h-full">
                 {children}
             </div>
+
+            {/* 2. COMMON HEADER (Energy | Club Name | Points) */}
+            <GameHeader />
 
             {/* 2. NAVIGATION DOCK (Z-50) */}
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[360px]">
