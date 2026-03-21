@@ -144,34 +144,7 @@ const ManagerOffice = () => {
 
                 </div>
 
-                {/* ── HUD ── */}
-                <div className="absolute top-0 left-0 w-full p-4 pt-6 flex justify-between items-center z-50 pointer-events-none">
-                    {/* Back Button + Energy */}
-                    <div className="flex items-center gap-2">
-                        <button
-                            data-testid="nav-dressing-room"
-                            onClick={() => navigate('/dashboard')}
-                            className="pointer-events-auto glass-dark shadow-office p-2 rounded-full active:scale-95 transition-transform"
-                        >
-                            <ArrowLeft className="w-4 h-4 text-white" />
-                        </button>
-                        <div className="pointer-events-auto flex items-center gap-2 glass-dark px-4 py-2 rounded-full shadow-office">
-                            <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                            <span className="text-white font-bold text-sm font-mono pt-0.5">{energy}/{maxEnergy}</span>
-                        </div>
-                    </div>
-
-                    {/* Club Name */}
-                    <div className="absolute left-1/2 -translate-x-1/2 text-white text-lg font-black uppercase tracking-widest drop-shadow-lg truncate max-w-[150px] text-center">
-                        {clubName}
-                    </div>
-
-                    {/* Coins */}
-                    <div className="pointer-events-auto flex items-center gap-2 glass-dark px-4 py-2 rounded-full shadow-office">
-                        <Coins className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                        <span className="text-white font-bold text-sm font-mono pt-0.5">{coins}</span>
-                    </div>
-                </div>
+                {/* HUD provided by NavigationShell > GameHeader */}
             </div>
         </div>
     );

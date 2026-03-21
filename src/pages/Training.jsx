@@ -4,6 +4,7 @@ import { useGame } from '../shared/context/GameContext';
 import { ArrowLeft, CheckCircle, XCircle, Zap, HelpCircle, Clock, Loader2, Brain, Trophy, PlayCircle } from 'lucide-react';
 import MobileLayout from '../shared/ui/MobileLayout';
 import AdOverlay from '../components/AdOverlay';
+import GameHeader from '../shared/ui/GameHeader';
 import gameData from '../data/gameData.json';
 
 const Training = () => {
@@ -138,12 +139,10 @@ const Training = () => {
   if (phase === 'briefing') {
     const hasEnergy = userProfile.energy > 0;
     return (
-      <>
+      <div className="relative min-h-screen">
+        <GameHeader />
         <MobileLayout bgImage="/bg-training-brief.webp">
-          <div className="w-full max-w-md h-full flex flex-col justify-center p-6 relative">
-            <button onClick={() => navigate('/dashboard')} className="absolute top-6 left-4 flex items-center gap-2 text-gray-300 hover:text-white z-50">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
+          <div className="w-full max-w-md h-full flex flex-col justify-center p-6 relative pt-20">
 
             <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded-2xl p-8 shadow-2xl">
               <div className="flex justify-center mb-4">
@@ -190,7 +189,7 @@ const Training = () => {
             onClose={() => setShowAd(false)}
           />
         )}
-      </>
+      </div>
     );
   }
 
@@ -198,6 +197,8 @@ const Training = () => {
   if (phase === 'complete') {
     const passed = score >= 3;
     return (
+      <div className="relative min-h-screen">
+        <GameHeader />
       <MobileLayout bgImage="/bg-training-quiz.webp">
         <div className="h-full flex flex-col items-center justify-center p-6 relative z-50">
           <div className="w-full max-w-md bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-gray-700 text-center relative overflow-hidden">
@@ -224,15 +225,17 @@ const Training = () => {
           </div>
         </div>
       </MobileLayout>
+      </div>
     );
   }
 
   // --- RENDER: QUIZ ---
-  if (questions.length === 0) return <div className="text-white text-center pt-20">Loading Data...</div>;
+  if (questions.length === 0) return <div className="relative min-h-screen"><GameHeader /><div className="text-white text-center pt-20">Loading Data...</div></div>;
   const currentQuestion = questions[currentQIndex];
 
   return (
-    <>
+    <div className="relative min-h-screen">
+      <GameHeader />
       <MobileLayout bgImage="/bg-training-quiz.webp">
         <div className="flex flex-col h-full relative p-4 max-w-md mx-auto">
           <div className="flex items-center justify-between mb-8 mt-4">
@@ -301,7 +304,7 @@ const Training = () => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 
