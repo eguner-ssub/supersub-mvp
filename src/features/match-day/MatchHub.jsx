@@ -126,7 +126,17 @@ const MatchHub = () => {
                     <span className="text-[9px] font-black">
                       {status === 'NS' && kickoff
                         ? new Date(kickoff).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : status}
+                        : ({
+                            INPLAY_1ST_HALF: '1st Half',
+                            INPLAY_2ND_HALF: '2nd Half',
+                            INPLAY_ET: 'Extra Time',
+                            INPLAY_ET_SECOND_HALF: 'Extra Time',
+                            INPLAY_PENALTIES: 'Penalties',
+                            EXTRA_TIME_BREAK: 'Break',
+                            BREAK: 'Break',
+                            HT: 'HT', FT: 'FT', AET: 'AET', FT_PEN: 'FT-P',
+                            POSTPONED: 'PST', CANCELLED: 'CANC', ABANDONED: 'ABD',
+                          }[status] ?? status)}
                     </span>
                   </div>
                 </div>
