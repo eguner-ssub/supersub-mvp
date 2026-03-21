@@ -118,7 +118,7 @@ describe('MatchDetail - Industrial Battle Arena', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         global.fetch.mockImplementation((url) => {
-            if (String(url).includes('/api/odds/sportmonks')) {
+            if (String(url).includes('/api/odds')) {
                 return Promise.resolve({
                     ok: true,
                     json: async () => MOCK_SPORTMONKS_ODDS,

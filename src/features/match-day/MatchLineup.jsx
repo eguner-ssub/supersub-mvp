@@ -266,7 +266,7 @@ const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP' 
         const fetchLineups = async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`/api/lineups?fixture=${fixtureId}`);
+                const res = await fetch(`/api/matches?fixture=${fixtureId}&include=lineups`);
                 const data = await res.json();
 
                 if (data.response && data.response.length >= 2) {

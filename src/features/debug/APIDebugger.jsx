@@ -11,7 +11,7 @@ const APIDebugger = () => {
         setLoading(true);
         setResponse(null);
         try {
-            const res = await fetch(`/api/odds/sportmonks?fixture=${fixtureId}`);
+            const res = await fetch(`/api/odds?fixture=${fixtureId}`);
             const data = await res.json();
             setResponse(data);
         } catch (err) {

@@ -5,7 +5,7 @@ import {
     parseMatchResult,
     parseTotalGoals,
     parseGoalscorers,
-} from '../../lib/oddsParser.js';
+} from '../lib/oddsParser.js';
 
 // ── Lazy Supabase Client ─────────────────────────────────────────────────────
 let _supabase = null;

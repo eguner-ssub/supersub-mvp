@@ -785,7 +785,7 @@ const MatchDetail = () => {
 
         if (phase !== 'POST') {
           secondaryFetches.push(
-            fetch(`/api/odds/sportmonks?fixture=${fixtureId}`)
+            fetch(`/api/odds?fixture=${fixtureId}`)
               .then(r => r.ok ? r.json() : null)
               .then(d => {
                 if (!d) { setOdds(null); setActiveBookie(null); return; }
