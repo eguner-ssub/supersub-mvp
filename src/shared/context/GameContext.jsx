@@ -271,16 +271,69 @@ export const GameProvider = ({ children }) => {
   }, []);
   useEffect(() => {
     let mounted = true;
+    let realtimeChannel = null;
+
     async function initSession() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (mounted && session) await loadProfile(session);
-      else if (mounted) setLoading(false);
+      if (mounted && session) {
+        await loadProfile(session);
+        subscribeRealtime(session.user.id);
+      } else if (mounted) {
+        setLoading(false);
+      }
     }
+
+    function subscribeRealtime(userId) {
+      realtimeChannel = supabase
+        .channel(`user-data-${userId}`)
+        // Profile changes (points, energy, coins, etc.)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+          (payload) => {
+            setUserProfile(prev => prev ? { ...prev, ...payload.new } : prev);
+          }
+        )
+        // Inventory changes (card counts added/updated manually or via settlement)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'inventory', filter: `user_id=eq.${userId}` },
+          (payload) => {
+            if (payload.eventType === 'DELETE') {
+              setUserProfile(prev => {
+                if (!prev) return prev;
+                const newMap = { ...prev.inventoryMap };
+                delete newMap[payload.old.card_id];
+                return { ...prev, inventoryMap: newMap };
+              });
+            } else {
+              const { card_id, count } = payload.new;
+              setUserProfile(prev => prev ? {
+                ...prev,
+                inventoryMap: { ...prev.inventoryMap, [card_id]: count },
+              } : prev);
+            }
+          }
+        )
+        .subscribe();
+    }
+
     initSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) { activeRequestId.current += 1; loadProfile(session); }
+      if (!mounted) return;
+      // Clean up previous channel before re-subscribing for new session
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+      activeRequestId.current += 1;
+      loadProfile(session);
+      if (session) subscribeRealtime(session.user.id);
     });
-    return () => { mounted = false; subscription.unsubscribe(); };
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+    };
   }, []);
 
   const value = { userProfile, loading, statDictionary, supabase, placeBet, consumeCard, spendEnergy, gainEnergy, updateInventory, loadProfile, createProfile };
