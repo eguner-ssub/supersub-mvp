@@ -120,14 +120,17 @@ export const calculateBetResult = (cardType, selection, matchData) => {
         }
 
         // --- D. SUPERSUB ---
-        // Wins if a substitute from the backed team scores or assists a goal
-        // after their substitution minute, within 120 minutes.
+        // Team-level (player_id null): any sub from backed team scores → 500 pts
+        // Player-level (player_id set): that specific player subs on AND scores → 2500 pts
         case 'c_supersub': {
-            const backedTeamId = matchData.team_id ? Number(matchData.team_id) : null;
+            const backedTeamId  = matchData.team_id  ? Number(matchData.team_id)  : null;
+            const backedPlayerId = matchData.player_id ? Number(matchData.player_id) : null;
+
             if (backedTeamId == null) {
                 return { status: 'LOST', points: 0, message: 'No team_id' };
             }
 
+            // Build map: incoming player_id → minute they came on
             const subsOnMap = new Map();
             for (const event of events) {
                 const isSub = event.type_id === 18 || event.type === 'subst';
@@ -136,25 +139,40 @@ export const calculateBetResult = (cardType, selection, matchData) => {
 
                 if (isSub && isBackedTeam && incomingPlayerId != null) {
                     const minute = event.minute || event.time?.elapsed || 0;
-                    subsOnMap.set(incomingPlayerId, minute);
+                    subsOnMap.set(Number(incomingPlayerId), minute);
                 }
             }
 
             if (subsOnMap.size === 0) return { status: 'LOST', points: 0 };
 
+            // Player-level: backed player must have subbed on AND scored
+            if (backedPlayerId != null) {
+                const subOnTime = subsOnMap.get(backedPlayerId);
+                if (subOnTime === undefined) return { status: 'LOST', points: 0 }; // never came on
+
+                for (const event of events) {
+                    const isGoal = event.type_id === 14 || event.type_id === 97 || event.type === 'Goal';
+                    const time   = event.minute || event.time?.elapsed || 0;
+                    const scorerId = Number(event.player_id || event.player?.id);
+
+                    if (isGoal && scorerId === backedPlayerId && time >= subOnTime && time <= 120) {
+                        return { status: 'WON', points: 2500 };
+                    }
+                }
+                return { status: 'LOST', points: 0 };
+            }
+
+            // Team-level: any sub from backed team scores
             for (const event of events) {
                 const isGoal = event.type_id === 14 || event.type_id === 97 || event.type === 'Goal';
                 const isBackedTeam = event.participant_id === backedTeamId || event.team?.id === backedTeamId;
                 const time = event.minute || event.time?.elapsed || 0;
 
                 if (isGoal && isBackedTeam && time <= 120) {
-                    const scorerId = event.player_id || event.player?.id;
-
-                    if (scorerId != null) {
-                        const subOnTime = subsOnMap.get(scorerId);
-                        if (subOnTime !== undefined && time >= subOnTime) {
-                            return { status: 'WON', points: 500 };
-                        }
+                    const scorerId = Number(event.player_id || event.player?.id);
+                    const subOnTime = subsOnMap.get(scorerId);
+                    if (subOnTime !== undefined && time >= subOnTime) {
+                        return { status: 'WON', points: 500 };
                     }
                 }
             }

@@ -51,7 +51,8 @@ const COUNTABLE_GOAL_DETAILS = ['Normal Goal', 'Penalty'];
  */
 export const settleSupersub = (bet, events) => {
 
-    const teamId = bet.team_id;
+    const teamId   = bet.team_id;
+    const playerId = bet.player_id ? Number(bet.player_id) : null;
 
     if (teamId == null) {
         console.warn(`⚠️  Supersub bet ${bet.id} has no team_id — cannot settle, marking LOST`);
@@ -67,28 +68,46 @@ export const settleSupersub = (bet, events) => {
 
         if (isSub && isBackedTeam && incomingPlayerId != null) {
             const minute = event.minute || event.time?.elapsed || 0;
-            subsOnMap.set(incomingPlayerId, minute);
+            subsOnMap.set(Number(incomingPlayerId), minute);
         }
     }
 
     if (subsOnMap.size === 0) return { status: 'LOST', points: 0 };
 
-    // Step 2: Check if any of those specific subs scored a goal
+    // Step 2a: Player-level — specific player must sub on AND score → 2500 pts
+    if (playerId != null) {
+        const subOnTime = subsOnMap.get(playerId);
+        if (subOnTime === undefined) {
+            console.log(`  ✗ Player-specific supersub: player ${playerId} never came on`);
+            return { status: 'LOST', points: 0 };
+        }
+
+        for (const event of events) {
+            const isGoal   = event.type_id === 14 || event.type_id === 97 || event.type === 'Goal';
+            const scorerId = Number(event.player_id || event.player?.id);
+            const time     = event.minute || event.time?.elapsed || 0;
+
+            if (isGoal && scorerId === playerId && time >= subOnTime && time <= 120) {
+                console.log(`  ⚡ Player supersub WIN: player ${playerId} subbed on at ${subOnTime}', scored at ${time}' — 2500 pts`);
+                return { status: 'WON', points: 2500 };
+            }
+        }
+        console.log(`  ✗ Player-specific supersub: player ${playerId} came on at ${subsOnMap.get(playerId)}' but did not score`);
+        return { status: 'LOST', points: 0 };
+    }
+
+    // Step 2b: Team-level — any sub from backed team scores → 500 pts
     for (const event of events) {
         const isGoal = event.type_id === 14 || event.type_id === 97 || event.type === 'Goal';
         const isBackedTeam = event.participant_id === teamId || event.team?.id === teamId;
         const time = event.minute || event.time?.elapsed || 0;
 
         if (isGoal && isBackedTeam && time <= 120) {
-            const scorerId = event.player_id || event.player?.id;
-
-            if (scorerId != null) {
-                const subOnTime = subsOnMap.get(scorerId);
-                // Sub must have come on before or during the same minute as the goal
-                if (subOnTime !== undefined && time >= subOnTime) {
-                    console.log(`  ⚡ Supersub win: player ${scorerId} subbed on at ${subOnTime}', scored at ${time}'`);
-                    return { status: 'WON', points: 500 };
-                }
+            const scorerId = Number(event.player_id || event.player?.id);
+            const subOnTime = subsOnMap.get(scorerId);
+            if (subOnTime !== undefined && time >= subOnTime) {
+                console.log(`  ⚡ Supersub win: player ${scorerId} subbed on at ${subOnTime}', scored at ${time}' — 500 pts`);
+                return { status: 'WON', points: 500 };
             }
         }
     }

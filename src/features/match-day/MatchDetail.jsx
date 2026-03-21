@@ -841,7 +841,7 @@ const MatchDetail = () => {
       }
     }
 
-    const result = await placeBet(match, stagedBet.selection, stagedBet.reward, stagedBet.card, stagedBet.odds, stagedBet.displayLabel, stagedBet.teamId ?? null, snapshot);
+    const result = await placeBet(match, stagedBet.selection, stagedBet.reward, stagedBet.card, stagedBet.odds, stagedBet.displayLabel, stagedBet.teamId ?? null, snapshot, stagedBet.playerId ?? null);
     if (result.success) {
       await consumeCard(stagedBet.card);
       setFlowState('resolved');
@@ -1138,6 +1138,8 @@ const MatchDetail = () => {
               <SubstitutesTab
                 match={match}
                 onStageSupersub={handleStageSupersub}
+                onStagePlayerSupersub={handleStagePlayerSupersub}
+                supersubCount={getCardCount('c_supersub')}
               />
             )}
 
@@ -1201,6 +1203,8 @@ const MatchDetail = () => {
               <SubstitutesTab
                 match={match}
                 onStageSupersub={handleStageSupersub}
+                onStagePlayerSupersub={handleStagePlayerSupersub}
+                supersubCount={getCardCount('c_supersub')}
               />
             )}
 
@@ -1268,12 +1272,7 @@ const MatchDetail = () => {
       {viewState === 'LIVE' && (
         <LiveSupersubPanel
           insights={liveInsights || LIVE_INSIGHTS_MOCK}
-          onUseSupersubCard={() => {
-            setActiveTab('SUBS');
-            const homeId = match?.teams?.home?.id;
-            const homeName = match?.teams?.home?.name;
-            handleStageSupersub('home', homeId, homeName);
-          }}
+          onUseSupersubCard={() => setActiveTab('SUBS')}
           supersubCount={getCardCount('c_supersub')}
         />
       )}

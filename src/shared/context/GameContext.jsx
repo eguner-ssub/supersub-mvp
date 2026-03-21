@@ -110,7 +110,7 @@ export const GameProvider = ({ children }) => {
    *   Pass match.teams.home.id or match.teams.away.id at the call site.
    *   Without this, the backend settlement engine will always settle Supersub as LOST.
    */
-  const placeBet = async (match, selection, potentialReward, cardType, odds, displayLabel, teamId = null) => {
+  const placeBet = async (match, selection, potentialReward, cardType, odds, displayLabel, teamId = null, oddsSnapshot = null, playerId = null) => {
     if (!userProfile) return { success: false, error: 'No user' };
     try {
       const homeTeam = match.teams?.home?.name || match.home_team || 'Home';
@@ -150,8 +150,9 @@ export const GameProvider = ({ children }) => {
       }
 
       // Extract Player ID from Player Score selections (e.g., "SCORE_12345")
-      let resolvedPlayerId = null;
-      if (cardType === 'c_player_score' && String(resolvedSelection).startsWith('SCORE_')) {
+      // Also carry through player_id for player-specific supersub bets
+      let resolvedPlayerId = playerId ?? null;
+      if (!resolvedPlayerId && cardType === 'c_player_score' && String(resolvedSelection).startsWith('SCORE_')) {
         const parts = String(resolvedSelection).split('_');
         resolvedPlayerId = parts.length > 1 ? Number(parts[1]) : null;
       }
