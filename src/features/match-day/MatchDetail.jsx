@@ -710,6 +710,8 @@ const MatchDetail = () => {
     const fetchMatchDetail = async () => {
       try {
         setLoading(true);
+
+        // Step 1: fetch match first — we need phase + fixtureId before secondary calls
         const res = await fetch(`/api/matches?id=${id}`);
         const data = await res.json();
         if (!data.response?.length) throw new Error("Match unavailable");
@@ -725,58 +727,50 @@ const MatchDetail = () => {
 
         const fixtureId = matchInfo.fixture?.id || matchInfo.id;
 
+        // Step 2: fire all secondary requests in parallel
+        const secondaryFetches = [];
+
         if (phase === 'PRE') {
-          try {
-            const intelRes = await fetch(`/api/intel?match_id=${fixtureId}`);
-            if (intelRes.ok) {
-              const intelData = await intelRes.json();
-              if (intelData.analysis) setAnalysisData(intelData.analysis);
-            }
-          } catch (intelErr) {
-            console.warn('[MatchDetail] Intel fetch error:', intelErr);
-          }
+          secondaryFetches.push(
+            fetch(`/api/intel?match_id=${fixtureId}`)
+              .then(r => r.ok ? r.json() : null)
+              .then(d => { if (d?.analysis) setAnalysisData(d.analysis); })
+              .catch(e => console.warn('[MatchDetail] Intel fetch error:', e))
+          );
         }
 
         if (phase === 'LIVE') {
-          try {
-            const insightsRes = await fetch(`/api/intel?match_id=${fixtureId}&phase=live`);
-            if (insightsRes.ok) {
-              const insightsData = await insightsRes.json();
-              if (insightsData.available) setLiveInsights(insightsData);
-            }
-          } catch (insightsErr) {
-            console.warn('[MatchDetail] Live insights fetch error:', insightsErr);
-          }
+          secondaryFetches.push(
+            fetch(`/api/intel?match_id=${fixtureId}&phase=live`)
+              .then(r => r.ok ? r.json() : null)
+              .then(d => { if (d?.available) setLiveInsights(d); })
+              .catch(e => console.warn('[MatchDetail] Live insights fetch error:', e))
+          );
         }
 
         if (phase !== 'POST') {
-          const fixtureId = matchInfo.fixture?.id || matchInfo.id;
-          try {
-            const oddsRes = await fetch(`/api/odds/sportmonks?fixture=${fixtureId}`);
-            if (oddsRes.ok) {
-              const oddsData = await oddsRes.json();
-              const mr = oddsData.match_result || {};
-              const tg = oddsData.total_goals || {};
-              setOdds({
-                home: mr.home || 0,
-                draw: mr.draw || 0,
-                away: mr.away || 0,
-                goals_over: tg.over_2_5 || 0,
-                goals_under: tg.under_2_5 || 0,
-                goalscorers: oddsData.goalscorers || [],
-              });
-              setActiveBookie(null);
-            } else {
-              console.warn('[MatchDetail] No odds available for this fixture');
-              setOdds(null);
-              setActiveBookie(null);
-            }
-          } catch (oddsErr) {
-            console.error('[MatchDetail] Odds fetch error:', oddsErr);
-            setOdds(null);
-            setActiveBookie(null);
-          }
+          secondaryFetches.push(
+            fetch(`/api/odds/sportmonks?fixture=${fixtureId}`)
+              .then(r => r.ok ? r.json() : null)
+              .then(d => {
+                if (!d) { setOdds(null); setActiveBookie(null); return; }
+                const mr = d.match_result || {};
+                const tg = d.total_goals || {};
+                setOdds({
+                  home: mr.home || 0,
+                  draw: mr.draw || 0,
+                  away: mr.away || 0,
+                  goals_over: tg.over_2_5 || 0,
+                  goals_under: tg.under_2_5 || 0,
+                  goalscorers: d.goalscorers || [],
+                });
+                setActiveBookie(null);
+              })
+              .catch(e => { console.error('[MatchDetail] Odds fetch error:', e); setOdds(null); setActiveBookie(null); })
+          );
         }
+
+        await Promise.all(secondaryFetches);
       } catch (err) {
         console.error('[MatchDetail] Error:', err);
       } finally {

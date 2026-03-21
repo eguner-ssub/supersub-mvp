@@ -10,6 +10,7 @@ export const GameProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [statDictionary, setStatDictionary] = useState(null);
   const activeRequestId = useRef(0);
+  const realtimeChannelRef = useRef(null);
 
   const loadProfile = async (session) => {
     if (!session?.user) {
@@ -288,12 +289,10 @@ export const GameProvider = ({ children }) => {
   useEffect(() => {
     if (!userProfile?.id) return;
 
-    const channelRef = { current: null };
-
     const cleanupChannel = async () => {
-      if (channelRef.current) {
-        const old = channelRef.current;
-        channelRef.current = null;
+      if (realtimeChannelRef.current) {
+        const old = realtimeChannelRef.current;
+        realtimeChannelRef.current = null;
         await supabase.removeChannel(old);
       }
     };
@@ -336,14 +335,14 @@ export const GameProvider = ({ children }) => {
           console.log(`📡 [Realtime] user-data channel: ${status}`);
         });
 
-      channelRef.current = channel;
+      realtimeChannelRef.current = channel;
     };
 
     initRealtime();
 
     return () => {
       setTimeout(() => {
-        if (channelRef.current) supabase.removeChannel(channelRef.current);
+        if (realtimeChannelRef.current) supabase.removeChannel(realtimeChannelRef.current);
       }, 100);
     };
   }, [userProfile?.id]);
