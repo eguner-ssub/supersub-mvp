@@ -104,7 +104,8 @@ export default function Dashboard() {
       setBagStage('rewards');
 
       if (randomCards.length > 0) {
-        updateInventory(randomCards);
+        // updateInventory expects string card IDs, not card objects
+        updateInventory(randomCards.map(c => c.type || c.id));
       }
     }, 1500);
   };
