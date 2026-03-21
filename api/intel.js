@@ -98,8 +98,22 @@ async function buildLiveInsights(supabase, match) {
   const benchPotential = [homeThreat, awayThreat].filter(Boolean).join(' ') ||
     'No notable supersub threats on either bench this season.';
 
-  // Load coach patterns for sub timing analysis
-  const coachIds = [match.home_coach_id, match.away_coach_id].filter(Boolean);
+  // Resolve coach IDs — use match columns if set, otherwise look up from coaches table
+  let homeCoachId = match.home_coach_id;
+  let awayCoachId = match.away_coach_id;
+  if (!homeCoachId || !awayCoachId) {
+    const { data: coachRows } = await supabase
+      .from('coaches')
+      .select('id, current_team_id')
+      .in('current_team_id', [homeId, awayId]);
+    for (const c of coachRows || []) {
+      if (!homeCoachId && c.current_team_id === homeId) homeCoachId = c.id;
+      if (!awayCoachId && c.current_team_id === awayId) awayCoachId = c.id;
+    }
+  }
+
+  // Load coach substitution patterns
+  const coachIds = [homeCoachId, awayCoachId].filter(Boolean);
   const { data: coachPatterns } = coachIds.length > 0
     ? await supabase
         .from('coach_substitution_patterns')
@@ -108,21 +122,20 @@ async function buildLiveInsights(supabase, match) {
     : { data: [] };
 
   const patternByCoach = Object.fromEntries((coachPatterns || []).map(c => [c.coach_id, c]));
-  const homePattern = match.home_coach_id ? patternByCoach[match.home_coach_id] : null;
-  const awayPattern = match.away_coach_id ? patternByCoach[match.away_coach_id] : null;
+  const homePattern = homeCoachId ? patternByCoach[homeCoachId] : null;
+  const awayPattern = awayCoachId ? patternByCoach[awayCoachId] : null;
 
   const buildSubLine = (teamName, subEvents, firstSubMinute, pattern) => {
     const used = subEvents.length;
-    if (used === 0 && pattern?.avg_first_sub_minute) {
-      return `${teamName} yet to make a change — manager typically acts around the ${Math.round(pattern.avg_first_sub_minute)}' mark.`;
+    if (used === 0) {
+      return pattern?.avg_first_sub_minute
+        ? `${teamName} yet to make a change — manager typically acts around the ${Math.round(pattern.avg_first_sub_minute)}' mark.`
+        : `${teamName} yet to make a change.`;
     }
-    if (used > 0 && firstSubMinute !== null) {
-      const vsAvg = pattern?.avg_first_sub_minute
-        ? ` (avg ${Math.round(pattern.avg_first_sub_minute)}' historically)`
-        : '';
-      return `${teamName} made first sub at ${firstSubMinute}'${vsAvg}. ${used} change${used > 1 ? 's' : ''} used.`;
-    }
-    return null;
+    const vsAvg = pattern?.avg_first_sub_minute
+      ? ` (avg ${Math.round(pattern.avg_first_sub_minute)}' historically)`
+      : '';
+    return `${teamName} made first sub at ${firstSubMinute}'${vsAvg}. ${used} change${used > 1 ? 's' : ''} used.`;
   };
 
   const homeLine = buildSubLine(homeTeam, homeSubEvents, homeFirstSubMinute, homePattern);
