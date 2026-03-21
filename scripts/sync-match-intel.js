@@ -246,8 +246,15 @@ export async function syncMatchIntel(supabaseOverride) {
   return success;
 }
 
-// Run if called directly
-syncMatchIntel().catch(err => {
-  console.error(`${PREFIX} Fatal:`, err);
-  process.exit(1);
-});
+// Run if called directly (not when imported by cron handler)
+const isMain = process.argv[1]?.endsWith('sync-match-intel.js');
+if (isMain) {
+  // Load dotenv only for standalone CLI runs
+  const { default: dotenv } = await import('dotenv');
+  dotenv.config();
+
+  syncMatchIntel().catch(err => {
+    console.error(`${PREFIX} Fatal:`, err);
+    process.exit(1);
+  });
+}
