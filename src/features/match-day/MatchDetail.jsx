@@ -643,6 +643,7 @@ const MatchDetail = () => {
   const [activeTab, setActiveTab] = useState('LINEUP');
   const [selectedScorerTeam, setSelectedScorerTeam] = useState('home');
   const [analysisData, setAnalysisData] = useState(null);
+  const [liveInsights, setLiveInsights] = useState(null);
 
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result' },
@@ -671,8 +672,9 @@ const MatchDetail = () => {
         const phase = IN_PLAY.includes(status) ? 'LIVE' : (FINISHED.includes(status) ? 'POST' : 'PRE');
         setMatchPhase(phase);
 
+        const fixtureId = matchInfo.fixture?.id || matchInfo.id;
+
         if (phase === 'PRE') {
-          const fixtureId = matchInfo.fixture?.id || matchInfo.id;
           try {
             const intelRes = await fetch(`/api/intel?match_id=${fixtureId}`);
             if (intelRes.ok) {
@@ -681,6 +683,18 @@ const MatchDetail = () => {
             }
           } catch (intelErr) {
             console.warn('[MatchDetail] Intel fetch error:', intelErr);
+          }
+        }
+
+        if (phase === 'LIVE') {
+          try {
+            const insightsRes = await fetch(`/api/intel?match_id=${fixtureId}&phase=live`);
+            if (insightsRes.ok) {
+              const insightsData = await insightsRes.json();
+              if (insightsData.available) setLiveInsights(insightsData);
+            }
+          } catch (insightsErr) {
+            console.warn('[MatchDetail] Live insights fetch error:', insightsErr);
           }
         }
 
@@ -1133,7 +1147,7 @@ const MatchDetail = () => {
 
       {viewState === 'LIVE' && (
         <LiveSupersubPanel
-          insights={LIVE_INSIGHTS_MOCK}
+          insights={liveInsights || LIVE_INSIGHTS_MOCK}
           onUseSupersubCard={() => {
             setActiveTab('SUBS');
             const homeId = match?.teams?.home?.id;
