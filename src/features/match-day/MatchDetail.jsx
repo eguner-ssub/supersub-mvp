@@ -273,8 +273,18 @@ const LiveSupersubPanel = ({ insights, onUseSupersubCard, supersubCount }) => {
    ───────────────────────────────────────────────────────────── */
 const SM_BENCH_TYPE_ID = 12;
 
-const SubstitutesTab = ({ match, onStageSupersub }) => {
+const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersubCount }) => {
   const allLineups = Array.isArray(match?.lineups) ? match.lineups : [];
+  const events     = Array.isArray(match?.events)  ? match.events  : [];
+
+  // Players who have already been subbed ON (incoming player = assist.id or player_id on sub event)
+  const subbedOnIds = new Set(
+    events
+      .filter(e => e.type_id === 18 || e.type === 'subst')
+      .map(e => e.assist?.id ?? e.player_id)
+      .filter(Boolean)
+      .map(Number)
+  );
 
   // Coerce to string to defeat JSON serialization type mismatches
   const benchPlayers = allLineups.filter((p) => String(p.type_id) === String(SM_BENCH_TYPE_ID));
@@ -282,12 +292,13 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
   if (benchPlayers.length === 0)
     return <p className="text-center text-white/30 text-xs uppercase tracking-widest py-12">No substitute data available</p>;
 
-  // Pure Sportmonks Reality: Trust the match payload, but force string matching
   const homeId = String(match?.teams?.home?.id);
   const awayId = String(match?.teams?.away?.id);
 
   const homeBench = benchPlayers.filter(p => String(p.team_id) === homeId);
   const awayBench = benchPlayers.filter(p => String(p.team_id) === awayId);
+
+  const hasCards = supersubCount > 0;
 
   const renderBench = (side, teamId, teamName, teamLogo, players) => {
     if (!players || players.length === 0) return null;
@@ -302,38 +313,38 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
           </span>
         </div>
 
-        {/* Supersub CTA */}
+        {/* Bench supersub CTA (whole team) */}
         <button
           onClick={() => onStageSupersub && onStageSupersub(side, teamId, teamName)}
+          disabled={!hasCards}
           style={{
             width: '100%',
             padding: '10px 16px',
             marginBottom: '14px',
-            background: 'rgba(0,0,0,0.80)',
-            border: '1.5px solid #00e5ff',
+            background: hasCards ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.04)',
+            border: `1.5px solid ${hasCards ? '#00e5ff' : 'rgba(255,255,255,0.1)'}`,
             borderRadius: '12px',
-            color: '#00e5ff',
+            color: hasCards ? '#00e5ff' : 'rgba(255,255,255,0.2)',
             fontFamily: "'Montserrat', sans-serif",
             fontWeight: 800,
             fontSize: '12px',
             textTransform: 'uppercase',
             letterSpacing: '1.5px',
-            cursor: 'pointer',
+            cursor: hasCards ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s',
-            boxShadow: '0 0 10px rgba(0,229,255,0.15)',
+            boxShadow: hasCards ? '0 0 10px rgba(0,229,255,0.15)' : 'none',
           }}
-          onMouseEnter={(e) => { e.target.style.background = 'rgba(0,229,255,0.12)'; e.target.style.boxShadow = '0 0 20px rgba(0,229,255,0.3)'; }}
-          onMouseLeave={(e) => { e.target.style.background = 'rgba(0,0,0,0.80)'; e.target.style.boxShadow = '0 0 10px rgba(0,229,255,0.15)'; }}
         >
-          ⚡ Use Supersub Card
+          ⚡ Any Sub to Score — 500 pts
         </button>
 
-        {/* Bench list */}
+        {/* Bench list with per-player supersub button */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {players.map((entry, i) => {
             const playerName = entry.player_name || entry.player?.display_name || entry.player?.name || 'Unknown';
-            const jerseyNum = entry.jersey_number ?? '-';
-            const playerId = entry.player_id || entry.player?.id || i;
+            const jerseyNum  = entry.jersey_number ?? '-';
+            const playerId   = entry.player_id || entry.player?.id || i;
+            const alreadyOn  = subbedOnIds.has(Number(playerId));
 
             return (
               <div
@@ -342,9 +353,10 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '8px 10px',
-                  background: 'rgba(255,255,255,0.03)',
+                  background: alreadyOn ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
                   borderRadius: '10px',
-                  border: '1px solid rgba(255,255,255,0.05)',
+                  border: `1px solid ${alreadyOn ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.05)'}`,
+                  opacity: alreadyOn ? 0.4 : 1,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
@@ -354,21 +366,44 @@ const SubstitutesTab = ({ match, onStageSupersub }) => {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0,
                   }}>
-                    <span style={{
-                      fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-                      fontSize: '10px', color: 'rgba(255,255,255,0.6)',
-                    }}>
+                    <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>
                       {jerseyNum}
                     </span>
                   </div>
                   <span style={{
                     fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-                    fontSize: '11px', color: '#FFFFFF',
+                    fontSize: '11px', color: alreadyOn ? 'rgba(255,255,255,0.4)' : '#FFFFFF',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
-                    {playerName}
+                    {playerName}{alreadyOn ? ' · On pitch' : ''}
                   </span>
                 </div>
+
+                {/* Per-player supersub button — only for players still on bench */}
+                {!alreadyOn && (
+                  <button
+                    onClick={() => onStagePlayerSupersub && onStagePlayerSupersub(playerId, playerName, teamId, side)}
+                    disabled={!hasCards}
+                    style={{
+                      flexShrink: 0,
+                      marginLeft: '8px',
+                      padding: '5px 10px',
+                      background: hasCards ? 'rgba(0,229,255,0.08)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${hasCards ? 'rgba(0,229,255,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                      borderRadius: '8px',
+                      color: hasCards ? '#00e5ff' : 'rgba(255,255,255,0.2)',
+                      fontFamily: "'Montserrat', sans-serif",
+                      fontWeight: 800,
+                      fontSize: '9px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      cursor: hasCards ? 'pointer' : 'not-allowed',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ⚡ Supersub
+                  </button>
+                )}
               </div>
             );
           })}
@@ -681,7 +716,7 @@ const StatsTab = ({ match }) => {
 const MatchDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { userProfile, loading: gameLoading, placeBet, consumeCard } = useGame();
+  const { userProfile, loading: gameLoading, placeBet, consumeCard, supabase } = useGame();
 
   const [match, setMatch] = useState(null);
   const [odds, setOdds] = useState(null);
@@ -835,27 +870,48 @@ const MatchDetail = () => {
     }
   };
 
+  const handleStagePlayerSupersub = (playerId, playerName, teamId, side) => {
+    const count = getCardCount('c_supersub');
+    if (count > 0) {
+      setSelectedCard('c_supersub');
+      setStagedBet({
+        card: 'c_supersub',
+        selection: side,
+        teamId,
+        playerId: Number(playerId),
+        playerName,
+        displayLabel: `${playerName} to Score as Sub`,
+        odds: 0,
+        reward: 2500,
+      });
+      setFlowState('staging');
+    }
+  };
+
   // Reset scorer team tab when card selection changes
   useEffect(() => { setSelectedScorerTeam('home'); }, [selectedCard]);
 
   // ── Derived view state ────────────────────────────────────────
   const lineupsAnnounced = match?.lineups && Array.isArray(match.lineups) && match.lineups.length > 0;
-  // ── Live polling: refresh match data every 60s while LIVE ─────────────
+  // ── Realtime: subscribe to match row updates while LIVE ───────────────
   useEffect(() => {
-    if (matchPhase !== 'LIVE' || !id) return;
-    const poll = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/matches?id=${id}`);
-        const data = await res.json();
-        if (data.response?.length) {
-          setMatch(normalizeMatch(data.response[0]));
+    if (matchPhase !== 'LIVE' || !id || !supabase) return;
+
+    const channel = supabase
+      .channel(`match-live-${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'matches', filter: `id=eq.${id}` },
+        (payload) => {
+          if (payload.new) setMatch(prev => normalizeMatch({ ...prev, ...payload.new }));
         }
-      } catch (e) {
-        console.warn('[MatchDetail] Live poll error:', e);
-      }
-    }, 60_000);
-    return () => clearInterval(poll);
-  }, [matchPhase, id]);
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.log(`📡 [MatchDetail] Live channel connected: match-live-${id}`);
+      });
+
+    return () => { supabase.removeChannel(channel); };
+  }, [matchPhase, id, supabase]);
 
   const viewState = matchPhase === 'PRE'
     ? (lineupsAnnounced ? 'PRE_LINEUPS' : 'PRE_NO_LINEUPS')
