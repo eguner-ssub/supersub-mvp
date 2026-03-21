@@ -324,26 +324,6 @@ const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP' 
 
     return (
         <div style={{ padding: '0 12px', marginBottom: '16px' }}>
-            {/* ── STATUS BADGE — Electric Cyan on Ink-Black when confirmed ── */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-                <span
-                    style={{
-                        fontFamily: "'Montserrat', sans-serif",
-                        fontWeight: 700,
-                        fontSize: '9px',
-                        letterSpacing: '1.5px',
-                        textTransform: 'uppercase',
-                        padding: '4px 14px',
-                        borderRadius: '20px',
-                        color: lineupStatus === 'confirmed' ? '#00e5ff' : '#f59e0b',
-                        background: lineupStatus === 'confirmed' ? 'rgba(18,18,18,0.9)' : 'rgba(245,158,11,0.1)',
-                        border: `1px solid ${lineupStatus === 'confirmed' ? 'rgba(0,229,255,0.3)' : 'rgba(245,158,11,0.25)'}`,
-                    }}
-                >
-                    {lineupStatus === 'confirmed' ? '● Confirmed Lineup' : '◐ Probable Lineup'}
-                </span>
-            </div>
-
             {/* ── PITCH ── */}
             <div style={pitchContainerStyle}>
                 {/* Paper grain overlay */}

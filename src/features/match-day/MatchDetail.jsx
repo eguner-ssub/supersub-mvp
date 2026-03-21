@@ -893,6 +893,9 @@ const MatchDetail = () => {
 
   // ── Derived view state ────────────────────────────────────────
   const lineupsAnnounced = match?.lineups && Array.isArray(match.lineups) && match.lineups.length > 0;
+  const hasAnyCard = cardTypes.some(c => getCardCount(c.id) > 0);
+  const shelfVisible = (viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS') && hasAnyCard;
+  const contentBottom = viewState === 'LIVE' ? '140px' : shelfVisible ? '256px' : '0px';
   // ── Realtime: subscribe to match row updates while LIVE ───────────────
   useEffect(() => {
     if (matchPhase !== 'LIVE' || !id || !supabase) return;
@@ -1068,7 +1071,7 @@ const MatchDetail = () => {
           className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
           style={{
             top: '132px',
-            bottom: '256px',
+            bottom: contentBottom,
             WebkitOverflowScrolling: 'touch',
           }}
         >
@@ -1095,7 +1098,7 @@ const MatchDetail = () => {
           className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
           style={{
             top: '172px',
-            bottom: viewState === 'LIVE' ? '140px' : '256px',
+            bottom: contentBottom,
             WebkitOverflowScrolling: 'touch',
           }}
         >
@@ -1219,7 +1222,7 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {(viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS') && (
+      {shelfVisible && (
         <div data-testid="card-shelf" className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
           <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
           <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 pointer-events-auto">

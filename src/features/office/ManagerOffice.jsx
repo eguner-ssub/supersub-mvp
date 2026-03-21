@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
@@ -6,7 +6,7 @@ import { normalizeMatch } from '../../shared/utils/normalizeMatch';
 
 const ManagerOffice = () => {
     const navigate = useNavigate();
-    const { userProfile } = useGame();
+    useGame();
 
     const [anyLiveMatches, setAnyLiveMatches] = useState(false);
     // Separate loaded state for each image to enable crossfade

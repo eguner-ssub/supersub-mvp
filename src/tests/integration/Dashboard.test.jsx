@@ -52,29 +52,9 @@ describe('Dashboard', () => {
     mockUseGame.mockReturnValue(defaultGame);
   });
 
-  // --------------------------------------------------------------------------
-  // HUD
-  // --------------------------------------------------------------------------
-
-  it('renders energy and points in the HUD', () => {
-    render(<Dashboard />);
-    expect(screen.getByText('3/5')).toBeInTheDocument();
-    expect(screen.getByText('1000')).toBeInTheDocument();
-  });
-
-  it('renders club name from userProfile.club_name', () => {
-    render(<Dashboard />);
-    expect(screen.getByText("Eren's FC")).toBeInTheDocument();
-  });
-
-  it('falls back to "Manager" when club_name is absent', () => {
-    mockUseGame.mockReturnValue({
-      ...defaultGame,
-      userProfile: { ...defaultProfile, club_name: null, name: null },
-    });
-    render(<Dashboard />);
-    expect(screen.getByText('Manager')).toBeInTheDocument();
-  });
+  // NOTE: HUD (energy, points, club name) and settings sheet tests
+  // live in GameHeader.test.jsx — GameHeader is mounted by NavigationShell,
+  // not directly by Dashboard.
 
   // --------------------------------------------------------------------------
   // HOTSPOT NAVIGATION
@@ -141,36 +121,7 @@ describe('Dashboard', () => {
     expect(screen.getByText('Max Energy Full')).toBeDisabled();
   });
 
-  // --------------------------------------------------------------------------
-  // SETTINGS SHEET
-  // --------------------------------------------------------------------------
-
-  it('tapping club name opens the settings sheet', () => {
-    render(<Dashboard />);
-    fireEvent.click(screen.getByRole('button', { name: "Eren's FC" }));
-    // Text is "Manager Profile" — Tailwind uppercase is visual only, not in DOM
-    expect(screen.getByText('Manager Profile')).toBeInTheDocument();
-    // Email appears in both the profile card and account row
-    expect(screen.getAllByText('test@erentest.com').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Active')).toBeInTheDocument();
-  });
-
-  it('tapping the backdrop closes the settings sheet', () => {
-    render(<Dashboard />);
-    fireEvent.click(screen.getByRole('button', { name: "Eren's FC" }));
-    expect(screen.getByText('Manager Profile')).toBeInTheDocument();
-    // Click the backdrop (the outermost fixed overlay div, not the sheet)
-    const backdrop = document.querySelector('.fixed.inset-0');
-    fireEvent.click(backdrop);
-    expect(screen.queryByText('Manager Profile')).not.toBeInTheDocument();
-  });
-
-  it('Log Out button calls supabase.auth.signOut', async () => {
-    render(<Dashboard />);
-    fireEvent.click(screen.getByRole('button', { name: "Eren's FC" }));
-    fireEvent.click(screen.getByText('Log Out'));
-    await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
-  });
+  // NOTE: Settings sheet tests live in GameHeader.test.jsx
 
   // --------------------------------------------------------------------------
   // LOADING STATE

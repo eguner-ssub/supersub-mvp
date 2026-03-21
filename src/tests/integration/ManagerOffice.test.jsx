@@ -112,28 +112,10 @@ describe('ManagerOffice Simulation Drill', () => {
 
     // ============================================================================
     // SCENARIO C: User Profile Display
+    // NOTE: Energy, points and club name are now rendered by GameHeader
+    // (mounted via NavigationShell), not ManagerOffice itself.
+    // See GameHeader.test.jsx for those assertions.
     // ============================================================================
-    it('displays user profile data correctly', () => {
-        mockUseGame.mockReturnValue({
-            userProfile: {
-                energy: 2,
-                max_energy: 5,
-                points: 1500,
-                club_name: 'Arsenal FC'
-            },
-        });
-
-        render(<ManagerOffice />);
-
-        // Check Energy Display
-        expect(screen.getByText('2/5')).toBeInTheDocument();
-
-        // Check Coins Display
-        expect(screen.getByText('1500')).toBeInTheDocument();
-
-        // Check Club Name
-        expect(screen.getByText('Arsenal FC')).toBeInTheDocument();
-    });
 
     // ============================================================================
     // SCENARIO D: Live Match State Logic (Future Enhancement)
