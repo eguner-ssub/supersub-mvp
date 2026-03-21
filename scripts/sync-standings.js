@@ -106,7 +106,9 @@ async function syncStandings(db, smSeasonId, seasonUuid, teamCache) {
       goals_for: stat(133),
       goals_against: stat(134),
       points: entry.points ?? stat(187),
-      form: null,
+      form: Array.isArray(entry.form)
+        ? entry.form.map(f => (f.result || '').toUpperCase()[0]).filter(Boolean).join('')
+        : null,
       updated_at: new Date().toISOString(),
     });
   }

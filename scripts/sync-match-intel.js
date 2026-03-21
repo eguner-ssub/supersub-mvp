@@ -7,13 +7,13 @@
 // merges with internal bench/coach analytics, generates editorial prose,
 // and upserts to match_intel table.
 
-import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 import { processMatchIntel } from '../lib/intel/processor.js';
 import { INTEL_CONFIG } from '../config/intel.js';
 
 const PREFIX = '[sync-match-intel]';
 const { SYNC_DAYS_AHEAD, MIN_DAYS_BEFORE_KICKOFF, STALE_AFTER_HOURS } = INTEL_CONFIG;
+const MAX_PER_RUN = 8; // Prevent Vercel 10s function timeout
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
 const RATE_LIMIT_MS = 1100;
@@ -110,6 +110,18 @@ async function loadInternalData(supabase, match, seasonId) {
     coach_name: awayCoach.data.coaches?.common_name || awayCoach.data.coaches?.name,
   } : null;
 
+  // Standings (for Form Guide)
+  const [homeStandings, awayStandings] = await Promise.all([
+    supabase.from('standings')
+      .select('position, played, won, drawn, lost, points, form')
+      .eq('team_id', match.home_team_id)
+      .eq('season_id', seasonId).single(),
+    supabase.from('standings')
+      .select('position, played, won, drawn, lost, points, form')
+      .eq('team_id', match.away_team_id)
+      .eq('season_id', seasonId).single(),
+  ]);
+
   // Flatten supersub data with player name
   const flattenSubs = (rows) => (rows || []).map(s => ({
     ...s,
@@ -123,6 +135,8 @@ async function loadInternalData(supabase, match, seasonId) {
     awayCoachPatterns: awayCoachData,
     homeTopSupersubs: flattenSubs(homeSupersubs.data),
     awayTopSupersubs: flattenSubs(awaySupersubs.data),
+    homeStandings: homeStandings.data,
+    awayStandings: awayStandings.data,
   };
 }
 
@@ -165,8 +179,9 @@ export async function syncMatchIntel(supabaseOverride) {
       .map(i => i.match_id)
   );
 
-  const staleMatches = matches.filter(m => !freshSet.has(m.id));
-  console.log(`${PREFIX} ${matches.length} matches in window, ${staleMatches.length} need refresh`);
+  const allStale = matches.filter(m => !freshSet.has(m.id));
+  const staleMatches = allStale.slice(0, MAX_PER_RUN);
+  console.log(`${PREFIX} ${matches.length} matches in window, ${allStale.length} need refresh (processing ${staleMatches.length})`);
 
   let success = 0;
   let failed = 0;
@@ -185,6 +200,8 @@ export async function syncMatchIntel(supabaseOverride) {
         ...internalData,
         homeTeam: match.home_team,
         awayTeam: match.away_team,
+        homeStandings: internalData.homeStandings,
+        awayStandings: internalData.awayStandings,
       });
 
       // Upsert to match_intel

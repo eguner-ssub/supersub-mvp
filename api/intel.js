@@ -1,6 +1,33 @@
 import { createClient } from '@supabase/supabase-js';
 import { INTEL_CONFIG } from '../config/intel.js';
 
+function toFrontendFormat(prose) {
+  const p = prose || {};
+  return {
+    greeting: p.summary
+      ? `Hi Boss. ${p.summary}`
+      : `Hi Boss. I've been studying the opposition. Here's what I've found.`,
+    sections: [
+      {
+        title: 'Form Guide',
+        content: p.formGuide || 'Form data unavailable for this match.',
+      },
+      {
+        title: 'Key Matchup',
+        content: [p.commandOfPitch, p.managerTendencies].filter(Boolean).join(' ') || 'Match prediction data unavailable.',
+      },
+      {
+        title: 'Goals Market',
+        content: [p.totalGoalOutlook, p.defensiveDiscipline, p.attackingFirepower].filter(Boolean).join(' ') || 'Goals market data unavailable.',
+      },
+      {
+        title: 'Prediction',
+        content: [p.scoreboardForecast, p.benchWatch].filter(Boolean).join(' ') || 'Prediction unavailable.',
+      },
+    ],
+  };
+}
+
 // ── Lazy Supabase client ──────────────────────────────────────────────────────
 let _client = null;
 
@@ -74,14 +101,16 @@ export default async function handler(req, res) {
 
     if (intelError || !intel) {
       // No intel generated yet — return fallback
+      const fallbackProse = {
+        summary: 'Detailed predictions unavailable for this match. Check back closer to kickoff for lineup-based analysis.',
+      };
       return res.json({
         available: true,
         sportmonksAvailable: false,
         sections: {},
-        prose: {
-          summary: 'Detailed predictions unavailable for this match. Check back closer to kickoff for lineup-based analysis.',
-        },
+        prose: fallbackProse,
         proseMethod: 'fallback',
+        analysis: toFrontendFormat(fallbackProse),
         match: {
           id: match.id,
           homeTeam: match.home_team,
@@ -109,6 +138,7 @@ export default async function handler(req, res) {
       prose: intel.prose,
       generatedAt: intel.generated_at,
       proseMethod: intel.prose_method,
+      analysis: toFrontendFormat(intel.prose),
     });
   } catch (err) {
     console.error('[api/intel] Error:', err.message);

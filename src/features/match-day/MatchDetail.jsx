@@ -642,6 +642,7 @@ const MatchDetail = () => {
   const [stagedBet, setStagedBet] = useState(null);
   const [activeTab, setActiveTab] = useState('LINEUP');
   const [selectedScorerTeam, setSelectedScorerTeam] = useState('home');
+  const [analysisData, setAnalysisData] = useState(null);
 
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result' },
@@ -669,6 +670,19 @@ const MatchDetail = () => {
         const FINISHED = ['FT', 'AET', 'FT_PEN', 'POSTPONED', 'CANCELLED', 'ABANDONED', 'AWARDED', 'WO', 'DELETED'];
         const phase = IN_PLAY.includes(status) ? 'LIVE' : (FINISHED.includes(status) ? 'POST' : 'PRE');
         setMatchPhase(phase);
+
+        if (phase === 'PRE') {
+          const fixtureId = matchInfo.fixture?.id || matchInfo.id;
+          try {
+            const intelRes = await fetch(`/api/intel?match_id=${fixtureId}`);
+            if (intelRes.ok) {
+              const intelData = await intelRes.json();
+              if (intelData.analysis) setAnalysisData(intelData.analysis);
+            }
+          } catch (intelErr) {
+            console.warn('[MatchDetail] Intel fetch error:', intelErr);
+          }
+        }
 
         if (phase !== 'POST') {
           const fixtureId = matchInfo.fixture?.id || matchInfo.id;
@@ -936,7 +950,7 @@ const MatchDetail = () => {
               minHeight: '100%',
             }}
           >
-            <PrematchAnalysis data={PREMATCH_ANALYSIS_MOCK} />
+            <PrematchAnalysis data={analysisData || PREMATCH_ANALYSIS_MOCK} />
           </div>
         </div>
       )}
