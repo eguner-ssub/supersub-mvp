@@ -33,8 +33,10 @@ import LeagueHub from './features/league-hub/LeagueHub';
 import ViewLedger from './features/locker-room/ViewLedger';
 import APIDebugger from './features/debug/APIDebugger';
 
+// Pages - Eager Loading (Dashboard must not be lazy — chunk 404 on production)
+import Dashboard from './pages/Dashboard';
+
 // Pages - Lazy Loading
-const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ManagerOffice = lazy(() => import('./features/office/ManagerOffice'));
 
 // --- THE BOUNCER (Security Guard) ---

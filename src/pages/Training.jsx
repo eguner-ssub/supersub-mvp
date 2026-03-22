@@ -99,9 +99,9 @@ const Training = () => {
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (score >= 3 && wonCard) {
-      updateInventory([wonCard.id]);
+      await updateInventory([wonCard.id]);
     }
     try { spendEnergy(1); } catch (e) { console.error('Energy spend failed', e); }
     navigate('/dashboard');

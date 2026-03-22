@@ -64,9 +64,14 @@ const Signup = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6 flex flex-col justify-center relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 blur-[120px] rounded-full"></div>
-      
+    <div className="min-h-screen text-white p-6 flex flex-col justify-center relative overflow-hidden bg-black">
+      <img
+        src="/assets/bg-stadium.webp"
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover opacity-40"
+      />
+      <div className="absolute inset-0 bg-black/50" />
+
       <div className="max-w-md w-full mx-auto space-y-8 relative z-10">
         <Link to="/" className="text-gray-500 hover:text-white flex items-center gap-2 mb-4 transition-colors font-black text-[10px] uppercase tracking-[0.2em]">
           <ArrowLeft className="w-3 h-3" /> Back
@@ -80,7 +85,7 @@ const Signup = () => {
         <form onSubmit={handleSignup} className="space-y-6">
           <div className="space-y-4">
             <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Email Terminal</label>
+              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Email</label>
               <input
                 type="email"
                 required
@@ -92,7 +97,7 @@ const Signup = () => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Access Cipher</label>
+              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}

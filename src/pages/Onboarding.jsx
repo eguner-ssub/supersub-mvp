@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../shared/context/GameContext';
-import { ArrowRight, PenTool, CheckCircle, Coins, Zap, Layers } from 'lucide-react';
+import { ArrowRight, PenTool, CheckCircle, Star, Zap } from 'lucide-react';
 import MobileLayout from '../shared/ui/MobileLayout';
 
 const Onboarding = () => {
@@ -78,10 +78,10 @@ const Onboarding = () => {
 
               <div className="space-y-5 text-sm font-serif leading-relaxed text-justify mb-8 text-gray-800">
                 <p>
-                  <strong>1. LIABILITY:</strong> By executing this agreement, the undersigned Manager accepts full accountability for tactical operations, squad morale, and economic stability.
+                  <strong>1. LIABILITY:</strong> Your goal is to win as more Points as possible by using your prediction cards in real matches. You will have Match Result, Total Goals, Player to Score and Supersub cards at your disposal.
                 </p>
                 <p>
-                  <strong>2. COMPENSATION:</strong> Upon signature, the Club shall release a starting capital of <span className="font-bold border-b border-gray-800">500 Coins</span> and standard tactical provisions.
+                  <strong>2. COMPENSATION:</strong> By winning points, you can compete in the Leaderboards. To win more cards, don't forget to attend training. You will also receive a surprise card from your training bag every day.
                 </p>
               </div>
 
@@ -95,7 +95,7 @@ const Onboarding = () => {
                     value={managerName}
                     onChange={(e) => setManagerName(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSignContract()}
-                    placeholder="ENTER SURNAME"
+                    placeholder="TEAM NAME"
                     className="w-full px-4 py-4 bg-[#e8e4dc] border-2 border-gray-300 rounded-lg text-gray-900 font-serif font-bold text-2xl text-center uppercase tracking-widest focus:outline-none focus:border-gray-900 focus:bg-white transition-all placeholder:text-gray-300"
                     autoFocus
                   />
@@ -147,29 +147,21 @@ const Onboarding = () => {
 
                 <div className="bg-black/40 rounded-xl p-5 mb-8 border border-white/5 space-y-4 shadow-inner">
                   <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.3em] text-center mb-2">Signing Bonus Issued</p>
-                  
-                  <div className="flex items-center justify-between p-2 border-b border-white/5">
-                    <div className="flex items-center gap-3">
-                      <Coins className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                      <span className="text-gray-300 font-bold uppercase text-sm tracking-wider">Capital</span>
-                    </div>
-                    <span className="text-yellow-400 font-mono font-bold text-lg drop-shadow-md">+500</span>
-                  </div>
 
                   <div className="flex items-center justify-between p-2 border-b border-white/5">
                     <div className="flex items-center gap-3">
-                      <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
-                      <span className="text-gray-300 font-bold uppercase text-sm tracking-wider">Energy</span>
+                      <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                      <span className="text-gray-300 font-bold uppercase text-sm tracking-wider">Starting Points</span>
                     </div>
-                    <span className="text-blue-400 font-mono font-bold text-lg drop-shadow-md">+3</span>
+                    <span className="text-yellow-400 font-mono font-bold text-lg drop-shadow-md">2500</span>
                   </div>
 
                   <div className="flex items-center justify-between p-2">
                     <div className="flex items-center gap-3">
-                      <Layers className="w-5 h-5 text-purple-400" />
-                      <span className="text-gray-300 font-bold uppercase text-sm tracking-wider">Scouts</span>
+                      <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
+                      <span className="text-gray-300 font-bold uppercase text-sm tracking-wider">Energy</span>
                     </div>
-                    <span className="text-purple-400 font-mono font-bold text-lg drop-shadow-md">+3</span>
+                    <span className="text-blue-400 font-mono font-bold text-lg drop-shadow-md">+5</span>
                   </div>
                 </div>
 
