@@ -114,22 +114,19 @@ export default function Dashboard() {
 
   return (
     <div className="w-full h-[100dvh] bg-black flex items-center justify-center overflow-hidden font-sans select-none">
+
+      {/* ============================================================ */}
+      {/* LAYER 0: THE ROOM (Background) — fills full viewport          */}
+      {/* Lives outside the aspect-ratio div to avoid hairline artefacts*/}
+      {/* ============================================================ */}
+      <img
+        src="/assets/bg-dashboard.webp"
+        alt=""
+        onLoad={() => setImageLoaded(true)}
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+      />
+
       <div className="relative aspect-[9/16] h-full max-h-[100dvh] w-auto overflow-hidden">
-
-        {/* ============================================================ */}
-        {/* LAYER 0: THE ROOM (Background)                               */}
-        {/* ============================================================ */}
-
-        {/* Placeholder while image loads */}
-        <div className={`absolute inset-0 bg-gray-900 transition-opacity duration-1000 ${imageLoaded ? 'opacity-0' : 'opacity-100'}`} />
-
-        <img
-          src="/assets/bg-dashboard.webp"
-          alt="Dashboard"
-          onLoad={() => setImageLoaded(true)}
-          className={`absolute inset-0 w-full h-full object-fill transition-opacity duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-        />
-
 
         {/* ============================================================ */}
         {/* LAYER 1: INTERACTIVE HOTSPOTS                                */}

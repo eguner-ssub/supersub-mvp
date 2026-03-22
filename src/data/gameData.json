@@ -135,17 +135,15 @@
       "correctIndex": 1
     },
     {
-      "qId": 103,
-      "category": "Tactics",
-      "difficulty": "Hard",
-      "text": "In a 'False 9' formation, which position drops deep into midfield?",
+      "text": "Which club won the first five European Cup titles consecutively from 1956 to 1960?",
       "options": [
-        "Center Back",
-        "Winger",
-        "Center Forward",
-        "Defensive Midfielder"
+        "Real Madrid",
+        "AC Milan",
+        "Benfica",
+        "Ajax"
       ],
-      "correctIndex": 2
+      "correctIndex": 0,
+      "qId": 103
     },
     {
       "qId": 104,
@@ -187,17 +185,15 @@
       "correctIndex": 2
     },
     {
-      "qId": 107,
-      "category": "Tactics",
-      "difficulty": "Medium",
-      "text": "What is the primary goal of 'Gegenpressing'?",
+      "text": "The 1950 World Cup final (Maracanazo) saw which team suffer a shock home defeat to Uruguay?",
       "options": [
-        "Park the bus",
-        "Possess the ball",
-        "Win ball back immediately",
-        "Long balls"
+        "Argentina",
+        "Brazil",
+        "Spain",
+        "Italy"
       ],
-      "correctIndex": 2
+      "correctIndex": 1,
+      "qId": 107
     },
     {
       "qId": 108,
@@ -237,6 +233,996 @@
         "AC Milan"
       ],
       "correctIndex": 2
+    },
+    {
+      "text": "Who scored the winning goal for Manchester United in the 1999 Champions League final in the 93rd minute?",
+      "options": [
+        "Teddy Sheringham",
+        "David Beckham",
+        "Ole Gunnar Solskj\u00e6r",
+        "Ryan Giggs"
+      ],
+      "correctIndex": 2,
+      "qId": 111
+    },
+    {
+      "text": "Which country won the first ever UEFA European Championship in 1960?",
+      "options": [
+        "Soviet Union",
+        "Yugoslavia",
+        "France",
+        "West Germany"
+      ],
+      "correctIndex": 0,
+      "qId": 112
+    },
+    {
+      "text": "In what year was the English Premier League founded?",
+      "options": [
+        "1990",
+        "1992",
+        "1994",
+        "1995"
+      ],
+      "correctIndex": 1,
+      "qId": 113
+    },
+    {
+      "text": "Which team was the first British side to win the European Cup?",
+      "options": [
+        "Manchester United",
+        "Liverpool",
+        "Celtic",
+        "Nottingham Forest"
+      ],
+      "correctIndex": 2,
+      "qId": 114
+    },
+    {
+      "text": "Who was the manager of Inter Milan during their 2010 Treble-winning season?",
+      "options": [
+        "Pep Guardiola",
+        "Jos\u00e9 Mourinho",
+        "Carlo Ancelotti",
+        "Rafa Ben\u00edtez"
+      ],
+      "correctIndex": 1,
+      "qId": 115
+    },
+    {
+      "text": "Which stadium hosted the final of the 1966 FIFA World Cup?",
+      "options": [
+        "Old Trafford",
+        "Wembley",
+        "Anfield",
+        "Villa Park"
+      ],
+      "correctIndex": 1,
+      "qId": 116
+    },
+    {
+      "text": "In 1995, which player's court case revolutionized the transfer system via the 'Bosman Ruling'?",
+      "options": [
+        "Jean-Marc Bosman",
+        "Eric Cantona",
+        "Zinedine Zidane",
+        "Marco van Basten"
+      ],
+      "correctIndex": 0,
+      "qId": 117
+    },
+    {
+      "text": "Which country hosted the first FIFA World Cup in 1930?",
+      "options": [
+        "France",
+        "Uruguay",
+        "Brazil",
+        "USA"
+      ],
+      "correctIndex": 1,
+      "qId": 118
+    },
+    {
+      "text": "Which club is the oldest professional football club in the world (founded in 1862)?",
+      "options": [
+        "Sheffield FC",
+        "Notts County",
+        "Stoke City",
+        "Crystal Palace"
+      ],
+      "correctIndex": 1,
+      "qId": 119
+    },
+    {
+      "text": "Who scored the first ever goal in Premier League history for Sheffield United?",
+      "options": [
+        "Alan Shearer",
+        "Brian Deane",
+        "Teddy Sheringham",
+        "Les Ferdinand"
+      ],
+      "correctIndex": 1,
+      "qId": 120
+    },
+    {
+      "text": "The 'Hand of God' goal occurred in which World Cup tournament?",
+      "options": [
+        "1982",
+        "1986",
+        "1990",
+        "1994"
+      ],
+      "correctIndex": 1,
+      "qId": 121
+    },
+    {
+      "text": "Which nation won the UEFA Euro 1992 despite not initially qualifying?",
+      "options": [
+        "Denmark",
+        "Greece",
+        "Portugal",
+        "Sweden"
+      ],
+      "correctIndex": 0,
+      "qId": 122
+    },
+    {
+      "text": "In 2004, which manager led Porto to a shock Champions League title?",
+      "options": [
+        "Sir Alex Ferguson",
+        "Ars\u00e8ne Wenger",
+        "Jos\u00e9 Mourinho",
+        "Louis van Gaal"
+      ],
+      "correctIndex": 2,
+      "qId": 123
+    },
+    {
+      "text": "Which country was the first from Africa to compete in a World Cup finals (1934)?",
+      "options": [
+        "Morocco",
+        "Egypt",
+        "Cameroon",
+        "Nigeria"
+      ],
+      "correctIndex": 1,
+      "qId": 124
+    },
+    {
+      "text": "Who is the only manager to have won the World Cup three times?",
+      "options": [
+        "Mario Zagallo",
+        "Vittorio Pozzo",
+        "Franz Beckenbauer",
+        "Didier Deschamps"
+      ],
+      "correctIndex": 1,
+      "qId": 125
+    },
+    {
+      "text": "Which team won the inaugural FIFA Women's World Cup in 1991?",
+      "options": [
+        "USA",
+        "Norway",
+        "Germany",
+        "China"
+      ],
+      "correctIndex": 0,
+      "qId": 126
+    },
+    {
+      "text": "Which Eastern European club won the European Cup in 1986?",
+      "options": [
+        "Red Star Belgrade",
+        "Steaua Bucure\u0219ti",
+        "Dynamo Kyiv",
+        "Sparta Prague"
+      ],
+      "correctIndex": 1,
+      "qId": 127
+    },
+    {
+      "text": "Who was the first ever winner of the Ballon d'Or in 1956?",
+      "options": [
+        "Alfredo Di Stefano",
+        "Stanley Matthews",
+        "Raymond Kopa",
+        "Lev Yashin"
+      ],
+      "correctIndex": 1,
+      "qId": 128
+    },
+    {
+      "text": "What color was the Brazil national team kit before they switched to yellow after 1950?",
+      "options": [
+        "Blue",
+        "Green",
+        "White",
+        "Red"
+      ],
+      "correctIndex": 2,
+      "qId": 129
+    },
+    {
+      "text": "Which stadium is known as the 'Theatre of Dreams'?",
+      "options": [
+        "Anfield",
+        "Etihad",
+        "Old Trafford",
+        "Emirates"
+      ],
+      "correctIndex": 2,
+      "qId": 130
+    },
+    {
+      "text": "In which city was the first FIFA World Cup final played?",
+      "options": [
+        "Montevideo",
+        "Buenos Aires",
+        "Rio de Janeiro",
+        "Paris"
+      ],
+      "correctIndex": 0,
+      "qId": 131
+    },
+    {
+      "text": "Which country won the UEFA Euro 2004 in a massive underdog victory?",
+      "options": [
+        "Denmark",
+        "Greece",
+        "Portugal",
+        "Czech Republic"
+      ],
+      "correctIndex": 1,
+      "qId": 132
+    },
+    {
+      "text": "Who was the first black player to represent the England national team (1978)?",
+      "options": [
+        "John Barnes",
+        "Viv Anderson",
+        "Laurie Cunningham",
+        "Cyrille Regis"
+      ],
+      "correctIndex": 1,
+      "qId": 133
+    },
+    {
+      "text": "Who is the all-time leading goalscorer in Premier League history (260 goals)?",
+      "options": [
+        "Wayne Rooney",
+        "Harry Kane",
+        "Alan Shearer",
+        "Sergio Ag\u00fcero"
+      ],
+      "correctIndex": 2,
+      "qId": 134
+    },
+    {
+      "text": "Which player has the most appearances in Premier League history (653)?",
+      "options": [
+        "Ryan Giggs",
+        "Frank Lampard",
+        "Gareth Barry",
+        "James Milner"
+      ],
+      "correctIndex": 2,
+      "qId": 135
+    },
+    {
+      "text": "Who holds the record for the most clean sheets in Premier League history (202)?",
+      "options": [
+        "David de Gea",
+        "Petr \u010cech",
+        "Pepe Reina",
+        "David Seaman"
+      ],
+      "correctIndex": 1,
+      "qId": 136
+    },
+    {
+      "text": "Which player scored the fastest hat-trick in Premier League history (2m 56s)?",
+      "options": [
+        "Robbie Fowler",
+        "Sadio Man\u00e9",
+        "Gabriel Jesus",
+        "Sergio Ag\u00fcero"
+      ],
+      "correctIndex": 1,
+      "qId": 137
+    },
+    {
+      "text": "Which country has won the most FIFA World Cup titles?",
+      "options": [
+        "Germany",
+        "Italy",
+        "Argentina",
+        "Brazil"
+      ],
+      "correctIndex": 3,
+      "qId": 138
+    },
+    {
+      "text": "Who holds the record for the most goals in a single FIFA World Cup tournament (13)?",
+      "options": [
+        "Pel\u00e9",
+        "Gerd M\u00fcller",
+        "Just Fontaine",
+        "Miroslav Klose"
+      ],
+      "correctIndex": 2,
+      "qId": 139
+    },
+    {
+      "text": "Who is the all-time leading goalscorer in FIFA World Cup history (16 goals)?",
+      "options": [
+        "Ronaldo",
+        "Miroslav Klose",
+        "Pel\u00e9",
+        "Lionel Messi"
+      ],
+      "correctIndex": 1,
+      "qId": 140
+    },
+    {
+      "text": "Which club has won the most UEFA Champions League titles?",
+      "options": [
+        "AC Milan",
+        "Bayern Munich",
+        "Liverpool",
+        "Real Madrid"
+      ],
+      "correctIndex": 3,
+      "qId": 141
+    },
+    {
+      "text": "Who was the first goalkeeper to keep 200 clean sheets in the Premier League?",
+      "options": [
+        "Edwin van der Sar",
+        "Petr \u010cech",
+        "David James",
+        "Mark Schwarzer"
+      ],
+      "correctIndex": 1,
+      "qId": 142
+    },
+    {
+      "text": "Which player holds the record for the most Premier League assists (162)?",
+      "options": [
+        "Cesc F\u00e0bregas",
+        "Kevin De Bruyne",
+        "Ryan Giggs",
+        "Frank Lampard"
+      ],
+      "correctIndex": 2,
+      "qId": 143
+    },
+    {
+      "text": "Who holds the record for the most Premier League red cards (8, shared)?",
+      "options": [
+        "Patrick Vieira",
+        "Duncan Ferguson",
+        "Richard Dunne",
+        "All of the above"
+      ],
+      "correctIndex": 3,
+      "qId": 144
+    },
+    {
+      "text": "Which player holds the record for most own goals in Premier League history (10)?",
+      "options": [
+        "Jamie Carragher",
+        "Richard Dunne",
+        "Martin \u0160krtel",
+        "Phil Jagielka"
+      ],
+      "correctIndex": 1,
+      "qId": 145
+    },
+    {
+      "text": "What is the record for the highest scoring match in Premier League history?",
+      "options": [
+        "8-2",
+        "9-0",
+        "7-4",
+        "6-6"
+      ],
+      "correctIndex": 2,
+      "qId": 146
+    },
+    {
+      "text": "Which manager has won the most Premier League titles (13)?",
+      "options": [
+        "Ars\u00e8ne Wenger",
+        "Jos\u00e9 Mourinho",
+        "Sir Alex Ferguson",
+        "Pep Guardiola"
+      ],
+      "correctIndex": 2,
+      "qId": 147
+    },
+    {
+      "text": "What is the longest unbeaten run in Premier League history (49 games)?",
+      "options": [
+        "Chelsea",
+        "Man City",
+        "Arsenal",
+        "Liverpool"
+      ],
+      "correctIndex": 2,
+      "qId": 148
+    },
+    {
+      "text": "Who holds the record for the most goals scored in a single World Cup match (5)?",
+      "options": [
+        "Oleg Salenko",
+        "Hristo Stoichkov",
+        "Ronaldo",
+        "Eus\u00e9bio"
+      ],
+      "correctIndex": 0,
+      "qId": 149
+    },
+    {
+      "text": "Which player has won the most UEFA Champions League titles as a player (6)?",
+      "options": [
+        "Cristiano Ronaldo",
+        "Francisco Gento",
+        "Paolo Maldini",
+        "Luka Modri\u0107"
+      ],
+      "correctIndex": 1,
+      "qId": 150
+    },
+    {
+      "text": "Who is the most expensive football player of all time (transfer fee)?",
+      "options": [
+        "Kylian Mbapp\u00e9",
+        "Philippe Coutinho",
+        "Neymar",
+        "Ousmane Demb\u00e9l\u00e9"
+      ],
+      "correctIndex": 2,
+      "qId": 151
+    },
+    {
+      "text": "Which goalkeeper is the most expensive of all time (as of 2018)?",
+      "options": [
+        "Alisson",
+        "Ederson",
+        "Kepa Arrizabalaga",
+        "Jan Oblak"
+      ],
+      "correctIndex": 2,
+      "qId": 152
+    },
+    {
+      "text": "What is the record for the fastest goal in Premier League history (7.69 seconds)?",
+      "options": [
+        "Ledley King",
+        "Shane Long",
+        "Alan Shearer",
+        "Christian Eriksen"
+      ],
+      "correctIndex": 1,
+      "qId": 153
+    },
+    {
+      "text": "Who is the oldest player to have ever won a FIFA World Cup?",
+      "options": [
+        "Dino Zoff",
+        "Gianluigi Buffon",
+        "Miroslav Klose",
+        "Pel\u00e9"
+      ],
+      "correctIndex": 0,
+      "qId": 154
+    },
+    {
+      "text": "Which team holds the record for the most consecutive Premier League wins (18)?",
+      "options": [
+        "Arsenal",
+        "Man City",
+        "Liverpool",
+        "Both Man City and Liverpool"
+      ],
+      "correctIndex": 3,
+      "qId": 155
+    },
+    {
+      "text": "Which player has scored the most goals for a single club (672)?",
+      "options": [
+        "Pel\u00e9",
+        "Cristiano Ronaldo",
+        "Lionel Messi",
+        "Gerd M\u00fcller"
+      ],
+      "correctIndex": 2,
+      "qId": 156
+    },
+    {
+      "text": "Who has won the most Premier League Golden Boots (4)?",
+      "options": [
+        "Alan Shearer",
+        "Thierry Henry",
+        "Harry Kane",
+        "Mohamed Salah"
+      ],
+      "correctIndex": 1,
+      "qId": 157
+    },
+    {
+      "text": "What was the lowest attendance ever recorded at a World Cup match?",
+      "options": [
+        "300",
+        "1,000",
+        "2,500",
+        "5,000"
+      ],
+      "correctIndex": 0,
+      "qId": 158
+    },
+    {
+      "text": "Who is the only player to have won the Champions League with three different clubs?",
+      "options": [
+        "Cristiano Ronaldo",
+        "Clarence Seedorf",
+        "Samuel Eto'o",
+        "Zlatan Ibrahimovi\u0107"
+      ],
+      "correctIndex": 1,
+      "qId": 159
+    },
+    {
+      "text": "Which player is the all-time top scorer for the Argentina national team?",
+      "options": [
+        "Diego Maradona",
+        "Gabriel Batistuta",
+        "Lionel Messi",
+        "Sergio Ag\u00fcero"
+      ],
+      "correctIndex": 2,
+      "qId": 160
+    },
+    {
+      "text": "Who was the first African player to win the FIFA Ballon d'Or?",
+      "options": [
+        "Samuel Eto'o",
+        "George Weah",
+        "Didier Drogba",
+        "Mohamed Salah"
+      ],
+      "correctIndex": 1,
+      "qId": 161
+    },
+    {
+      "text": "Which striker is known by the nickname 'El Fenomeno'?",
+      "options": [
+        "Cristiano Ronaldo",
+        "Ronaldo Naz\u00e1rio",
+        "Rom\u00e1rio",
+        "Ronaldinho"
+      ],
+      "correctIndex": 1,
+      "qId": 162
+    },
+    {
+      "text": "Who holds the record for the most goals scored in international football history?",
+      "options": [
+        "Pel\u00e9",
+        "Lionel Messi",
+        "Cristiano Ronaldo",
+        "Ali Daei"
+      ],
+      "correctIndex": 2,
+      "qId": 163
+    },
+    {
+      "text": "Which goalkeeper is famously known as 'The Black Spider'?",
+      "options": [
+        "Lev Yashin",
+        "Gordon Banks",
+        "Gianluigi Buffon",
+        "Oliver Kahn"
+      ],
+      "correctIndex": 0,
+      "qId": 164
+    },
+    {
+      "text": "Which player won the World Cup three times (1958, 1962, 1970)?",
+      "options": [
+        "Garrincha",
+        "Pel\u00e9",
+        "Cafu",
+        "Ronaldo"
+      ],
+      "correctIndex": 1,
+      "qId": 165
+    },
+    {
+      "text": "Which French player is the only one to win the PFA Player of the Year award twice?",
+      "options": [
+        "Eric Cantona",
+        "Thierry Henry",
+        "N'Golo Kant\u00e9",
+        "Patrick Vieira"
+      ],
+      "correctIndex": 1,
+      "qId": 166
+    },
+    {
+      "text": "Who scored the winning goal for Germany in the 2014 World Cup final?",
+      "options": [
+        "Miroslav Klose",
+        "Thomas M\u00fcller",
+        "Mario G\u00f6tze",
+        "Mesut \u00d6zil"
+      ],
+      "correctIndex": 2,
+      "qId": 167
+    },
+    {
+      "text": "Which player is known as 'The Divine Ponytail'?",
+      "options": [
+        "Roberto Baggio",
+        "Andrea Pirlo",
+        "Alessandro Del Piero",
+        "Francesco Totti"
+      ],
+      "correctIndex": 0,
+      "qId": 168
+    },
+    {
+      "text": "Who is the most capped player in the history of the England national team (125 caps)?",
+      "options": [
+        "Wayne Rooney",
+        "David Beckham",
+        "Peter Shilton",
+        "Steven Gerrard"
+      ],
+      "correctIndex": 2,
+      "qId": 169
+    },
+    {
+      "text": "Which player holds the record for most goals in a single calendar year (91 goals in 2012)?",
+      "options": [
+        "Cristiano Ronaldo",
+        "Lionel Messi",
+        "Robert Lewandowski",
+        "Gerd M\u00fcller"
+      ],
+      "correctIndex": 1,
+      "qId": 170
+    },
+    {
+      "text": "Which future Ballon d'Or winner was sold by West Ham to Leeds United in 2000 for \u00a318m?",
+      "options": [
+        "Rio Ferdinand",
+        "Frank Lampard",
+        "Joe Cole",
+        "Michael Carrick"
+      ],
+      "correctIndex": 0,
+      "qId": 171
+    },
+    {
+      "text": "Who is the only goalkeeper to ever win the Ballon d'Or?",
+      "options": [
+        "Dino Zoff",
+        "Lev Yashin",
+        "Iker Casillas",
+        "Manuel Neuer"
+      ],
+      "correctIndex": 1,
+      "qId": 172
+    },
+    {
+      "text": "Which player famously missed the deciding penalty in the 1994 World Cup final shootout?",
+      "options": [
+        "Franco Baresi",
+        "Daniele Massaro",
+        "Roberto Baggio",
+        "Gianluca Vialli"
+      ],
+      "correctIndex": 2,
+      "qId": 173
+    },
+    {
+      "text": "Who scored the first ever hat-trick in a World Cup final (1966)?",
+      "options": [
+        "Pel\u00e9",
+        "Geoff Hurst",
+        "Gerd M\u00fcller",
+        "Kylian Mbapp\u00e9"
+      ],
+      "correctIndex": 1,
+      "qId": 174
+    },
+    {
+      "text": "Which player is the all-time top scorer for the Brazil national team?",
+      "options": [
+        "Pel\u00e9",
+        "Ronaldo",
+        "Neymar",
+        "Rom\u00e1rio"
+      ],
+      "correctIndex": 2,
+      "qId": 175
+    },
+    {
+      "text": "Who won the Golden Boot at the 2022 FIFA World Cup?",
+      "options": [
+        "Lionel Messi",
+        "Kylian Mbapp\u00e9",
+        "Juli\u00e1n \u00c1lvarez",
+        "Olivier Giroud"
+      ],
+      "correctIndex": 1,
+      "qId": 176
+    },
+    {
+      "text": "Which defender has the most goals in football history?",
+      "options": [
+        "Sergio Ramos",
+        "Roberto Carlos",
+        "Ronald Koeman",
+        "Franz Beckenbauer"
+      ],
+      "correctIndex": 2,
+      "qId": 177
+    },
+    {
+      "text": "Who was the first player to be transferred for a fee of over \u00a350 million?",
+      "options": [
+        "Cristiano Ronaldo",
+        "Zinedine Zidane",
+        "Kak\u00e1",
+        "Luis Figo"
+      ],
+      "correctIndex": 2,
+      "qId": 178
+    },
+    {
+      "text": "Which player holds the record for most saves in a single World Cup match (16)?",
+      "options": [
+        "Guillermo Ochoa",
+        "Tim Howard",
+        "Manuel Neuer",
+        "Keylor Navas"
+      ],
+      "correctIndex": 1,
+      "qId": 179
+    },
+    {
+      "text": "Which midfielder is associated with the 'Makelele Role'?",
+      "options": [
+        "Patrick Vieira",
+        "Claude Mak\u00e9l\u00e9l\u00e9",
+        "N'Golo Kant\u00e9",
+        "Casemiro"
+      ],
+      "correctIndex": 1,
+      "qId": 180
+    },
+    {
+      "text": "Which player won the Premier League with both Leicester City and Manchester City?",
+      "options": [
+        "Riyad Mahrez",
+        "N'Golo Kant\u00e9",
+        "Kasper Schmeichel",
+        "Danny Drinkwater"
+      ],
+      "correctIndex": 0,
+      "qId": 181
+    },
+    {
+      "text": "Which club did Lionel Messi play for as a youth before joining Barcelona?",
+      "options": [
+        "River Plate",
+        "Boca Juniors",
+        "Newell's Old Boys",
+        "Rosario Central"
+      ],
+      "correctIndex": 2,
+      "qId": 182
+    },
+    {
+      "text": "Can a player be offside if they receive the ball directly from a throw-in?",
+      "options": [
+        "Yes",
+        "No",
+        "Only if in the box",
+        "Only if in the second half"
+      ],
+      "correctIndex": 1,
+      "qId": 183
+    },
+    {
+      "text": "Can a player be offside if they receive the ball directly from a goal kick?",
+      "options": [
+        "Yes",
+        "No",
+        "Only if they are in their own half",
+        "Only if the keeper is out"
+      ],
+      "correctIndex": 1,
+      "qId": 184
+    },
+    {
+      "text": "What is the required distance (in yards) for the defending wall during a free kick?",
+      "options": [
+        "8 yards",
+        "10 yards",
+        "12 yards",
+        "15 yards"
+      ],
+      "correctIndex": 1,
+      "qId": 185
+    },
+    {
+      "text": "If a player is in their own half, can they be penalized for being offside?",
+      "options": [
+        "Yes",
+        "No",
+        "Only if the ball is behind them",
+        "Only if they touch the ball"
+      ],
+      "correctIndex": 1,
+      "qId": 186
+    },
+    {
+      "text": "According to the DOGSO rules, a genuine attempt to play the ball in the penalty area results in what?",
+      "options": [
+        "Red Card and Penalty",
+        "Yellow Card and Penalty",
+        "Red Card and Free Kick",
+        "No Card and Penalty"
+      ],
+      "correctIndex": 1,
+      "qId": 187
+    },
+    {
+      "text": "How many seconds is a goalkeeper technically allowed to hold the ball for?",
+      "options": [
+        "4 seconds",
+        "6 seconds",
+        "10 seconds",
+        "Unlimited"
+      ],
+      "correctIndex": 1,
+      "qId": 188
+    },
+    {
+      "text": "A goal is scored directly from a throw-in without touching anyone. What is the result?",
+      "options": [
+        "Goal is awarded",
+        "Goal kick",
+        "Corner kick",
+        "Throw-in retake"
+      ],
+      "correctIndex": 1,
+      "qId": 189
+    },
+    {
+      "text": "Can a goalkeeper score a goal by throwing the ball into the opponent's goal with their hands?",
+      "options": [
+        "Yes",
+        "No",
+        "Only in the last minute",
+        "Only if it bounces first"
+      ],
+      "correctIndex": 1,
+      "qId": 190
+    },
+    {
+      "text": "If a ball becomes defective during a corner kick before touching another player, how is play restarted?",
+      "options": [
+        "Dropped ball",
+        "Corner retake",
+        "Goal kick",
+        "Indirect free kick"
+      ],
+      "correctIndex": 1,
+      "qId": 191
+    },
+    {
+      "text": "What is the standard duration of a professional football match (excluding stoppage time)?",
+      "options": [
+        "45 minutes",
+        "60 minutes",
+        "80 minutes",
+        "90 minutes"
+      ],
+      "correctIndex": 3,
+      "qId": 192
+    },
+    {
+      "text": "Is using the shoulder to play the ball considered a handball?",
+      "options": [
+        "Yes",
+        "No",
+        "Only if intentional",
+        "Only for defenders"
+      ],
+      "correctIndex": 1,
+      "qId": 193
+    },
+    {
+      "text": "A player removes their shirt after scoring. What is the mandatory punishment?",
+      "options": [
+        "Warning",
+        "Yellow Card",
+        "Red Card",
+        "No punishment"
+      ],
+      "correctIndex": 1,
+      "qId": 194
+    },
+    {
+      "text": "Which part of the body cannot score a legal goal?",
+      "options": [
+        "Head",
+        "Chest",
+        "Hand",
+        "Heel"
+      ],
+      "correctIndex": 2,
+      "qId": 195
+    },
+    {
+      "text": "How many players must a team have as a minimum to continue a match?",
+      "options": [
+        "5",
+        "7",
+        "9",
+        "11"
+      ],
+      "correctIndex": 1,
+      "qId": 196
+    },
+    {
+      "text": "During a penalty, if a teammate of the taker enters the box and a goal is scored, what happens?",
+      "options": [
+        "Goal stands",
+        "Penalty is retaken",
+        "Indirect free kick for defense",
+        "Corner kick"
+      ],
+      "correctIndex": 1,
+      "qId": 197
+    },
+    {
+      "text": "Can a player be offside if they receive the ball directly from a corner kick?",
+      "options": [
+        "Yes",
+        "No",
+        "Only if the keeper is out",
+        "Only if the ball goes out"
+      ],
+      "correctIndex": 1,
+      "qId": 198
+    },
+    {
+      "text": "What color card is shown to a player for a second cautionable offense?",
+      "options": [
+        "Yellow",
+        "Red",
+        "Blue",
+        "Yellow then Red"
+      ],
+      "correctIndex": 3,
+      "qId": 199
+    },
+    {
+      "text": "If a substitute enters the field without permission and stops a goal, what is the restart?",
+      "options": [
+        "Indirect free kick",
+        "Direct free kick / Penalty",
+        "Dropped ball",
+        "Corner kick"
+      ],
+      "correctIndex": 1,
+      "qId": 200
     }
   ]
 }
