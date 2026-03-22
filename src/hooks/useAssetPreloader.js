@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 
 const CRITICAL_ASSETS = [
-    '/assets/bg-dressing-room.webp', // Dressing Room Background
     '/assets/manager-room-empty.webp', // Manager Office Background (default)
     // Add other large assets here if needed
 ];

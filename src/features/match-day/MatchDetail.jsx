@@ -935,18 +935,20 @@ const MatchDetail = () => {
   return (
     <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
       <div className="absolute inset-0 z-0">
-        <img
-          src="/assets/bg-tunnel-live.webp"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${matchPhase === 'LIVE' ? 'opacity-100' : 'opacity-0'
-            }`}
-          alt="Live Match Tunnel"
-        />
-        <img
-          src="/assets/bg-tunnel-prepost.webp"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${matchPhase === 'PRE' || matchPhase === 'POST' ? 'opacity-100' : 'opacity-0'
-            }`}
-          alt="Pre/Post Match Tunnel"
-        />
+        {matchPhase === 'LIVE' && (
+          <img
+            src="/assets/bg-tunnel-live.webp"
+            className="absolute inset-0 w-full h-full object-cover"
+            alt="Live Match Tunnel"
+          />
+        )}
+        {(matchPhase === 'PRE' || matchPhase === 'POST') && (
+          <img
+            src="/assets/bg-tunnel-prepost.webp"
+            className="absolute inset-0 w-full h-full object-cover"
+            alt="Pre/Post Match Tunnel"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
       </div>
 

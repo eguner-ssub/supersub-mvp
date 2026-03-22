@@ -10,9 +10,15 @@ const Landing = () => {
 
   // --- AUTO-REDIRECT LOGIC ---
   useEffect(() => {
-    // Only redirect if we are done loading AND have a valid profile
-    if (!loading && userProfile?.club_name) {
+    if (loading) return;
+    // Authenticated users go straight to dashboard
+    if (userProfile?.club_name) {
       navigate('/dashboard', { replace: true });
+      return;
+    }
+    // New unauthenticated visitors who haven't seen the interactive intro
+    if (!userProfile && !localStorage.getItem('ss_onboarding_seen')) {
+      navigate('/intro', { replace: true });
     }
   }, [userProfile, loading, navigate]);
 
