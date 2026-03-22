@@ -307,61 +307,60 @@ function BenchScene({ introStage, phase, onTabletTap }) {
 
       {/* Scoreboard */}
       <div
-        className="absolute top-0 left-0 right-0 z-20 px-4 pt-10 pb-6"
+        className="absolute top-0 left-0 right-0 z-20 px-5 pt-9 pb-5"
         style={{
           opacity:    showScoreboard ? 1 : 0,
           transition: 'opacity 0.9s ease-in',
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.5) 60%, transparent 100%)',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)',
           pointerEvents: 'none',
         }}
       >
-        <p className="text-center text-[10px] font-bold uppercase tracking-[3px] text-white/55 mb-4">
+        <p className="text-center text-[9px] font-bold uppercase tracking-[3px] text-white/40 mb-3">
           UEFA Champions League Final · 26 May 1999
         </p>
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col items-center gap-1.5 flex-1">
-            <TeamLogo src={MAN_UTD_LOGO} fallback="🔴" size={36} />
-            <span className="text-white font-black text-xs uppercase tracking-wide text-center">Man Utd</span>
+        <div className="flex items-center justify-between gap-2">
+          {/* Home */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <TeamLogo src={MAN_UTD_LOGO} fallback="🔴" size={32} />
+            <span className="text-white font-black text-sm uppercase tracking-wide truncate">Man Utd</span>
           </div>
-          <div className="flex flex-col items-center px-4">
-            <span className="font-black text-5xl tracking-tighter" style={{ color: '#00e5ff' }}>0 — 1</span>
-            <span className="text-white/65 font-bold text-sm mt-1.5">81'</span>
+          {/* Score */}
+          <div className="flex flex-col items-center flex-shrink-0 px-2">
+            <span className="font-black text-3xl text-white tracking-tighter leading-none">0 — 1</span>
+            <span className="text-[11px] font-black mt-1" style={{ color: '#00e5ff' }}>81'</span>
           </div>
-          <div className="flex flex-col items-center gap-1.5 flex-1">
-            <TeamLogo src={BAYERN_LOGO} fallback="🔵" size={36} />
-            <span className="text-white font-black text-xs uppercase tracking-wide text-center">Bayern</span>
+          {/* Away */}
+          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+            <span className="text-white font-black text-sm uppercase tracking-wide truncate text-right">Bayern</span>
+            <TeamLogo src={BAYERN_LOGO} fallback="🔵" size={32} />
           </div>
         </div>
       </div>
 
       {/* Tablet hotspot */}
       {phase === 'bench' && (
-        <>
-          <button
-            onClick={onTabletTap}
-            className="absolute z-30"
-            aria-label="Tap the tablet to make your Supersub call"
+        <button
+          onClick={onTabletTap}
+          className="absolute z-30 flex flex-col items-center justify-end"
+          aria-label="Tap the tablet to make your Supersub call"
+          style={{
+            top: '70%', left: '0%', width: '36%', height: '18%',
+            borderRadius: '10px', background: 'transparent',
+            border: 'none', paddingBottom: '6px',
+          }}
+        >
+          <div
+            className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap"
             style={{
-              top: '74%', left: '3%', width: '27%', height: '11%',
-              borderRadius: '10px', background: 'transparent',
-              border: '2px solid rgba(0,229,255,0.75)',
-              animation: 'pulse-border 1.8s ease-in-out infinite',
+              background: 'rgba(0,0,0,0.72)',
+              border: '1px solid rgba(0,229,255,0.5)',
+              color: '#00e5ff',
+              animation: 'pulse-border 2s ease-in-out infinite',
             }}
-          />
-          <div className="absolute z-30 left-1/2 -translate-x-1/2" style={{ bottom: '14%' }}>
-            <div
-              className="px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest whitespace-nowrap"
-              style={{
-                background: 'rgba(0,0,0,0.65)',
-                border: '1px solid rgba(0,229,255,0.45)',
-                color: '#00e5ff',
-                animation: 'pulse-border 2s ease-in-out infinite',
-              }}
-            >
-              ⚡ Tap the tablet
-            </div>
+          >
+            ⚡ Tap the tablet
           </div>
-        </>
+        </button>
       )}
     </div>
   );
@@ -385,17 +384,17 @@ function MockMatchView({ activeTab, minute, score, onUseSupersubCard, onSolskjae
 
       {/* Row 2: teams + score */}
       <div className="flex items-center justify-between px-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex items-center gap-2 flex-1">
-          <TeamLogo src={MAN_UTD_LOGO} fallback="🔴" size={32} />
-          <span className="text-white font-black text-sm uppercase tracking-wide">Man Utd</span>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <TeamLogo src={MAN_UTD_LOGO} fallback="🔴" size={28} />
+          <span className="text-white font-black text-xs uppercase tracking-wide truncate">Man Utd</span>
         </div>
-        <div className="flex flex-col items-center px-3">
-          <span className="font-black text-xl text-white tracking-tighter">{score.home} — {score.away}</span>
-          <span className="text-xs font-black mt-0.5" style={{ color: '#00e5ff' }}>{minute}</span>
+        <div className="flex flex-col items-center flex-shrink-0 px-3">
+          <span className="font-black text-2xl text-white tracking-tighter leading-none">{score.home} — {score.away}</span>
+          <span className="text-[11px] font-black mt-0.5" style={{ color: '#00e5ff' }}>{minute}</span>
         </div>
-        <div className="flex items-center gap-2 flex-1 justify-end">
-          <span className="text-white font-black text-sm uppercase tracking-wide">Bayern</span>
-          <TeamLogo src={BAYERN_LOGO} fallback="🔵" size={32} />
+        <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+          <span className="text-white font-black text-xs uppercase tracking-wide truncate text-right">Bayern</span>
+          <TeamLogo src={BAYERN_LOGO} fallback="🔵" size={28} />
         </div>
       </div>
 
