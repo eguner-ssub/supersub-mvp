@@ -58,13 +58,24 @@ const KEYFRAMES = `
 const MAN_UTD_LOGO = 'https://cdn.sportmonks.com/images/soccer/teams/14/14.png';
 const BAYERN_LOGO  = 'https://cdn.sportmonks.com/images/soccer/teams/23/503.png';
 
-// 4-4-2: stored GK→FWD, rendered FWD→GK (reversed) so GK appears at bottom
-const STARTERS_BY_ROW = [
-  [{ number: 1,  name: 'Schmeichel' }],                                               // GK
-  [{ number: 3,  name: 'Irwin' }, { number: 6, name: 'Stam' }, { number: 12, name: 'Johnsen' }, { number: 2, name: 'Neville' }], // DEF L→R
-  [{ number: 15, name: 'Blomqvist' }, { number: 8, name: 'Butt' }, { number: 7, name: 'Beckham' }, { number: 11, name: 'Giggs' }], // MID L→R
-  [{ number: 9,  name: 'Cole' }, { number: 19, name: 'Yorke' }],                     // FWD L→R
+// Man Utd 4-4-2 — GK→FWD order; LineupTab reverses to render FWD at top
+const MAN_UTD_ROWS = [
+  [{ n: 1,  name: 'Schmeichel' }],
+  [{ n: 3,  name: 'Irwin' }, { n: 6, name: 'Stam' }, { n: 12, name: 'Johnsen' }, { n: 2, name: 'Neville' }],
+  [{ n: 15, name: 'Blomqvist' }, { n: 8, name: 'Butt' }, { n: 7, name: 'Beckham' }, { n: 11, name: 'Giggs' }],
+  [{ n: 9,  name: 'Cole' }, { n: 19, name: 'Yorke' }],
 ];
+
+// Bayern 3-4-3 (5-2-3) — GK→FWD order; rendered GK at top half, FWD nearest centre
+const BAYERN_ROWS = [
+  [{ n: 1,  name: 'Kahn' }],
+  [{ n: 2,  name: 'Babbel' }, { n: 25, name: 'Linke' }, { n: 10, name: 'Matthäus' }, { n: 4, name: 'Kuffour' }, { n: 18, name: 'Tarnat' }],
+  [{ n: 11, name: 'Effenberg' }, { n: 16, name: 'Jeremies' }],
+  [{ n: 14, name: 'Basler' }, { n: 19, name: 'Jancker' }, { n: 21, name: 'Zickler' }],
+];
+
+// Legacy alias so existing code still works
+const STARTERS_BY_ROW = MAN_UTD_ROWS;
 
 const SUBS_LIST = [
   { number: 13, name: 'Raimond van der Gouw', position: 'GK' },
@@ -461,40 +472,53 @@ function MockMatchView({ activeTab, minute, score, onUseSupersubCard, onSolskjae
   );
 }
 
-// ── LineupTab ─────────────────────────────────────────────────────────────
+// ── LineupTab — split pitch, Bayern top half, Man Utd bottom half ──────────
 function LineupTab() {
-  // Render rows reversed so GK is at bottom, FWD at top (standard football pitch view)
-  const rows = [...STARTERS_BY_ROW].reverse();
-
   return (
     <div
-      className="relative mx-4 my-4 rounded-xl overflow-hidden"
-      style={{ background: '#162116', border: '1px solid rgba(255,255,255,0.06)', minHeight: '300px' }}
+      className="relative mx-3 my-3 rounded-xl overflow-hidden"
+      style={{ background: '#152015', border: '1px solid rgba(255,255,255,0.06)', minHeight: '340px' }}
     >
-      {/* Formation label */}
-      <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
-        <TeamLogo src={MAN_UTD_LOGO} fallback="🔴" size={20} />
-        <span className="text-white/50 text-xs font-bold">4-4-2</span>
-      </div>
-
       {/* Pitch markings */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 160" preserveAspectRatio="none" style={{ opacity: 0.18 }}>
-        <rect x="8" y="4" width="84" height="152" fill="none" stroke="white" strokeWidth="1" />
-        <line x1="8" y1="80" x2="92" y2="80" stroke="white" strokeWidth="0.6" />
-        <circle cx="50" cy="80" r="13" fill="none" stroke="white" strokeWidth="0.6" />
-        <rect x="28" y="4"   width="44" height="18" fill="none" stroke="white" strokeWidth="0.6" />
-        <rect x="28" y="138" width="44" height="18" fill="none" stroke="white" strokeWidth="0.6" />
-        <rect x="38" y="4"   width="24" height="8"  fill="none" stroke="white" strokeWidth="0.6" />
-        <rect x="38" y="148" width="24" height="8"  fill="none" stroke="white" strokeWidth="0.6" />
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 170" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
+        <rect x="6" y="3" width="88" height="164" fill="none" stroke="white" strokeWidth="1" />
+        {/* Halfway line */}
+        <line x1="6" y1="85" x2="94" y2="85" stroke="white" strokeWidth="0.7" />
+        {/* Centre circle */}
+        <circle cx="50" cy="85" r="12" fill="none" stroke="white" strokeWidth="0.7" />
+        <circle cx="50" cy="85" r="1" fill="white" />
+        {/* Bayern penalty box (top) */}
+        <rect x="26" y="3"  width="48" height="18" fill="none" stroke="white" strokeWidth="0.6" />
+        <rect x="37" y="3"  width="26" height="9"  fill="none" stroke="white" strokeWidth="0.6" />
+        {/* Man Utd penalty box (bottom) */}
+        <rect x="26" y="149" width="48" height="18" fill="none" stroke="white" strokeWidth="0.6" />
+        <rect x="37" y="158" width="26" height="9"  fill="none" stroke="white" strokeWidth="0.6" />
       </svg>
 
-      {/* Player rows — FWD at top, GK at bottom */}
-      <div className="relative z-10 flex flex-col justify-around" style={{ minHeight: '300px', paddingTop: '24px', paddingBottom: '16px' }}>
-        {rows.map((row, rowIdx) => (
-          <div key={rowIdx} className="flex justify-around items-center px-2">
-            {row.map((player) => (
-              <PlayerNode key={`${player.number}-${player.name}`} {...player} />
-            ))}
+      {/* Formation badges */}
+      <div className="absolute top-2 left-2.5 flex items-center gap-1 z-10">
+        <TeamLogo src={BAYERN_LOGO} fallback="🔵" size={14} />
+        <span className="text-white/40 text-[9px] font-bold">3-4-3</span>
+      </div>
+      <div className="absolute bottom-2 left-2.5 flex items-center gap-1 z-10">
+        <TeamLogo src={MAN_UTD_LOGO} fallback="🔴" size={14} />
+        <span className="text-white/40 text-[9px] font-bold">4-4-2</span>
+      </div>
+
+      {/* ── Bayern: GK at top, FWD nearest centre line ── */}
+      <div className="relative z-10 flex flex-col justify-around" style={{ height: '50%', paddingTop: 10, paddingBottom: 4 }}>
+        {BAYERN_ROWS.map((row, i) => (
+          <div key={i} className="flex justify-around items-center px-1">
+            {row.map(p => <PlayerNode key={p.n} number={p.n} name={p.name} kit="away" />)}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Man Utd: FWD nearest centre line, GK at bottom ── */}
+      <div className="relative z-10 flex flex-col-reverse justify-around" style={{ height: '50%', paddingTop: 4, paddingBottom: 10 }}>
+        {MAN_UTD_ROWS.map((row, i) => (
+          <div key={i} className="flex justify-around items-center px-1">
+            {row.map(p => <PlayerNode key={p.n} number={p.n} name={p.name} kit="home" />)}
           </div>
         ))}
       </div>
@@ -502,13 +526,20 @@ function LineupTab() {
   );
 }
 
-function PlayerNode({ number, name }) {
+function PlayerNode({ number, name, kit = 'home' }) {
+  const bg   = kit === 'home' ? '#f5f0e8' : '#9ca3af';
+  const text = '#111';
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm shadow-md" style={{ background: '#f5f0e8', color: '#111' }}>
+    <div className="flex flex-col items-center gap-0.5">
+      <div
+        className="rounded-full flex items-center justify-center font-black shadow-md"
+        style={{ width: 28, height: 28, background: bg, color: text, fontSize: 10 }}
+      >
         {number}
       </div>
-      <span className="text-white/65 text-[9px] font-semibold text-center max-w-[52px] truncate">{name}</span>
+      <span className="text-white/55 text-[8px] font-semibold text-center leading-tight" style={{ maxWidth: 40, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {name}
+      </span>
     </div>
   );
 }
