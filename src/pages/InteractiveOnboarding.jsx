@@ -117,8 +117,9 @@ export default function InteractiveOnboarding() {
   const [minute, setMinute]                   = useState(81);
   const [score, setScore]                     = useState({ home: 0, away: 1 });
   const [shaking, setShaking]                 = useState(false);
-  const [showGoalPopup, setShowGoalPopup]     = useState(false);
-  const [showFinalPopup, setShowFinalPopup]   = useState(false);
+  const [showGoalPopup, setShowGoalPopup]           = useState(false);
+  const [showSheringhamPopup, setShowSheringhamPopup] = useState(false);
+  const [showFinalPopup, setShowFinalPopup]           = useState(false);
 
   const progressStep = PHASE_TO_STEP[phase] ?? 0;
 
@@ -152,10 +153,19 @@ export default function InteractiveOnboarding() {
     const interval = setInterval(() => {
       current++;
       setMinute(current);
+
+      // 90+1 — Sheringham equalises: 1-1
+      if (current === 91) {
+        setScore({ home: 1, away: 1 });
+        setShowSheringhamPopup(true);
+        setTimeout(() => setShowSheringhamPopup(false), 2200);
+      }
+
+      // 90+3 — Solskjær wins it: 2-1
       if (current >= 93) {
         clearInterval(interval);
         setTimeout(() => {
-          setScore({ home: 2, away: 1 }); // Solskjær makes it 2-1
+          setScore({ home: 2, away: 1 });
           setShaking(true);
           setTimeout(() => setShaking(false), 700);
           setTimeout(() => setShowGoalPopup(true), 200);
@@ -223,6 +233,7 @@ export default function InteractiveOnboarding() {
             score={score}
             shaking={shaking}
             showGoalPopup={showGoalPopup}
+            showSheringhamPopup={showSheringhamPopup}
             showFinalPopup={showFinalPopup}
             onComplete={handleComplete}
           />
@@ -488,68 +499,132 @@ function MockMatchView({ activeTab, minute, score, onUseSupersubCard, onSolskjae
   );
 }
 
-// ── LineupTab — split pitch, Bayern top half, Man Utd bottom half ──────────
+// ── Converts row arrays → absolute-positioned player coords ─────────────
+function rowsToPositioned(rows, inverted = false) {
+  const totalRows = rows.length;
+  return rows.flatMap((row, rowIdx) => {
+    const totalCols = row.length;
+    return row.map((player, colIdx) => {
+      let top = ((rowIdx + 0.5) / totalRows) * 100;
+      if (inverted) top = 100 - top;
+      return {
+        player,
+        top,
+        left: ((colIdx + 1) / (totalCols + 1)) * 100,
+      };
+    });
+  });
+}
+
+// ── LineupTab — absolute-positioned pitch, matching MatchLineup.jsx style ─
+const LINE_COLOR = 'rgba(255,255,255,0.08)';
+const SPOT_COLOR = 'rgba(255,255,255,0.10)';
+
 function LineupTab() {
+  const bayernPositioned = rowsToPositioned(BAYERN_ROWS, false); // GK at top
+  const utdPositioned    = rowsToPositioned(MAN_UTD_ROWS, true); // GK at bottom
+
   return (
-    <div
-      className="relative mx-3 my-3 rounded-xl overflow-hidden"
-      style={{ background: '#152015', border: '1px solid rgba(255,255,255,0.06)', minHeight: '460px' }}
-    >
-      {/* Pitch markings */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 170" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
-        <rect x="6" y="3" width="88" height="164" fill="none" stroke="white" strokeWidth="1" />
-        {/* Halfway line */}
-        <line x1="6" y1="85" x2="94" y2="85" stroke="white" strokeWidth="0.7" />
-        {/* Centre circle */}
-        <circle cx="50" cy="85" r="12" fill="none" stroke="white" strokeWidth="0.7" />
-        <circle cx="50" cy="85" r="1" fill="white" />
-        {/* Bayern penalty box (top) */}
-        <rect x="26" y="3"  width="48" height="18" fill="none" stroke="white" strokeWidth="0.6" />
-        <rect x="37" y="3"  width="26" height="9"  fill="none" stroke="white" strokeWidth="0.6" />
-        {/* Man Utd penalty box (bottom) */}
-        <rect x="26" y="149" width="48" height="18" fill="none" stroke="white" strokeWidth="0.6" />
-        <rect x="37" y="158" width="26" height="9"  fill="none" stroke="white" strokeWidth="0.6" />
-      </svg>
+    <div style={{ padding: '8px 12px' }}>
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        aspectRatio: '3 / 5',
+        background: '#1a2e1a',
+        borderRadius: '16px',
+        overflow: 'hidden',
+        boxShadow: 'inset 0 0 40px rgba(0,0,0,0.5)',
+        filter: 'saturate(0.7)',
+      }}>
+        {/* Grain overlay */}
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 1,
+          opacity: 0.10, mixBlendMode: 'multiply', pointerEvents: 'none',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+          backgroundSize: '128px 128px',
+        }} />
 
-      {/* Formation badges */}
-      <div className="absolute top-2 left-2.5 flex items-center gap-1 z-10">
-        <TeamLogo src={BAYERN_LOGO} fallback="🔵" size={14} />
-        <span className="text-white/40 text-[9px] font-bold">3-4-3</span>
-      </div>
-      <div className="absolute bottom-2 left-2.5 flex items-center gap-1 z-10">
-        <TeamLogo src={MAN_UTD_LOGO} fallback="🔴" size={14} />
-        <span className="text-white/40 text-[9px] font-bold">4-4-2</span>
-      </div>
+        {/* Pitch SVG markings */}
+        <svg viewBox="0 0 100 166" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'none' }}>
+          <rect x="4" y="3" width="92" height="160" rx="2" fill="none" stroke={LINE_COLOR} strokeWidth="0.5" />
+          <line x1="4" y1="83" x2="96" y2="83" stroke={LINE_COLOR} strokeWidth="0.5" />
+          <circle cx="50" cy="83" r="12" fill="none" stroke={LINE_COLOR} strokeWidth="0.5" />
+          <circle cx="50" cy="83" r="1" fill={SPOT_COLOR} />
+          {/* Top half boxes */}
+          <rect x="18" y="3" width="64" height="22" fill="none" stroke={LINE_COLOR} strokeWidth="0.5" />
+          <rect x="30" y="3" width="40" height="10" fill="none" stroke={LINE_COLOR} strokeWidth="0.5" />
+          <circle cx="50" cy="18" r="0.8" fill={SPOT_COLOR} />
+          {/* Bottom half boxes */}
+          <rect x="18" y="141" width="64" height="22" fill="none" stroke={LINE_COLOR} strokeWidth="0.5" />
+          <rect x="30" y="153" width="40" height="10" fill="none" stroke={LINE_COLOR} strokeWidth="0.5" />
+          <circle cx="50" cy="148" r="0.8" fill={SPOT_COLOR} />
+        </svg>
 
-      {/* ── Bayern: GK at top, FWD nearest centre line ── */}
-      <div className="relative z-10 flex flex-col justify-around" style={{ height: '50%', paddingTop: 10, paddingBottom: 4 }}>
-        {BAYERN_ROWS.map((row, i) => (
-          <div key={i} className="flex justify-around items-center px-1">
-            {row.map(p => <PlayerNode key={p.n} number={p.n} name={p.name} kit="away" />)}
-          </div>
-        ))}
-      </div>
+        {/* Formation badges */}
+        <div style={{ position: 'absolute', top: 8, left: 10, zIndex: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <TeamLogo src={BAYERN_LOGO} fallback="🔵" size={14} />
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 700 }}>3-4-3</span>
+        </div>
+        <div style={{ position: 'absolute', bottom: 8, left: 10, zIndex: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <TeamLogo src={MAN_UTD_LOGO} fallback="🔴" size={14} />
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 700 }}>4-4-2</span>
+        </div>
 
-      {/* ── Man Utd: FWD nearest centre line, GK at bottom ── */}
-      <div className="relative z-10 flex flex-col-reverse justify-around" style={{ height: '50%', paddingTop: 4, paddingBottom: 10 }}>
-        {MAN_UTD_ROWS.map((row, i) => (
-          <div key={i} className="flex justify-around items-center px-1">
-            {row.map(p => <PlayerNode key={p.n} number={p.n} name={p.name} kit="home" />)}
-          </div>
-        ))}
+        {/* Bayern top half */}
+        <div style={{ position: 'absolute', left: '4%', right: '4%', top: '2%', height: '46%', zIndex: 5 }}>
+          {bayernPositioned.map((p, i) => (
+            <div key={i} style={{ position: 'absolute', top: `${p.top}%`, left: `${p.left}%`, transform: 'translate(-50%, -50%)', zIndex: 10 }}>
+              <PitchPlayerNode number={p.player.n} name={p.player.name} kit="away" />
+            </div>
+          ))}
+        </div>
+
+        {/* Man Utd bottom half */}
+        <div style={{ position: 'absolute', left: '4%', right: '4%', top: '52%', height: '46%', zIndex: 5 }}>
+          {utdPositioned.map((p, i) => (
+            <div key={i} style={{ position: 'absolute', top: `${p.top}%`, left: `${p.left}%`, transform: 'translate(-50%, -50%)', zIndex: 10 }}>
+              <PitchPlayerNode number={p.player.n} name={p.player.name} kit="home" />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
+function PitchPlayerNode({ number, name, kit = 'home' }) {
+  const bg = kit === 'home' ? '#f5f0e8' : '#9ca3af';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 48 }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: '50%', background: bg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.3)',
+        border: '1.5px solid rgba(0,0,0,0.08)', fontSize: 10, fontWeight: 700, color: '#121212',
+        fontFamily: "'Montserrat', sans-serif",
+      }}>
+        {number}
+      </div>
+      <span style={{
+        fontSize: 8, fontWeight: 700, color: '#ffffff', textAlign: 'center',
+        lineHeight: 1.15, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+        maxWidth: 40, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        fontFamily: "'Montserrat', sans-serif",
+      }}>
+        {name.split(' ').pop()}
+      </span>
+    </div>
+  );
+}
+
+// Legacy PlayerNode — kept for SubsTab (uses className-based styling)
 function PlayerNode({ number, name, kit = 'home' }) {
   const bg   = kit === 'home' ? '#f5f0e8' : '#9ca3af';
-  const text = '#111';
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div
         className="rounded-full flex items-center justify-center font-black shadow-md"
-        style={{ width: 28, height: 28, background: bg, color: text, fontSize: 10 }}
+        style={{ width: 28, height: 28, background: bg, color: '#111', fontSize: 10 }}
       >
         {number}
       </div>
@@ -669,7 +744,7 @@ function ConfirmModal({ onConfirm, onCancel }) {
 }
 
 // ── PayoffView ────────────────────────────────────────────────────────────
-function PayoffView({ minute, score, shaking, showGoalPopup, showFinalPopup, onComplete }) {
+function PayoffView({ minute, score, shaking, showGoalPopup, showSheringhamPopup, showFinalPopup, onComplete }) {
   return (
     <div
       className="absolute inset-0 flex flex-col"
@@ -718,6 +793,21 @@ function PayoffView({ minute, score, shaking, showGoalPopup, showFinalPopup, onC
       {/* Cyan flash */}
       {shaking && (
         <div className="absolute inset-0 z-20 pointer-events-none" style={{ background: 'rgba(0,229,255,0.12)', animation: 'cyan-flash 0.7s ease-out forwards' }} />
+      )}
+
+      {/* SHERINGHAM popup — 1-1 equaliser */}
+      {showSheringhamPopup && (
+        <div className="absolute inset-x-4 top-[28%] z-30 animate-in zoom-in duration-300">
+          <div className="w-full max-w-md mx-auto bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent" />
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
+              <span className="text-3xl">⚽</span>
+            </div>
+            <h2 className="text-white font-black uppercase text-3xl tracking-tighter mb-2">Goal!</h2>
+            <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest">Manchester United</p>
+            <p className="text-zinc-500 text-xs mt-1">Scored by Teddy Sheringham · 90+1'</p>
+          </div>
+        </div>
       )}
 
       {/* GOAL popup — matches real resolved modal style */}

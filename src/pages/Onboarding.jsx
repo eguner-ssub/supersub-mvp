@@ -78,10 +78,10 @@ const Onboarding = () => {
 
               <div className="space-y-5 text-sm font-serif leading-relaxed text-justify mb-8 text-gray-800">
                 <p>
-                  <strong>1. LIABILITY:</strong> Your goal is to win as more Points as possible by using your prediction cards in real matches. You will have Match Result, Total Goals, Player to Score and Supersub cards at your disposal.
+                  <strong>1.</strong> Your goal is to win as more Points as possible by using your prediction cards in real matches. You will have Match Result, Total Goals, Player to Score and Supersub cards at your disposal.
                 </p>
                 <p>
-                  <strong>2. COMPENSATION:</strong> By winning points, you can compete in the Leaderboards. To win more cards, don't forget to attend training. You will also receive a surprise card from your training bag every day.
+                  <strong>2.</strong> By winning points, you can compete in the Leaderboards. To win more cards, don't forget to attend training. You will also receive a surprise card from your training bag every day.
                 </p>
               </div>
 
@@ -96,7 +96,7 @@ const Onboarding = () => {
                     onChange={(e) => setManagerName(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSignContract()}
                     placeholder="TEAM NAME"
-                    className="w-full px-4 py-4 bg-[#e8e4dc] border-2 border-gray-300 rounded-lg text-gray-900 font-serif font-bold text-2xl text-center uppercase tracking-widest focus:outline-none focus:border-gray-900 focus:bg-white transition-all placeholder:text-gray-300"
+                    className="w-full px-4 py-4 bg-[#e8e4dc] border-2 border-gray-300 rounded-lg text-gray-900 font-serif font-bold text-[19px] text-center uppercase tracking-widest focus:outline-none focus:border-gray-900 focus:bg-white transition-all placeholder:text-gray-300"
                     autoFocus
                   />
                   <PenTool className="absolute right-4 top-10 w-5 h-5 text-gray-400 opacity-50" />

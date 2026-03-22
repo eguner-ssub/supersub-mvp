@@ -66,7 +66,7 @@ const Signup = () => {
   return (
     <div className="min-h-screen text-white p-6 flex flex-col justify-center relative overflow-hidden bg-black">
       <img
-        src="/assets/bg-stadium.webp"
+        src="/bg-stadium.webp"
         alt=""
         className="absolute inset-0 w-full h-full object-cover opacity-40"
       />

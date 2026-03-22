@@ -74,29 +74,28 @@ export default function Dashboard() {
   };
 
   // --- 3. HELPER: Bag Opening Logic ---
+  // One representative card per type shown in the reward screen (with ×3 badge)
+  const PACK_CARD_TYPES = [
+    { id: 'MATCH_RESULT', type: 'MATCH_RESULT', name: 'Match Result' },
+    { id: 'TOTAL_GOALS',  type: 'TOTAL_GOALS',  name: 'Total Goals' },
+    { id: 'PLAYER_SCORE', type: 'PLAYER_SCORE', name: 'Player to Score' },
+    { id: 'SUPERSUB',     type: 'SUPERSUB',     name: 'Supersub' },
+  ];
+
   const triggerBagOpening = () => {
     setBagStage('opening');
     setTimeout(() => {
-      const availableCards = gameData.cardTypes || [];
-      const randomCards = [];
+      // 3 of each card type = 12 cards total
+      const allCardIds = PACK_CARD_TYPES.flatMap(ct => [ct.id, ct.id, ct.id]);
 
-      for (let i = 0; i < 3; i++) {
-        const randomCard = availableCards[Math.floor(Math.random() * availableCards.length)];
-        if (randomCard) {
-          randomCards.push({
-            ...randomCard,
-            id: `card-${Date.now()}-${i}`,
-          });
-        }
-      }
-
-      setNewCards(randomCards);
+      // Show one representative card per type in the reward grid
+      setNewCards(PACK_CARD_TYPES);
       setBagStage('rewards');
 
-      if (randomCards.length > 0) {
-        // updateInventory expects string card IDs, not card objects
-        updateInventory(randomCards.map(c => c.type || c.id));
-      }
+      // Actually credit all 12 to inventory
+      (async () => {
+        await updateInventory(allCardIds);
+      })();
     }, 1500);
   };
 
@@ -260,11 +259,15 @@ export default function Dashboard() {
 
             {bagStage === 'rewards' && (
               <div className="text-center w-full max-w-md">
-                <h2 className="text-white text-2xl font-bold mb-6 italic uppercase">New Items!</h2>
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <h2 className="text-white text-2xl font-bold mb-2 italic uppercase">New Items!</h2>
+                <p className="text-yellow-400/70 text-xs font-bold uppercase tracking-widest mb-6">12 Cards Added to Kit Bag</p>
+                <div className="grid grid-cols-2 gap-4 mb-6">
                   {newCards.map((card, index) => (
-                    <div key={index} className="animate-in zoom-in" style={{ animationDelay: `${index * 100}ms` }}>
+                    <div key={index} className="relative animate-in zoom-in" style={{ animationDelay: `${index * 100}ms` }}>
                       <CardBase card={card} />
+                      <div className="absolute -top-2 -right-2 bg-yellow-500 text-black text-xs font-black rounded-full w-7 h-7 flex items-center justify-center shadow-lg">
+                        ×3
+                      </div>
                     </div>
                   ))}
                 </div>
