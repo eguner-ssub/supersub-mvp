@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 // scripts/backfill-round-names.js
 // Fetches round names from Sportmonks and populates matches.round_name.
-// matches.round stores the Sportmonks round_id as a string; this script maps
-// those IDs to human-readable names (e.g. "Gameweek 28").
+//
+// Strategy:
+//   1. Fetch round list from Sportmonks for each league's current season
+//   2. Read (sportmonks_id, round) pairs from the local `fixtures` table
+//      (fixtures.sportmonks_id === matches.id, fixtures.round = round_id string)
+//   3. Update matches.round_name WHERE matches.id = fixture.sportmonks_id
 //
 // Usage: node scripts/backfill-round-names.js
 
@@ -32,8 +36,8 @@ export async function backfillRoundNames() {
   const supabase = getSupabase();
 
   // 1. Load current seasons for all tracked leagues
-  // Use explicit FK name to avoid ambiguity — seasons.league_id → leagues.id
-  // (leagues also has current_season_id → seasons, which would create two join paths)
+  // Explicit FK name avoids "more than one relationship" ambiguity
+  // (seasons.league_id → leagues.id  AND  leagues.current_season_id → seasons.id)
   const { data: seasons, error: seasonsErr } = await supabase
     .from('seasons')
     .select('id, sportmonks_id, leagues!seasons_league_id_fkey(sportmonks_id, name)')
@@ -51,44 +55,70 @@ export async function backfillRoundNames() {
   let totalUpdated = 0;
 
   for (const season of seasons) {
-    const leagueId = season.leagues.sportmonks_id;
-    const seasonId = season.sportmonks_id;
     const leagueName = season.leagues.name;
+    const seasonSmId = season.sportmonks_id;  // Sportmonks integer season ID
+    const seasonUuid = season.id;             // Our UUID for the season
 
-    console.log(`${PREFIX} Fetching rounds for ${leagueName} (season ${seasonId})…`);
+    console.log(`${PREFIX} Fetching rounds for ${leagueName} (season ${seasonSmId})…`);
 
     try {
-      const resp = await request(`/rounds/seasons/${seasonId}`, { per_page: 200 });
+      // 2. Fetch round names from Sportmonks
+      const resp = await request(`/rounds/seasons/${seasonSmId}`, { per_page: 200 });
       const rounds = resp.data || [];
-      console.log(`${PREFIX}   ${rounds.length} rounds returned`);
+      totalRounds += rounds.length;
+      console.log(`${PREFIX}   ${rounds.length} rounds from Sportmonks`);
 
-      if (rounds.length === 0) {
+      if (!rounds.length) {
         await sleep(RATE_LIMIT_MS);
         continue;
       }
 
-      totalRounds += rounds.length;
+      // Build map: Sportmonks round_id (integer) → human-readable name
+      const roundMap = new Map(rounds.map(r => [r.id, r.name]));
 
-      // Update matches in batches — match on league_id + round (string of round_id)
-      for (const round of rounds) {
-        const roundIdStr = String(round.id);
-        const roundName = round.name;
+      // 3. Load fixtures for this season from our local DB
+      //    fixtures.round stores the Sportmonks round_id as a string
+      //    fixtures.sportmonks_id is the Sportmonks fixture ID = matches.id
+      const { data: dbFixtures, error: fErr } = await supabase
+        .from('fixtures')
+        .select('sportmonks_id, round')
+        .eq('season_id', seasonUuid)
+        .not('round', 'is', null);
 
-        const { count, error } = await supabase
-          .from('matches')
-          .update({ round_name: roundName }, { count: 'exact' })
-          .eq('league_id', leagueId)
-          .eq('round', roundIdStr);
-
-        if (error) {
-          console.warn(`${PREFIX}   ✗ Update failed for round ${roundName}: ${error.message}`);
-        } else if (count > 0) {
-          totalUpdated += count;
-        }
+      if (fErr) {
+        console.warn(`${PREFIX}   ✗ Could not load fixtures: ${fErr.message}`);
+        await sleep(RATE_LIMIT_MS);
+        continue;
       }
 
-      console.log(`${PREFIX}   ✓ ${leagueName} rounds processed`);
+      console.log(`${PREFIX}   ${dbFixtures?.length || 0} fixtures in local DB`);
+
+      if (!dbFixtures?.length) {
+        console.log(`${PREFIX}   ⚠ No fixtures in DB for this season — skipping`);
+        await sleep(RATE_LIMIT_MS);
+        continue;
+      }
+
+      // 4. Update matches.round_name for each fixture
+      //    matches.id (integer) === fixtures.sportmonks_id (integer)
+      let updated = 0;
+      for (const f of dbFixtures) {
+        const roundId = parseInt(f.round, 10);
+        const roundName = roundMap.get(roundId);
+        if (!roundName) continue;
+
+        const { count } = await supabase
+          .from('matches')
+          .update({ round_name: roundName }, { count: 'exact' })
+          .eq('id', f.sportmonks_id);
+
+        updated += count || 0;
+      }
+
+      totalUpdated += updated;
+      console.log(`${PREFIX}   ✓ ${leagueName}: ${updated} matches updated with round names`);
       await sleep(RATE_LIMIT_MS);
+
     } catch (err) {
       console.error(`${PREFIX} ✗ Error for ${leagueName}: ${err.message}`);
       await sleep(RATE_LIMIT_MS);

@@ -87,7 +87,7 @@ async function getStandings(supabase, leagueId) {
 async function getFixtures(supabase, leagueId) {
   const { data, error } = await supabase
     .from('matches')
-    .select('id, home_team, away_team, home_logo, away_logo, home_score, away_score, kickoff_time, status, round, round_name')
+    .select('id, home_team, away_team, home_logo, away_logo, home_score, away_score, kickoff_time, status, round_name')
     .eq('league_id', leagueId)
     .order('kickoff_time', { ascending: true });
 
@@ -99,7 +99,7 @@ async function getFixtures(supabase, leagueId) {
   const roundOrder = [];
   const seen = new Set();
   for (const m of matches) {
-    const label = m.round_name || `Round ${m.round}` || 'Unknown';
+    const label = m.round_name || 'Unknown';
     if (!seen.has(label)) {
       seen.add(label);
       roundOrder.push(label);
@@ -140,7 +140,7 @@ async function getFixtures(supabase, leagueId) {
     awayScore:   m.away_score,
     kickoffTime: m.kickoff_time,
     status:      m.status,
-    round:       m.round_name || `Round ${m.round}` || 'Unknown',
+    round:       m.round_name || 'Unknown',
   }));
 
   return { rounds: roundOrder, currentRound, matches: normalised };
