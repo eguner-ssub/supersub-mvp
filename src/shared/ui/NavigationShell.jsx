@@ -61,8 +61,8 @@ export default function NavigationShell({ children }) {
                 {children}
             </div>
 
-            {/* 2. COMMON HEADER (Energy | Club Name | Points) */}
-            <GameHeader />
+            {/* 2. COMMON HEADER (Energy | Club Name | Points) — hidden on Match Hub which has its own header */}
+            {location.pathname !== '/match-hub' && <GameHeader />}
 
             {/* 2. NAVIGATION DOCK (Z-50) */}
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[360px]">

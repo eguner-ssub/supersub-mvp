@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Coins, Lock, Loader2, Trophy, Signal, Goal, User, ArrowUpCircle, X } from 'lucide-react';
+import { ArrowLeft, Star, Lock, Loader2, Trophy, Signal, Goal, User, ArrowUpCircle, X } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 import CardBase from '../../shared/ui/CardBase';
 import TacticalHUD from '../../shared/ui/TacticalHUD';
@@ -917,9 +917,9 @@ const MatchDetail = () => {
     ? (lineupsAnnounced ? 'PRE_LINEUPS' : 'PRE_NO_LINEUPS')
     : matchPhase; // 'LIVE' or 'POST'
 
+  const shelfVisible = viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS';
   const hasAnyCard = cardTypes.some(c => getCardCount(c.id) > 0);
-  const shelfVisible = (viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS') && hasAnyCard;
-  const contentBottom = viewState === 'LIVE' ? '140px' : shelfVisible ? '256px' : '0px';
+  const contentBottom = viewState === 'LIVE' ? '140px' : shelfVisible ? (hasAnyCard ? '256px' : '120px') : '0px';
 
   if (gameLoading || !userProfile) return <div className="bg-black h-[100dvh] flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500 w-8 h-8" /></div>;
 
@@ -950,60 +950,49 @@ const MatchDetail = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
       </div>
 
-      <div className="absolute top-0 left-0 w-full px-4 pt-8 pb-4 flex justify-between items-center z-[60]">
-        <button onClick={() => navigate('/match-hub')} className="w-10 h-10 bg-black/50 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white"><ArrowLeft className="w-5 h-5" /></button>
-        <div className="flex flex-col items-end gap-1">
-          <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5">
-            <Coins className="w-4 h-4 text-yellow-400" />
-            <span className="text-white font-bold text-sm">{userProfile.points ?? 0}</span>
-          </div>
-          {activeBookie && (
-            <div className="px-2 py-0.5 rounded-full bg-black/40 border border-white/5 flex items-center gap-1.5">
-              <Signal className="w-3 h-3 text-green-500 animate-pulse" />
-              <span className="text-[9px] font-mono uppercase text-white/60">{activeBookie}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {match && (
-        <div className="absolute top-16 w-full z-40">
-          <div className="w-full h-16 flex items-center justify-between px-3 bg-black/80 backdrop-blur-md border-b border-white/10 relative">
-            <div className="flex-1 flex items-center justify-start min-w-0 mr-2">
-              <img
-                src={match.teams.home.logo}
-                className="w-8 h-8 object-contain mr-2 flex-shrink-0"
-                alt="Home"
-              />
-              <span className="text-xs font-bold text-white uppercase truncate text-left flex-grow">
-                {match.teams.home.name}
-              </span>
+        <div className="absolute top-0 w-full z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
+          {/* Row 1: Back + Points */}
+          <div className="flex items-center justify-between px-4 pt-10 pb-2">
+            <button onClick={() => navigate('/match-hub')} className="w-9 h-9 flex-shrink-0 bg-white/10 border border-white/20 rounded-full flex items-center justify-center text-white active:scale-95">
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+              <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+              <span className="text-white font-bold text-xs font-mono">{userProfile.points ?? 0}</span>
             </div>
-            <div className="w-auto flex-shrink-0 mx-2 flex flex-col items-center justify-center z-10">
-              <span className={`text-[9px] font-bold tracking-widest uppercase mb-[2px] leading-none ${['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'].includes(match.fixture.status.short)
-                ? 'text-[#39ff14]'
-                : 'text-zinc-400'
-                }`}>
+          </div>
+
+          {/* Row 2: Match info */}
+          <div className="flex items-center justify-between px-4 pb-3 gap-3">
+            {/* Home */}
+            <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
+              <img src={match.teams.home.logo} className="w-9 h-9 object-contain" alt="Home" />
+              <span className="text-[10px] font-bold text-white uppercase truncate w-full text-center">{match.teams.home.name}</span>
+            </div>
+
+            {/* Score + status */}
+            <div className="flex flex-col items-center justify-center flex-shrink-0 px-2">
+              <span className={`text-[9px] font-bold tracking-widest uppercase mb-1 leading-none ${
+                ['INPLAY_1ST_HALF','INPLAY_2ND_HALF','INPLAY_ET','INPLAY_ET_SECOND_HALF','INPLAY_PENALTIES','HT','BREAK','EXTRA_TIME_BREAK'].includes(match.fixture.status.short)
+                  ? 'text-[#39ff14]' : 'text-zinc-400'
+              }`}>
                 {match.fixture.status.short === 'NS'
                   ? new Date(match.fixture.date).toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()
-                  : (['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES'].includes(match.fixture.status.short) && match.fixture.status.elapsed)
+                  : (['INPLAY_1ST_HALF','INPLAY_2ND_HALF','INPLAY_ET','INPLAY_ET_SECOND_HALF','INPLAY_PENALTIES'].includes(match.fixture.status.short) && match.fixture.status.elapsed)
                     ? `${match.fixture.status.elapsed}'`
-                    : ({ INPLAY_1ST_HALF: '1H', HT: 'HT', INPLAY_2ND_HALF: '2H', INPLAY_ET: 'ET', INPLAY_ET_SECOND_HALF: 'ET', EXTRA_TIME_BREAK: 'BT', INPLAY_PENALTIES: 'PENS', BREAK: 'BT', FT: 'FT', AET: 'AET', FT_PEN: 'FT-P', POSTPONED: 'PST', CANCELLED: 'CANC', ABANDONED: 'ABD', AWARDED: 'AWD', WO: 'WO' }[match.fixture.status.short] ?? match.fixture.status.short)
+                    : ({ INPLAY_1ST_HALF: '1st Half', HT: 'HT', INPLAY_2ND_HALF: '2nd Half', INPLAY_ET: 'ET', INPLAY_ET_SECOND_HALF: 'ET', EXTRA_TIME_BREAK: 'BT', INPLAY_PENALTIES: 'Pens', BREAK: 'BT', FT: 'FT', AET: 'AET', FT_PEN: 'FT-P', POSTPONED: 'PST', CANCELLED: 'CANC', ABANDONED: 'ABD', AWARDED: 'AWD', WO: 'WO' }[match.fixture.status.short] ?? match.fixture.status.short)
                 }
               </span>
-              <div className="text-lg font-black text-white font-mono leading-none">
-                {match.goals.home} - {match.goals.away}
+              <div className="text-2xl font-black text-white font-mono leading-none">
+                {match.goals.home} – {match.goals.away}
               </div>
             </div>
-            <div className="flex-1 flex items-center justify-end min-w-0 ml-2">
-              <span className="text-xs font-bold text-white uppercase truncate text-right flex-grow">
-                {match.teams.away.name}
-              </span>
-              <img
-                src={match.teams.away.logo}
-                className="w-8 h-8 object-contain ml-2 flex-shrink-0"
-                alt="Away"
-              />
+
+            {/* Away */}
+            <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
+              <img src={match.teams.away.logo} className="w-9 h-9 object-contain" alt="Away" />
+              <span className="text-[10px] font-bold text-white uppercase truncate w-full text-center">{match.teams.away.name}</span>
             </div>
           </div>
         </div>
@@ -1012,7 +1001,7 @@ const MatchDetail = () => {
       {match && viewState !== 'PRE_NO_LINEUPS' && (
         <div
           className="absolute w-full z-[35]"
-          style={{ top: '132px' }}
+          style={{ top: '156px' }}
         >
           <div
             style={{
@@ -1098,7 +1087,7 @@ const MatchDetail = () => {
         <div
           className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
           style={{
-            top: '172px',
+            top: '196px',
             bottom: contentBottom,
             WebkitOverflowScrolling: 'touch',
           }}
@@ -1163,7 +1152,7 @@ const MatchDetail = () => {
         <div
           className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
           style={{
-            top: '172px',
+            top: '196px',
             bottom: '0px',
             WebkitOverflowScrolling: 'touch',
           }}
@@ -1223,7 +1212,22 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {shelfVisible && (
+      {shelfVisible && !cardTypes.some(c => getCardCount(c.id) > 0) && (
+        <div className="fixed bottom-0 w-full z-50 bg-zinc-900/95 backdrop-blur-md border-t border-white/10 px-6 py-5 flex flex-col items-center gap-3">
+          <p className="text-center text-sm text-zinc-400 leading-snug">
+            You don't have any cards in your inventory.{' '}
+            <span className="text-white font-semibold">Go to Training and win some cards!</span>
+          </p>
+          <button
+            onClick={() => navigate('/training')}
+            className="w-full py-3 bg-emerald-600 active:bg-emerald-500 text-white font-bold rounded-xl text-sm uppercase tracking-widest active:scale-95 transition-all"
+          >
+            Go To Training
+          </button>
+        </div>
+      )}
+
+      {shelfVisible && cardTypes.some(c => getCardCount(c.id) > 0) && (
         <div data-testid="card-shelf" className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
           <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
           <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 pointer-events-auto">

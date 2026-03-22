@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { calculateResult, isFinished, isLive, isVoid } from '../../scripts/settle.js';
 import { refreshLeaderboards } from '../../lib/leaderboard/refresh.js';
 import { syncMatchIntel } from '../../scripts/sync-match-intel.js';
+import { syncNewsIntel } from '../../scripts/sync-news-intel.js';
 
 // ── Lazy Supabase client ──────────────────────────────────────────────────────
 let _client = null;
@@ -176,12 +177,18 @@ async function runSyncMatchIntel(supabase) {
   return { ok: true, refreshed };
 }
 
+// ── Job: sync-news-intel ─────────────────────────────────────────────────────
+async function runSyncNewsIntel() {
+  return await syncNewsIntel();
+}
+
 // ── Job registry ─────────────────────────────────────────────────────────────
 const JOBS = {
-  'settle': runSettle,
-  'sync-coaches': runSyncCoaches,
+  'settle':               runSettle,
+  'sync-coaches':         runSyncCoaches,
   'refresh-leaderboards': runRefreshLeaderboards,
-  'sync-match-intel': runSyncMatchIntel,
+  'sync-match-intel':     runSyncMatchIntel,
+  'sync-news-intel':      runSyncNewsIntel,
 };
 
 /**
@@ -190,7 +197,7 @@ const JOBS = {
  * Unified cron endpoint. Dispatches to the correct job by ?job= param.
  * Protected by CRON_SECRET bearer token.
  *
- * Valid jobs: settle, sync-coaches, refresh-leaderboards, sync-match-intel
+ * Valid jobs: settle, sync-coaches, refresh-leaderboards, sync-match-intel, sync-news-intel
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
