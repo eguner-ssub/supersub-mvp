@@ -75,26 +75,26 @@ export default function Dashboard() {
 
   // --- 3. HELPER: Bag Opening Logic ---
   // One representative card per type shown in the reward screen (with ×3 badge)
+  // cardBaseType = key for CardBase's asset maps (c_ prefix)
+  // inventoryId  = key stored in the inventory table (matches Training.jsx convention)
   const PACK_CARD_TYPES = [
-    { id: 'MATCH_RESULT', type: 'MATCH_RESULT', name: 'Match Result' },
-    { id: 'TOTAL_GOALS',  type: 'TOTAL_GOALS',  name: 'Total Goals' },
-    { id: 'PLAYER_SCORE', type: 'PLAYER_SCORE', name: 'Player to Score' },
-    { id: 'SUPERSUB',     type: 'SUPERSUB',     name: 'Supersub' },
+    { cardBaseType: 'c_match_result', inventoryId: 'c_match_result' },
+    { cardBaseType: 'c_total_goals',  inventoryId: 'c_total_goals'  },
+    { cardBaseType: 'c_player_score', inventoryId: 'c_player_score' },
+    { cardBaseType: 'c_supersub',     inventoryId: 'c_supersub'     },
   ];
 
   const triggerBagOpening = () => {
     setBagStage('opening');
     setTimeout(() => {
-      // 3 of each card type = 12 cards total
-      const allCardIds = PACK_CARD_TYPES.flatMap(ct => [ct.id, ct.id, ct.id]);
-
-      // Show one representative card per type in the reward grid
+      // Show one card of each type in the reward grid
       setNewCards(PACK_CARD_TYPES);
       setBagStage('rewards');
 
-      // Actually credit all 12 to inventory
+      // Credit 3 of each = 12 cards to inventory
+      const allInventoryIds = PACK_CARD_TYPES.flatMap(ct => [ct.inventoryId, ct.inventoryId, ct.inventoryId]);
       (async () => {
-        await updateInventory(allCardIds);
+        await updateInventory(allInventoryIds);
       })();
     }, 1500);
   };
@@ -263,10 +263,13 @@ export default function Dashboard() {
                 <p className="text-yellow-400/70 text-xs font-bold uppercase tracking-widest mb-6">12 Cards Added to Kit Bag</p>
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   {newCards.map((card, index) => (
-                    <div key={index} className="relative animate-in zoom-in" style={{ animationDelay: `${index * 100}ms` }}>
-                      <CardBase card={card} />
-                      <div className="absolute -top-2 -right-2 bg-yellow-500 text-black text-xs font-black rounded-full w-7 h-7 flex items-center justify-center shadow-lg">
-                        ×3
+                    <div key={index} className="flex justify-center animate-in zoom-in" style={{ animationDelay: `${index * 100}ms` }}>
+                      {/* inner div sized to the card so badge positions on its corner */}
+                      <div className="relative w-fit">
+                        <CardBase type={card.cardBaseType} />
+                        <div className="absolute -top-2 -right-2 bg-yellow-500 text-black text-xs font-black rounded-full w-7 h-7 flex items-center justify-center shadow-lg z-30">
+                          ×3
+                        </div>
                       </div>
                     </div>
                   ))}
