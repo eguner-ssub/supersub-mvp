@@ -87,6 +87,16 @@ const SUBS_LIST = [
   { number: 20, name: 'Ole Gunnar Solskjær',  position: 'FWD', isSuperSub: true },
 ];
 
+const BAYERN_SUBS_LIST = [
+  { number: 22, name: 'Bernd Dreher',          position: 'GK' },
+  { number: 5,  name: 'Thomas Helmer',         position: 'DEF' },
+  { number: 7,  name: 'Mehmet Scholl',         position: 'MID' },
+  { number: 8,  name: 'Thomas Strunz',         position: 'MID' },
+  { number: 17, name: 'Thorsten Fink',         position: 'MID' },
+  { number: 20, name: 'Hasan Salihamidzic',    position: 'MID' },
+  { number: 24, name: 'Ali Daei',              position: 'FWD' },
+];
+
 // ── Progress step map ─────────────────────────────────────────────────────
 const PHASE_TO_STEP = {
   intro: 0, bench: 0,
@@ -348,30 +358,36 @@ function BenchScene({ introStage, phase, onTabletTap }) {
         </div>
       </div>
 
-      {/* Tablet hotspot */}
+      {/* Tablet hotspot — full lower-half invisible tap zone */}
       {phase === 'bench' && (
-        <button
-          onClick={onTabletTap}
-          className="absolute z-30 flex flex-col items-center justify-end"
-          aria-label="Tap the tablet to make your Supersub call"
-          style={{
-            top: '70%', left: '0%', width: '36%', height: '18%',
-            borderRadius: '10px', background: 'transparent',
-            border: 'none', paddingBottom: '6px',
-          }}
-        >
-          <div
-            className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap"
+        <>
+          <button
+            onClick={onTabletTap}
+            aria-label="Tap the tablet to make your Supersub call"
+            className="absolute z-30"
             style={{
-              background: 'rgba(0,0,0,0.72)',
-              border: '1px solid rgba(0,229,255,0.5)',
-              color: '#00e5ff',
-              animation: 'pulse-border 2s ease-in-out infinite',
+              top: '45%', left: '0%', width: '55%', height: '40%',
+              background: 'transparent', border: 'none',
             }}
+          />
+          {/* CTA pill — positioned right next to the tablet */}
+          <div
+            className="absolute z-40 pointer-events-none"
+            style={{ top: '64%', left: '4%' }}
           >
-            ⚡ Tap the tablet
+            <div
+              className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap"
+              style={{
+                background: 'rgba(0,0,0,0.72)',
+                border: '1px solid rgba(0,229,255,0.5)',
+                color: '#00e5ff',
+                animation: 'pulse-border 2s ease-in-out infinite',
+              }}
+            >
+              ⚡ Tap the tablet
+            </div>
           </div>
-        </button>
+        </>
       )}
     </div>
   );
@@ -430,7 +446,7 @@ function MockMatchView({ activeTab, minute, score, onUseSupersubCard, onSolskjae
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: activeTab === 'lineup' ? '148px' : '32px' }}>
+      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: activeTab === 'lineup' ? '168px' : '56px' }}>
         {activeTab === 'lineup' && <LineupTab />}
         {activeTab === 'subs'   && <SubsTab onSolskjaerCTA={onSolskjaerCTA} />}
       </div>
@@ -438,7 +454,7 @@ function MockMatchView({ activeTab, minute, score, onUseSupersubCard, onSolskjae
       {/* Live Insights + CTA — lineup only */}
       {activeTab === 'lineup' && (
         <div
-          className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-6"
+          className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-12"
           style={{ background: 'rgba(10,12,18,0.97)', borderTop: '1px solid rgba(255,255,255,0.07)' }}
         >
           <div className="flex items-start gap-2.5 mb-3">
@@ -477,7 +493,7 @@ function LineupTab() {
   return (
     <div
       className="relative mx-3 my-3 rounded-xl overflow-hidden"
-      style={{ background: '#152015', border: '1px solid rgba(255,255,255,0.06)', minHeight: '340px' }}
+      style={{ background: '#152015', border: '1px solid rgba(255,255,255,0.06)', minHeight: '460px' }}
     >
       {/* Pitch markings */}
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 170" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
@@ -548,7 +564,7 @@ function PlayerNode({ number, name, kit = 'home' }) {
 function SubsTab({ onSolskjaerCTA }) {
   return (
     <div style={{ padding: '0 12px' }}>
-      {/* Team bench header */}
+      {/* ── Man Utd bench ── */}
       <div className="flex items-center gap-2 mt-4 mb-2 px-1">
         <TeamLogo src={MAN_UTD_LOGO} fallback="🔴" size={18} />
         <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Man Utd Bench</span>
@@ -560,15 +576,12 @@ function SubsTab({ onSolskjaerCTA }) {
           className="flex items-center gap-3 px-4 pt-2 pb-2"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
         >
-          {/* Jersey number circle */}
           <div
             className="flex-shrink-0 flex items-center justify-center font-black text-xs rounded-full"
             style={{ width: 28, height: 28, background: '#f5f0e8', color: '#111' }}
           >
             {sub.number}
           </div>
-
-          {/* Full name */}
           <span className="flex-1 text-white font-semibold text-sm truncate">{sub.name}</span>
 
           {/* Supersub CTA — Solskjær ONLY */}
@@ -588,6 +601,28 @@ function SubsTab({ onSolskjaerCTA }) {
           )}
         </div>
       ))}
+
+      {/* ── Bayern bench ── */}
+      <div className="flex items-center gap-2 mt-5 mb-2 px-1">
+        <TeamLogo src={BAYERN_LOGO} fallback="🔵" size={18} />
+        <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Bayern Bench</span>
+      </div>
+
+      {BAYERN_SUBS_LIST.map((sub) => (
+        <div
+          key={sub.number}
+          className="flex items-center gap-3 px-4 pt-2 pb-2"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <div
+            className="flex-shrink-0 flex items-center justify-center font-black text-xs rounded-full"
+            style={{ width: 28, height: 28, background: '#9ca3af', color: '#111' }}
+          >
+            {sub.number}
+          </div>
+          <span className="flex-1 text-white font-semibold text-sm truncate">{sub.name}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -595,32 +630,35 @@ function SubsTab({ onSolskjaerCTA }) {
 // ── ConfirmModal — matches real MatchDetail staging modal ─────────────────
 function ConfirmModal({ onConfirm, onCancel }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
-        <div className="flex justify-between items-start mb-8">
-          <div className="space-y-1">
-            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Outcome Selection</p>
-            <h3 className="text-white font-black text-3xl uppercase italic tracking-tighter leading-tight">
+    <div className="absolute inset-0 z-50 flex items-center justify-center px-5 bg-black/65 backdrop-blur-sm">
+      <div className="w-full bg-zinc-900 border border-white/10 rounded-3xl p-6 shadow-2xl">
+        {/* Header row */}
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest mb-1.5">Outcome Selection</p>
+            <h3 className="text-white font-black text-2xl uppercase tracking-tight leading-tight">
               Solskjær<br />Sub to Score
             </h3>
           </div>
-          <div className="text-right space-y-1">
-            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Reward</p>
-            <p className="text-yellow-400 font-black text-4xl tracking-tighter">
-              2500 <span className="text-xs uppercase">pts</span>
-            </p>
+          <div className="text-right">
+            <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest mb-1.5">Reward</p>
+            <div className="flex items-baseline gap-1 justify-end">
+              <span className="text-yellow-400 font-black text-3xl tracking-tighter">2500</span>
+              <span className="text-yellow-400/70 text-xs font-black uppercase">pts</span>
+            </div>
           </div>
         </div>
-        <div className="flex gap-4">
+        {/* Buttons */}
+        <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-4 bg-zinc-800 rounded-2xl font-bold uppercase text-zinc-400 text-xs tracking-widest hover:bg-zinc-700 transition-colors"
+            className="flex-1 py-3.5 bg-zinc-800 rounded-2xl font-bold uppercase text-zinc-400 text-xs tracking-widest active:bg-zinc-700 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="flex-[2] py-4 bg-emerald-500 rounded-2xl font-black uppercase text-black text-xl shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:scale-105 transition-all"
+            className="flex-[2] py-3.5 bg-emerald-500 rounded-2xl font-black uppercase text-black text-sm tracking-wider shadow-[0_8px_24px_rgba(16,185,129,0.3)] active:scale-95 transition-all"
           >
             Confirm Play
           </button>
