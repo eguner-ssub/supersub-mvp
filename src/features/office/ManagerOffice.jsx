@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp } from 'lucide-react';
+import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp, Globe2 } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 import { normalizeMatch } from '../../shared/utils/normalizeMatch';
 
@@ -97,10 +97,10 @@ const ManagerOffice = () => {
                         </div>
                     </div>
 
-                    {/* C. LAPTOP SCREEN (Scouting) — Desk center */}
+                    {/* C. LAPTOP SCREEN (League Hub) — Desk center */}
                     <div
                         data-testid="hotspot-laptop"
-                        onClick={() => navigate('/scouting')}
+                        onClick={() => navigate('/league-hub')}
                         className="absolute top-[58%] left-[28%] w-[38%] h-[18%] z-20 cursor-pointer active:scale-[0.98] transition-all duration-100"
                         style={{
                             transform: 'skewX(-2deg) skewY(1deg)',
@@ -108,7 +108,7 @@ const ManagerOffice = () => {
                         }}
                     >
                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 diegetic-screen p-2 rounded-full shadow-office">
-                            <Monitor className="w-4 h-4 text-blue-400" />
+                            <Globe2 className="w-4 h-4 text-blue-400" />
                         </div>
                     </div>
 

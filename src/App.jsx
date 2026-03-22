@@ -13,6 +13,7 @@ import Landing from './pages/Landing';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
+import InteractiveOnboarding from './pages/InteractiveOnboarding';
 import MatchHub from './features/match-day/MatchHub';
 import MatchDetail from './features/match-day/MatchDetail';
 import Training from './pages/Training';
@@ -28,6 +29,7 @@ import GenericLab from './features/inventory/GenericLab';
 import ComingSoon from './pages/ComingSoon';
 import Leaderboard from './pages/Leaderboard';
 import FPLMarket from './pages/FPLMarket';
+import LeagueHub from './features/league-hub/LeagueHub';
 import ViewLedger from './features/locker-room/ViewLedger';
 import APIDebugger from './features/debug/APIDebugger';
 
@@ -67,6 +69,7 @@ export const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/intro" element={<InteractiveOnboarding />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
 
@@ -123,6 +126,7 @@ export const AppRoutes = () => {
 
       <Route path="/stats" element={<ProtectedRoute><FPLMarket /></ProtectedRoute>} />
       <Route path="/scouting" element={<ProtectedRoute><FPLMarket /></ProtectedRoute>} />
+      <Route path="/league-hub" element={<ProtectedRoute><LeagueHub /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><ViewLedger /></ProtectedRoute>} />
       <Route path="/inbox" element={<ProtectedRoute><ComingSoon title="Manager Inbox" message="Social features are currently locked." /></ProtectedRoute>} />
       <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
