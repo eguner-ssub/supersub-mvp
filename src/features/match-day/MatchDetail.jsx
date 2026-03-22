@@ -952,11 +952,16 @@ const MatchDetail = () => {
 
       {match && (
         <div className="absolute top-0 w-full z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
-          {/* Row 1: Back + Points */}
-          <div className="flex items-center justify-between px-4 pt-10 pb-2">
+          {/* Row 1: Back + League + Points */}
+          <div className="flex items-center justify-between px-4 pt-10 pb-2 gap-3">
             <button onClick={() => navigate('/match-hub')} className="w-9 h-9 flex-shrink-0 bg-white/10 border border-white/20 rounded-full flex items-center justify-center text-white active:scale-95">
               <ArrowLeft className="w-4 h-4" />
             </button>
+            {match.league?.name && (
+              <span className="flex-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-400 truncate">
+                {match.league.name}
+              </span>
+            )}
             <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
               <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
               <span className="text-white font-bold text-xs font-mono">{userProfile.points ?? 0}</span>
