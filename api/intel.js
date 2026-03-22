@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { INTEL_CONFIG } from '../config/intel.js';
+import { generateProse } from '../lib/intel/templates.js';
 
 function toFrontendFormat(prose) {
   const p = prose || {};
@@ -264,6 +265,12 @@ export default async function handler(req, res) {
       });
     }
 
+    // Re-generate prose at request time so template fixes apply instantly
+    // without needing to re-run the sync script on stored records.
+    const freshProse = intel.report_sections
+      ? generateProse(intel.report_sections, match.home_team, match.away_team)
+      : intel.prose;
+
     return res.json({
       available: true,
       match: {
@@ -276,10 +283,10 @@ export default async function handler(req, res) {
       },
       sportmonksAvailable: intel.sportmonks_available,
       sections: intel.report_sections,
-      prose: intel.prose,
+      prose: freshProse,
       generatedAt: intel.generated_at,
       proseMethod: intel.prose_method,
-      analysis: toFrontendFormat(intel.prose),
+      analysis: toFrontendFormat(freshProse),
     });
   } catch (err) {
     console.error('[api/intel] Error:', err.message);
