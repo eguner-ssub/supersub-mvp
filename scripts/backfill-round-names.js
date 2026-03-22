@@ -32,9 +32,11 @@ export async function backfillRoundNames() {
   const supabase = getSupabase();
 
   // 1. Load current seasons for all tracked leagues
+  // Use explicit FK name to avoid ambiguity — seasons.league_id → leagues.id
+  // (leagues also has current_season_id → seasons, which would create two join paths)
   const { data: seasons, error: seasonsErr } = await supabase
     .from('seasons')
-    .select('id, sportmonks_id, leagues!inner(sportmonks_id, name)')
+    .select('id, sportmonks_id, leagues!seasons_league_id_fkey(sportmonks_id, name)')
     .eq('is_current', true);
 
   if (seasonsErr) throw new Error(`Failed to load seasons: ${seasonsErr.message}`);

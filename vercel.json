@@ -1,44 +1,44 @@
 {
+  "headers": [
+    {
+      "source": "/",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
-    {
-      "source": "/login",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/signup",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/dashboard",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/onboarding",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/match-hub",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/match/:id",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/training",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/inventory",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/settings",
-      "destination": "/index.html"
-    }
+    { "source": "/login",           "destination": "/index.html" },
+    { "source": "/signup",          "destination": "/index.html" },
+    { "source": "/intro",           "destination": "/index.html" },
+    { "source": "/onboarding",      "destination": "/index.html" },
+    { "source": "/dashboard",       "destination": "/index.html" },
+    { "source": "/match-hub",       "destination": "/index.html" },
+    { "source": "/match/:id",       "destination": "/index.html" },
+    { "source": "/manager-office",  "destination": "/index.html" },
+    { "source": "/league-hub",      "destination": "/index.html" },
+    { "source": "/training",        "destination": "/index.html" },
+    { "source": "/inventory",       "destination": "/index.html" },
+    { "source": "/inventory/active","destination": "/index.html" },
+    { "source": "/settings",        "destination": "/index.html" },
+    { "source": "/account",         "destination": "/index.html" },
+    { "source": "/leaderboard",     "destination": "/index.html" },
+    { "source": "/scouting",        "destination": "/index.html" },
+    { "source": "/stats",           "destination": "/index.html" },
+    { "source": "/history",         "destination": "/index.html" },
+    { "source": "/inbox",           "destination": "/index.html" },
+    { "source": "/debug",           "destination": "/index.html" },
+    { "source": "/lab",             "destination": "/index.html" },
+    { "source": "/lab/(.*)",        "destination": "/index.html" }
   ]
 }
