@@ -60,7 +60,7 @@ const MatchHub = () => {
       <div className="flex-none bg-black/80 backdrop-blur-md border-b border-white/10 z-50">
 
         {/* Row 1: Back | Title | Points */}
-        <div className="flex justify-between items-center px-4 pt-12 pb-3">
+        <div className="relative flex justify-between items-center px-4 pt-12 pb-3">
           <button
             onClick={() => navigate('/manager-office')}
             className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center active:scale-95 transition-all"
@@ -68,7 +68,7 @@ const MatchHub = () => {
             <ChevronLeft className="w-5 h-5" />
           </button>
 
-          <h1 className="text-base font-black uppercase tracking-widest text-emerald-400">Match Hub</h1>
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-base font-black uppercase tracking-widest text-emerald-400">Match Hub</h1>
 
           <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
             <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />

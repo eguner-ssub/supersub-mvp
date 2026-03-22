@@ -37,12 +37,12 @@ const LEAGUES = [
 const EPL_ID = 8;
 
 const TABS = [
-  { key: 'standings', label: 'Table',    icon: Trophy },
-  { key: 'fixtures',  label: 'Fixtures', icon: BarChart2 },
-  { key: 'scorers',   label: 'Scorers',  icon: Target },
-  { key: 'bench',     label: 'Bench',    icon: Users },
-  { key: 'news',      label: 'News',     icon: Newspaper,  eplOnly: true },
-  { key: 'fpl',       label: 'FPL',      icon: TrendingUp, eplOnly: true },
+  { key: 'standings', label: 'Table',          icon: Trophy },
+  { key: 'fixtures',  label: 'Fixtures',       icon: BarChart2 },
+  { key: 'scorers',   label: 'Top Scorers',    icon: Target },
+  { key: 'bench',     label: 'Supersub Stats', icon: Users },
+  { key: 'news',      label: 'News',           icon: Newspaper,  eplOnly: true },
+  { key: 'fpl',       label: 'FPL Market',     icon: TrendingUp, eplOnly: true },
 ];
 
 /* ─────────────────────────────────────────────
@@ -101,7 +101,7 @@ const StandingsTab = ({ leagueId }) => {
   return (
     <div>
       {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0 8px', borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0 8px', borderBottom: `1px solid ${C.border}` }}>
         <div style={{ width: 20, flexShrink: 0 }} />
         <div style={{ flex: 1, fontFamily: FONT, fontSize: 10, fontWeight: 700, color: C.grey, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
           Club
@@ -110,9 +110,8 @@ const StandingsTab = ({ leagueId }) => {
         <div style={colStyle(22)}>W</div>
         <div style={colStyle(22)}>D</div>
         <div style={colStyle(22)}>L</div>
-        <div style={colStyle(28)}>GD</div>
+        <div className="gd-col" style={colStyle(28)}>GD</div>
         <div style={{ ...colStyle(28), color: C.cyan }}>Pts</div>
-        <div style={{ width: 44, flexShrink: 0 }} />
       </div>
 
       {loading
@@ -131,11 +130,11 @@ const StandingRow = ({ row }) => {
   const gdStr = row.gd > 0 ? `+${row.gd}` : String(row.gd);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 0', borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
       <div style={{ width: 20, fontFamily: FONT, fontSize: 11, fontWeight: 700, color: posColor, textAlign: 'center', flexShrink: 0 }}>
         {row.position}
       </div>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
         {row.logo
           ? <img src={row.logo} alt="" style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }} loading="lazy" />
           : <div style={{ width: 20, height: 20, borderRadius: 4, background: C.surface, flexShrink: 0 }} />
@@ -148,19 +147,16 @@ const StandingRow = ({ row }) => {
       <Cell w={22} val={row.won} />
       <Cell w={22} val={row.drawn} />
       <Cell w={22} val={row.lost} />
-      <Cell w={28} val={gdStr} muted />
+      <Cell w={28} val={gdStr} muted className="gd-col" />
       <div style={{ width: 28, textAlign: 'right', flexShrink: 0, fontFamily: FONT, fontSize: 12, fontWeight: 800, color: C.cyan }}>
         {row.points}
-      </div>
-      <div style={{ width: 44, flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>
-        <FormDots form={row.form} />
       </div>
     </div>
   );
 };
 
-const Cell = ({ w, val, muted = false }) => (
-  <div style={{ width: w, textAlign: 'right', flexShrink: 0, fontFamily: FONT, fontSize: 11, fontWeight: 600, color: muted ? C.grey : C.greyLight }}>
+const Cell = ({ w, val, muted = false, className }) => (
+  <div className={className} style={{ width: w, textAlign: 'right', flexShrink: 0, fontFamily: FONT, fontSize: 11, fontWeight: 600, color: muted ? C.grey : C.greyLight }}>
     {val ?? '–'}
   </div>
 );
@@ -455,6 +451,7 @@ const NewsTab = () => {
   const [error, setError] = useState(null);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
+  const [selectedArticle, setSelectedArticle] = useState(null);
   const LIMIT = 20;
 
   const fetchNews = useCallback((off) => {
@@ -477,17 +474,21 @@ const NewsTab = () => {
   const sourceColor = { 'BBC': C.red, 'Sky Sports': C.cyan, 'The Guardian': C.emerald };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {loading && articles.length === 0
-        ? Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} style={{ padding: '12px 14px', background: C.surface, borderRadius: 12, border: `1px solid ${C.border}` }}>
-              <div style={{ width: '70%', height: 13, borderRadius: 4, background: '#1a1a24', marginBottom: 8, animation: 'pulse 1.4s ease infinite' }} />
-              <div style={{ width: '90%', height: 10, borderRadius: 4, background: '#1a1a24', animation: 'pulse 1.4s ease infinite' }} />
-            </div>
-          ))
-        : articles.map((a, i) => (
-          <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-            <div style={{ padding: '12px 14px', background: C.surface, borderRadius: 12, border: `1px solid ${C.border}` }}>
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {loading && articles.length === 0
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{ padding: '12px 14px', background: C.surface, borderRadius: 12, border: `1px solid ${C.border}` }}>
+                <div style={{ width: '70%', height: 13, borderRadius: 4, background: '#1a1a24', marginBottom: 8, animation: 'pulse 1.4s ease infinite' }} />
+                <div style={{ width: '90%', height: 10, borderRadius: 4, background: '#1a1a24', animation: 'pulse 1.4s ease infinite' }} />
+              </div>
+            ))
+          : articles.map((a, i) => (
+            <div
+              key={i}
+              onClick={() => setSelectedArticle(a)}
+              style={{ padding: '12px 14px', background: C.surface, borderRadius: 12, border: `1px solid ${C.border}`, cursor: 'pointer' }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{
                   fontFamily: FONT, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
@@ -510,19 +511,110 @@ const NewsTab = () => {
                 </div>
               )}
             </div>
-          </a>
-        ))
-      }
-      {!loading && articles.length === 0 && <EmptyState msg="No EPL news available right now." />}
-      {!loading && articles.length < total && (
-        <button
-          onClick={() => fetchNews(offset)}
-          style={{ padding: '10px 0', background: C.cyanDim, border: `1px solid ${C.cyan}30`, borderRadius: 10, color: C.cyan, fontFamily: FONT, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+          ))
+        }
+        {!loading && articles.length === 0 && <EmptyState msg="No EPL news available right now." />}
+        {!loading && articles.length < total && (
+          <button
+            onClick={() => fetchNews(offset)}
+            style={{ padding: '10px 0', background: C.cyanDim, border: `1px solid ${C.cyan}30`, borderRadius: 10, color: C.cyan, fontFamily: FONT, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+          >
+            Load more
+          </button>
+        )}
+      </div>
+
+      {/* ── In-app article overlay ── */}
+      {selectedArticle && (
+        <div
+          onClick={() => setSelectedArticle(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'flex-end',
+          }}
         >
-          Load more
-        </button>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxHeight: '85vh',
+              background: '#13131e',
+              borderRadius: '20px 20px 0 0',
+              border: `1px solid ${C.border}`,
+              borderBottom: 'none',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Drag handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 0' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.2)' }} />
+            </div>
+
+            {/* Scrollable content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 0' }}>
+              {/* Source + date */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{
+                  fontFamily: FONT, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
+                  color: sourceColor[selectedArticle.source] || C.grey,
+                  background: `${sourceColor[selectedArticle.source] || C.grey}18`,
+                  padding: '3px 8px', borderRadius: 4,
+                }}>
+                  {selectedArticle.source}
+                </span>
+                <span style={{ fontFamily: FONT, fontSize: 10, color: C.grey }}>
+                  {selectedArticle.published_at
+                    ? new Date(selectedArticle.published_at).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'long' })
+                    : ''}
+                </span>
+              </div>
+
+              {/* Title */}
+              <div style={{ fontFamily: FONT, fontSize: 17, fontWeight: 800, color: C.white, lineHeight: 1.3, marginBottom: 14 }}>
+                {selectedArticle.title}
+              </div>
+
+              {/* Summary */}
+              {selectedArticle.summary && (
+                <div style={{ fontFamily: FONT, fontSize: 13, color: C.greyLight, lineHeight: 1.6, marginBottom: 24 }}>
+                  {selectedArticle.summary}
+                </div>
+              )}
+            </div>
+
+            {/* Footer actions */}
+            <div style={{ padding: '12px 20px 32px', display: 'flex', gap: 10, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+              <button
+                onClick={() => setSelectedArticle(null)}
+                style={{
+                  flex: 1, padding: '13px 0',
+                  background: 'rgba(255,255,255,0.06)', border: `1px solid ${C.border}`,
+                  borderRadius: 12, color: C.grey,
+                  fontFamily: FONT, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+              <a
+                href={selectedArticle.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  flex: 2, padding: '13px 0',
+                  background: C.cyanDim, border: `1px solid ${C.cyan}50`,
+                  borderRadius: 12, color: C.cyan,
+                  fontFamily: FONT, fontSize: 13, fontWeight: 800,
+                  textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                Read on {selectedArticle.source} ↗
+              </a>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 };
 
@@ -659,6 +751,7 @@ const LeagueHub = () => {
           50% { opacity: 0.7; }
         }
         * { box-sizing: border-box; }
+        @media (max-width: 360px) { .gd-col { display: none !important; } }
       `}</style>
 
       {/* ── Header ── */}
@@ -745,11 +838,9 @@ const LeagueHub = () => {
         {/* ── Tab Bar ── */}
         <div style={{
           display: 'flex',
+          flexWrap: 'wrap',
           gap: 4,
-          overflowX: 'auto',
           paddingBottom: 12,
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
         }}>
           {visibleTabs.map(tab => {
             const Icon = tab.icon;
