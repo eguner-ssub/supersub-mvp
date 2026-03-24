@@ -6,7 +6,7 @@
 
 @layer base {
   body {
-    @apply bg-gray-900 text-white min-h-screen;
+    @apply bg-black text-white min-h-screen;
   }
 }
 
