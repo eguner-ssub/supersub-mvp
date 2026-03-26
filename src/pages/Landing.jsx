@@ -100,6 +100,25 @@ const Landing = () => {
         </div>
 
       </div>
+
+      {/* ── Compliance footer ─────────────────────────────────────────────────
+          18+ pill (bottom-right) and BeGambleAware link (bottom-left).
+          Required for UKGC affiliate directory listing.
+      ──────────────────────────────────────────────────────────────────────── */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between px-5 pb-5 pt-2">
+        <a
+          href="https://www.begambleaware.org"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[9px] text-white/25 uppercase tracking-widest hover:text-white/45 transition-colors"
+        >
+          BeGambleAware.org
+        </a>
+        <div className="text-[9px] font-black text-white/25 uppercase tracking-widest border border-white/15 rounded px-1.5 py-0.5">
+          18+
+        </div>
+      </div>
+
     </div>
   );
 };

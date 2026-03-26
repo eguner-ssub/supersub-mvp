@@ -6,11 +6,12 @@ import gameDataRaw from '../data/gameData.json';
 import { getCardConfig } from '../utils/cardConfig';
 import CardBase from '../shared/ui/CardBase';
 import WinModal from '../components/WinModal';
+import WinCelebrationModal from '../shared/ui/WinCelebrationModal';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userProfile, updateInventory, loading, gainEnergy } = useGame();
+  const { userProfile, updateInventory, loading, gainEnergy, unseenSettlements, markPredictionsSeen } = useGame();
 
   // --- LOCAL STATE ---
   const [showBagOverlay, setShowBagOverlay] = useState(false);
@@ -285,7 +286,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* WIN MODAL */}
+        {/* WIN MODAL (onboarding/mock flow — kept intact) */}
         {showWinModal && (
           <WinModal
             amount={winAmount}
@@ -293,6 +294,20 @@ export default function Dashboard() {
               setShowWinModal(false);
               setWinAmount(0);
             }}
+          />
+        )}
+
+        {/* ── Win Celebration Modal — real settled predictions ─────────────────
+            Shows the first unseen settled prediction. On dismiss, marks it seen
+            and the next one (if any) will appear on the following render.
+            Gated on is_age_verified so affiliate CTAs are never shown to
+            unverified users. Requires migration 034 + 035.
+        ──────────────────────────────────────────────────────────────────────── */}
+        {unseenSettlements.length > 0 && userProfile?.is_age_verified && (
+          <WinCelebrationModal
+            prediction={unseenSettlements[0]}
+            onDismiss={() => markPredictionsSeen([unseenSettlements[0].id])}
+            onShare={() => {/* share flow added in Shareable Cards sprint */}}
           />
         )}
 

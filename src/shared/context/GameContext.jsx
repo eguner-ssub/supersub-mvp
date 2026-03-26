@@ -9,6 +9,8 @@ export const GameProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [statDictionary, setStatDictionary] = useState(null);
+  // Settled predictions the user hasn't seen yet — drives WinCelebrationModal on Dashboard
+  const [unseenSettlements, setUnseenSettlements] = useState([]);
   const activeRequestId = useRef(0);
   const realtimeChannelRef = useRef(null);
 
@@ -48,6 +50,20 @@ export const GameProvider = ({ children }) => {
 
       setUserProfile({ ...profile, inventoryMap });
 
+      // Check for unseen settled predictions (drives WinCelebrationModal on Dashboard).
+      // Gracefully no-ops if migration 034 hasn't been applied yet (column missing → error → []).
+      const { data: unseen, error: unseenError } = await supabase
+        .from('predictions')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('seen_by_user', false)
+        .eq('status', 'SETTLED')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (activeRequestId.current !== myRequestId) return;
+      setUnseenSettlements(unseenError ? [] : (unseen ?? []));
+
     } catch (error) {
       if (activeRequestId.current !== myRequestId) return;
       console.error('🔥 CONNECTION FAILURE:', error.message);
@@ -77,6 +93,21 @@ export const GameProvider = ({ children }) => {
       inventoryMap: { ...prev.inventoryMap, [cardId]: currentCount - 1 }
     }));
     return true;
+  };
+
+  /**
+   * MARK PREDICTIONS SEEN
+   * Called when WinCelebrationModal is dismissed.
+   * Sets seen_by_user = true in the DB and removes the rows from local state
+   * so the modal doesn't re-appear. Requires migration 034.
+   */
+  const markPredictionsSeen = async (ids) => {
+    if (!ids?.length) return;
+    await supabase
+      .from('predictions')
+      .update({ seen_by_user: true })
+      .in('id', ids);
+    setUnseenSettlements(prev => prev.filter(p => !ids.includes(p.id)));
   };
 
   const updateInventory = async (newCardIds) => {
@@ -348,6 +379,6 @@ export const GameProvider = ({ children }) => {
     };
   }, [userProfile?.id]);
 
-  const value = { userProfile, loading, statDictionary, supabase, placeBet, consumeCard, spendEnergy, gainEnergy, updateInventory, loadProfile, createProfile };
+  const value = { userProfile, loading, statDictionary, supabase, placeBet, consumeCard, spendEnergy, gainEnergy, updateInventory, loadProfile, createProfile, unseenSettlements, markPredictionsSeen };
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 };

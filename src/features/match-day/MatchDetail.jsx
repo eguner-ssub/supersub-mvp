@@ -7,6 +7,7 @@ import TacticalHUD from '../../shared/ui/TacticalHUD';
 import MatchTerminationTerminal from '../../shared/ui/MatchTerminationTerminal';
 import MatchLineup from './MatchLineup';
 import { normalizeMatch } from '../../shared/utils/normalizeMatch';
+import PostPredictionSheet from './PostPredictionSheet';
 
 /* ─────────────────────────────────────────────────────────────
    TAB DEFINITIONS
@@ -726,6 +727,8 @@ const MatchDetail = () => {
   const [flowState, setFlowState] = useState('idle');
   const [selectedCard, setSelectedCard] = useState(null);
   const [stagedBet, setStagedBet] = useState(null);
+  // Affiliate sheet — set after successful card placement, cleared on dismiss
+  const [affiliateSheetData, setAffiliateSheetData] = useState(null);
   const [activeTab, setActiveTab] = useState('LINEUP');
   const [selectedScorerTeam, setSelectedScorerTeam] = useState('home');
   const [analysisData, setAnalysisData] = useState(null);
@@ -845,6 +848,14 @@ const MatchDetail = () => {
     if (result.success) {
       await consumeCard(stagedBet.card);
       setFlowState('resolved');
+      // Show affiliate bottom sheet (only renders if userProfile.is_age_verified is true)
+      setAffiliateSheetData({
+        cardType:       stagedBet.card,
+        selectionLabel: stagedBet.displayLabel,
+        odds:           stagedBet.odds,
+        matchName:      match ? `${match.teams.home.name} vs ${match.teams.away.name}` : '',
+        matchId:        Number(id),
+      });
     }
   };
 
@@ -1434,6 +1445,18 @@ const MatchDetail = () => {
             <button onClick={handleReset} className="w-full py-5 bg-white text-black font-black uppercase rounded-2xl shadow-2xl hover:bg-zinc-200 transition-colors tracking-tighter text-lg">Continue Scouting</button>
           </div>
         </div>
+      )}
+
+      {/* ── Post-prediction affiliate sheet ──────────────────────────────────
+          Renders above the "Locked In!" overlay (z-[130] > z-[120]).
+          Only shown when userProfile.is_age_verified is true.
+          Auto-dismisses after 8 seconds or on manual X tap.
+      ─────────────────────────────────────────────────────────────────────── */}
+      {affiliateSheetData && userProfile?.is_age_verified && (
+        <PostPredictionSheet
+          {...affiliateSheetData}
+          onDismiss={() => setAffiliateSheetData(null)}
+        />
       )}
     </div>
   );
