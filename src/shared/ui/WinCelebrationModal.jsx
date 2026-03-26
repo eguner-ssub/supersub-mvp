@@ -1,6 +1,7 @@
 import React from 'react';
-import { Trophy, X, Share2 } from 'lucide-react';
+import { Trophy, X } from 'lucide-react';
 import AffiliateDisclaimer from './AffiliateDisclaimer';
+import ShareCardButton from './ShareCardButton';
 import { useAffiliateLink } from '../hooks/useAffiliateLink';
 import { useGame } from '../context/GameContext';
 
@@ -18,9 +19,8 @@ import { useGame } from '../context/GameContext';
  * Props:
  *   prediction — full predictions row from Supabase
  *   onDismiss  — called when user closes; parent calls markPredictionsSeen([id])
- *   onShare    — called with prediction; share flow added in a later sprint
  */
-const WinCelebrationModal = ({ prediction, onDismiss, onShare }) => {
+const WinCelebrationModal = ({ prediction, onDismiss }) => {
   const { userProfile, supabase } = useGame();
   const isWon = prediction?.settled_status === 'WON';
 
@@ -84,14 +84,8 @@ const WinCelebrationModal = ({ prediction, onDismiss, onShare }) => {
             <p className="text-white font-black text-3xl tracking-tighter">+{pointsEarned}</p>
           </div>
 
-          {/* Share button — wired to onShare; share infrastructure added in later sprint */}
-          <button
-            onClick={() => onShare(prediction)}
-            className="w-full py-3 mb-3 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-white/15 bg-white/5 text-white/60 hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            Share your call
-          </button>
+          {/* Share button */}
+          <ShareCardButton prediction={prediction} variant="won" className="w-full py-3 mb-3" />
 
           {/* Affiliate CTA */}
           <p className="text-zinc-400 text-xs text-center mb-3 leading-relaxed">

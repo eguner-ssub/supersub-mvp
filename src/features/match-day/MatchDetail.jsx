@@ -752,12 +752,15 @@ const MatchDetail = () => {
       await consumeCard(stagedBet.card);
       setFlowState('resolved');
       // Show affiliate bottom sheet — not shown for Supersub (fixed reward, no market odds)
+      // Include the newly created prediction (with share_token) for the share button
+      const newPrediction = result.data?.[0] ?? null;
       if (stagedBet.card !== 'c_supersub') setAffiliateSheetData({
         cardType:       stagedBet.card,
         selectionLabel: stagedBet.displayLabel,
         odds:           stagedBet.odds,
         matchName:      match ? `${match.teams.home.name} vs ${match.teams.away.name}` : '',
         matchId:        Number(id),
+        prediction:     newPrediction,
       });
     }
   };

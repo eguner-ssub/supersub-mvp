@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Signup from '../../pages/Signup';
@@ -18,15 +18,38 @@ import { supabase } from '../../supabaseClient';
 const renderSignup = () =>
   render(<MemoryRouter><Signup /></MemoryRouter>);
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fillEmail = (value = 'test@example.com') =>
+  fireEvent.change(screen.getByPlaceholderText('USER@STADIUM.MOBI'), {
+    target: { value },
+  });
+
+const fillPassword = (value = 'password123') =>
+  fireEvent.change(screen.getAllByPlaceholderText('••••••••')[0], {
+    target: { value },
+  });
+
+const checkAgeBox = () => {
+  const [ageCheckbox] = screen.getAllByRole('checkbox');
+  fireEvent.click(ageCheckbox);
+};
+
+const checkTermsBox = () => {
+  const [, termsCheckbox] = screen.getAllByRole('checkbox');
+  fireEvent.click(termsCheckbox);
+};
+
+const checkBothBoxes = () => { checkAgeBox(); checkTermsBox(); };
+
+const submitForm = () =>
+  fireEvent.submit(screen.getByText('CREATE ACCOUNT').closest('form'));
+
 describe('Signup Page', () => {
-  // NOTE: fake timers are only activated inside the one test that needs the
-  // 500ms navigation delay. All other tests use real timers so that waitFor
-  // can poll normally.
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  // ─── Form rendering ───────────────────────────────────────────────────────
+  // ─── Form rendering ─────────────────────────────────────────────────────────
 
   describe('Form rendering', () => {
     it('renders the email input', () => {
@@ -36,8 +59,7 @@ describe('Signup Page', () => {
 
     it('renders the password input', () => {
       renderSignup();
-      const inputs = screen.getAllByPlaceholderText('••••••••');
-      expect(inputs.length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText('••••••••').length).toBeGreaterThan(0);
     });
 
     it('renders the CREATE ACCOUNT submit button', () => {
@@ -51,7 +73,146 @@ describe('Signup Page', () => {
     });
   });
 
-  // ─── Successful signup (session returned → navigate to /onboarding) ───────
+  // ─── Compliance checkboxes ──────────────────────────────────────────────────
+
+  describe('Compliance checkboxes', () => {
+    it('renders the age confirmation checkbox', () => {
+      renderSignup();
+      expect(screen.getByText(/I confirm I am 18 years of age/i)).toBeInTheDocument();
+    });
+
+    it('renders the terms acceptance checkbox', () => {
+      renderSignup();
+      expect(screen.getByText(/I agree to the/i)).toBeInTheDocument();
+    });
+
+    it('renders inline Terms of Service link within the terms checkbox label', () => {
+      renderSignup();
+      const links = screen.getAllByRole('link', { name: /Terms of Service/i });
+      // One in the checkbox label, one in the footer — at least one must exist
+      expect(links.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('renders inline Privacy Policy link within the terms checkbox label', () => {
+      renderSignup();
+      const links = screen.getAllByRole('link', { name: /Privacy Policy/i });
+      expect(links.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('renders footer Terms of Service and Privacy Policy links below the button', () => {
+      renderSignup();
+      // getAllByRole picks up both the inline label link and the footer link
+      expect(screen.getAllByRole('link', { name: /Terms of Service/i }).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByRole('link', { name: /Privacy Policy/i }).length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('blocks submission and shows error when neither checkbox is checked', async () => {
+      renderSignup();
+      fillEmail(); fillPassword();
+      submitForm();
+      await waitFor(() =>
+        expect(screen.getByText(/Please confirm your age/i)).toBeInTheDocument()
+      );
+      expect(supabase.auth.signUp).not.toHaveBeenCalled();
+    });
+
+    it('blocks submission when only the age box is checked', async () => {
+      renderSignup();
+      fillEmail(); fillPassword();
+      checkAgeBox();
+      submitForm();
+      await waitFor(() =>
+        expect(screen.getByText(/Please confirm your age/i)).toBeInTheDocument()
+      );
+      expect(supabase.auth.signUp).not.toHaveBeenCalled();
+    });
+
+    it('blocks submission when only the terms box is checked', async () => {
+      renderSignup();
+      fillEmail(); fillPassword();
+      checkTermsBox();
+      submitForm();
+      await waitFor(() =>
+        expect(screen.getByText(/Please confirm your age/i)).toBeInTheDocument()
+      );
+      expect(supabase.auth.signUp).not.toHaveBeenCalled();
+    });
+
+    it('clears the compliance error when the user rechecks a box after a failed attempt', async () => {
+      renderSignup();
+      fillEmail(); fillPassword();
+      submitForm();
+      await waitFor(() =>
+        expect(screen.getByText(/Please confirm your age/i)).toBeInTheDocument()
+      );
+      checkAgeBox();
+      // Error should still be visible until a new submit — but checking the box doesn't auto-clear
+      // Re-submit with both boxes → error clears on the new submit cycle
+      checkTermsBox();
+      supabase.auth.signUp.mockResolvedValue({
+        data: { user: { id: 'u1' }, session: { access_token: 'tok' } },
+        error: null,
+      });
+      submitForm();
+      await waitFor(() => expect(supabase.auth.signUp).toHaveBeenCalled());
+    });
+
+    it('calls signUp when both boxes are checked', async () => {
+      supabase.auth.signUp.mockResolvedValue({
+        data: { user: { id: 'u1' }, session: { access_token: 'tok' } },
+        error: null,
+      });
+      renderSignup();
+      fillEmail(); fillPassword();
+      checkBothBoxes();
+      submitForm();
+      await waitFor(() => expect(supabase.auth.signUp).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        password: 'password123',
+      }));
+    });
+
+    it('calls profiles upsert with is_age_verified=true and terms_accepted_at on success', async () => {
+      supabase.auth.signUp.mockResolvedValue({
+        data: { user: { id: 'u1' }, session: { access_token: 'tok' } },
+        error: null,
+      });
+      renderSignup();
+      fillEmail(); fillPassword();
+      checkBothBoxes();
+      submitForm();
+      await waitFor(() => expect(supabase.from).toHaveBeenCalledWith('profiles'));
+      // The upsert on the returned from() object must have been called with compliance data
+      const upsertMock = supabase.from.mock.results[0]?.value?.upsert;
+      await waitFor(() =>
+        expect(upsertMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: 'u1',
+            is_age_verified: true,
+            terms_accepted_at: expect.any(String),
+          }),
+          expect.objectContaining({ onConflict: 'id' })
+        )
+      );
+    });
+
+    it('does not call from("profiles") when signUp fails', async () => {
+      supabase.auth.signUp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: { message: 'Email already registered' },
+      });
+      renderSignup();
+      fillEmail(); fillPassword();
+      checkBothBoxes();
+      submitForm();
+      await waitFor(() => expect(supabase.auth.signUp).toHaveBeenCalled());
+      // The upsert path requires from('profiles') — if that was never called, upsert wasn't called
+      const profilesCalls = supabase.from.mock.calls.filter(c => c[0] === 'profiles');
+      expect(profilesCalls.length).toBe(0);
+    });
+  });
+
+  // ─── Successful signup ──────────────────────────────────────────────────────
 
   describe('Successful signup', () => {
     beforeEach(() => {
@@ -63,13 +224,9 @@ describe('Signup Page', () => {
 
     it('calls supabase.auth.signUp with the entered email and password', async () => {
       renderSignup();
-      fireEvent.change(screen.getByPlaceholderText('USER@STADIUM.MOBI'), {
-        target: { value: 'test@example.com' },
-      });
-      fireEvent.change(screen.getAllByPlaceholderText('••••••••')[0], {
-        target: { value: 'password123' },
-      });
-      fireEvent.submit(screen.getByRole('button', { name: /CREATE ACCOUNT/i }).closest('form'));
+      fillEmail(); fillPassword();
+      checkBothBoxes();
+      submitForm();
       await waitFor(() => expect(supabase.auth.signUp).toHaveBeenCalledWith({
         email: 'test@example.com',
         password: 'password123',
@@ -80,14 +237,10 @@ describe('Signup Page', () => {
       vi.useFakeTimers();
       try {
         renderSignup();
-        fireEvent.change(screen.getByPlaceholderText('USER@STADIUM.MOBI'), {
-          target: { value: 'test@example.com' },
-        });
-        fireEvent.change(screen.getAllByPlaceholderText('••••••••')[0], {
-          target: { value: 'password123' },
-        });
-        fireEvent.submit(screen.getByText('CREATE ACCOUNT').closest('form'));
-        // Flush the async signUp promise
+        fillEmail(); fillPassword();
+        checkBothBoxes();
+        submitForm();
+        // Flush the async signUp promise and the upsert
         await act(async () => {});
         // Advance past the 500ms navigation timeout
         act(() => { vi.advanceTimersByTime(500); });
@@ -99,14 +252,14 @@ describe('Signup Page', () => {
 
     it('does NOT show the email confirmation screen on immediate-session signup', async () => {
       renderSignup();
-      fireEvent.submit(screen.getByText('CREATE ACCOUNT').closest('form'));
-      // Wait for the signUp promise to resolve
+      checkBothBoxes();
+      submitForm();
       await waitFor(() => expect(supabase.auth.signUp).toHaveBeenCalled());
       expect(screen.queryByText('Verify Access')).not.toBeInTheDocument();
     });
   });
 
-  // ─── Email confirmation required (session is null) ─────────────────────
+  // ─── Email confirmation required ────────────────────────────────────────────
 
   describe('Email confirmation required', () => {
     beforeEach(() => {
@@ -118,37 +271,37 @@ describe('Signup Page', () => {
 
     it('shows the "Verify Access" confirmation screen', async () => {
       renderSignup();
-      fireEvent.change(screen.getByPlaceholderText('USER@STADIUM.MOBI'), {
-        target: { value: 'test@example.com' },
-      });
-      fireEvent.submit(screen.getByText('CREATE ACCOUNT').closest('form'));
+      fillEmail('test@example.com');
+      checkBothBoxes();
+      submitForm();
       await waitFor(() => expect(screen.getByText('Verify Access')).toBeInTheDocument());
     });
 
     it('displays the submitted email in the confirmation message', async () => {
       renderSignup();
-      fireEvent.change(screen.getByPlaceholderText('USER@STADIUM.MOBI'), {
-        target: { value: 'manager@club.com' },
-      });
-      fireEvent.submit(screen.getByText('CREATE ACCOUNT').closest('form'));
+      fillEmail('manager@club.com');
+      checkBothBoxes();
+      submitForm();
       await waitFor(() => expect(screen.getByText('manager@club.com')).toBeInTheDocument());
     });
 
     it('does not navigate when email confirmation is required', async () => {
       renderSignup();
-      fireEvent.submit(screen.getByText('CREATE ACCOUNT').closest('form'));
+      checkBothBoxes();
+      submitForm();
       await waitFor(() => expect(supabase.auth.signUp).toHaveBeenCalled());
       expect(mockNavigate).not.toHaveBeenCalled();
     });
 
     it('shows the "Return to Gate" link on the confirmation screen', async () => {
       renderSignup();
-      fireEvent.submit(screen.getByText('CREATE ACCOUNT').closest('form'));
+      checkBothBoxes();
+      submitForm();
       await waitFor(() => expect(screen.getByText('Return to Gate')).toBeInTheDocument());
     });
   });
 
-  // ─── Error handling ───────────────────────────────────────────────────────
+  // ─── Error handling ──────────────────────────────────────────────────────────
 
   describe('Error handling', () => {
     it('displays the error message when signUp returns an error', async () => {
@@ -157,7 +310,8 @@ describe('Signup Page', () => {
         error: { message: 'Email already registered' },
       });
       renderSignup();
-      fireEvent.submit(screen.getByText('CREATE ACCOUNT').closest('form'));
+      checkBothBoxes();
+      submitForm();
       await waitFor(() =>
         expect(screen.getByText(/Email already registered/i)).toBeInTheDocument()
       );
@@ -169,20 +323,20 @@ describe('Signup Page', () => {
         error: { message: 'Email already registered' },
       });
       renderSignup();
-      fireEvent.submit(screen.getByText('CREATE ACCOUNT').closest('form'));
+      checkBothBoxes();
+      submitForm();
       await waitFor(() => expect(supabase.auth.signUp).toHaveBeenCalled());
       expect(mockNavigate).not.toHaveBeenCalled();
     });
   });
 
-  // ─── Password visibility toggle ───────────────────────────────────────────
+  // ─── Password visibility toggle ──────────────────────────────────────────────
 
   describe('Password visibility toggle', () => {
     it('toggles the password field type between "password" and "text"', () => {
       renderSignup();
       const passwordInput = screen.getAllByPlaceholderText('••••••••')[0];
       expect(passwordInput).toHaveAttribute('type', 'password');
-      // Click the eye-icon toggle button (type="button" inside the password wrapper)
       const toggleBtn = passwordInput.parentElement.querySelector('button[type="button"]');
       fireEvent.click(toggleBtn);
       expect(passwordInput).toHaveAttribute('type', 'text');

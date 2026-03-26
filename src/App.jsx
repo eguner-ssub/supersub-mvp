@@ -28,6 +28,8 @@ import CardLab from './pages/CardLab';
 import GenericLab from './features/inventory/GenericLab';
 import ComingSoon from './pages/ComingSoon';
 import Leaderboard from './pages/Leaderboard';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import FPLMarket from './pages/FPLMarket';
 import LeagueHub from './features/league-hub/LeagueHub';
 import ViewLedger from './features/locker-room/ViewLedger';
@@ -38,6 +40,7 @@ import Dashboard from './pages/Dashboard';
 
 // Pages - Lazy Loading
 const ManagerOffice = lazy(() => import('./features/office/ManagerOffice'));
+const PublicShareView = lazy(() => import('./pages/PublicShareView'));
 
 // --- THE BOUNCER (Security Guard) ---
 const ProtectedRoute = ({ children, requireOnboarding = true }) => {
@@ -132,6 +135,13 @@ export const AppRoutes = () => {
       <Route path="/history" element={<ProtectedRoute><ViewLedger /></ProtectedRoute>} />
       <Route path="/inbox" element={<ProtectedRoute><ComingSoon title="Manager Inbox" message="Social features are currently locked." /></ProtectedRoute>} />
       <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+
+      {/* Legal pages — public, no auth required */}
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
+
+      {/* Public share view — no auth required */}
+      <Route path="/share/:token" element={<PublicShareView />} />
 
       <Route path="/card-showcase" element={<CardShowcase />} />
       <Route path="/card-base-demo" element={<CardBaseDemo />} />

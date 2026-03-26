@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useGame } from '../shared/context/GameContext';
 import { LogIn, UserPlus, Loader2 } from 'lucide-react';
 
@@ -106,14 +106,32 @@ const Landing = () => {
           Required for UKGC affiliate directory listing.
       ──────────────────────────────────────────────────────────────────────── */}
       <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between px-5 pb-5 pt-2">
-        <a
-          href="https://www.begambleaware.org"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[9px] text-white/25 uppercase tracking-widest hover:text-white/45 transition-colors"
-        >
-          BeGambleAware.org
-        </a>
+        {/* Left: external + legal links */}
+        <div className="flex items-center gap-3">
+          <a
+            href="https://www.begambleaware.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[9px] text-white/25 uppercase tracking-widest hover:text-white/45 transition-colors"
+          >
+            BeGambleAware.org
+          </a>
+          <span className="text-white/15 text-[9px]">·</span>
+          <Link
+            to="/terms"
+            className="text-[9px] text-white/25 uppercase tracking-widest hover:text-white/45 transition-colors"
+          >
+            Terms
+          </Link>
+          <span className="text-white/15 text-[9px]">·</span>
+          <Link
+            to="/privacy"
+            className="text-[9px] text-white/25 uppercase tracking-widest hover:text-white/45 transition-colors"
+          >
+            Privacy
+          </Link>
+        </div>
+        {/* Right: 18+ pill */}
         <div className="text-[9px] font-black text-white/25 uppercase tracking-widest border border-white/15 rounded px-1.5 py-0.5">
           18+
         </div>

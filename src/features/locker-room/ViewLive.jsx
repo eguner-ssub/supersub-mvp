@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePredictions } from '../../shared/hooks/usePredictions';
 import { useGame } from '../../shared/context/GameContext';
 import { Coins, Activity } from 'lucide-react';
+import ShareCardButton from '../../shared/ui/ShareCardButton';
 
 const ViewLive = () => {
     const { predictions: liveBets, loading } = usePredictions('LIVE');
@@ -129,6 +130,13 @@ const ViewLive = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Share */}
+                            {bet.share_token && (
+                                <div className="mt-3 flex justify-end">
+                                    <ShareCardButton prediction={bet} variant="pre" />
+                                </div>
+                            )}
                         </div>
                     );
                 })}

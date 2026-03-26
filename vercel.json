@@ -37,8 +37,11 @@
     { "source": "/stats",           "destination": "/index.html" },
     { "source": "/history",         "destination": "/index.html" },
     { "source": "/inbox",           "destination": "/index.html" },
+    { "source": "/terms",           "destination": "/index.html" },
+    { "source": "/privacy",         "destination": "/index.html" },
     { "source": "/debug",           "destination": "/index.html" },
     { "source": "/lab",             "destination": "/index.html" },
-    { "source": "/lab/(.*)",        "destination": "/index.html" }
+    { "source": "/lab/(.*)",        "destination": "/index.html" },
+    { "source": "/share/:token",    "destination": "/index.html" }
   ]
 }

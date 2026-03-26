@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import AffiliateDisclaimer from '../../shared/ui/AffiliateDisclaimer';
+import ShareCardButton from '../../shared/ui/ShareCardButton';
 import { useAffiliateLink } from '../../shared/hooks/useAffiliateLink';
 import { useGame } from '../../shared/context/GameContext';
 
@@ -22,7 +23,7 @@ const AUTO_DISMISS_SECONDS = 8;
  *   matchId        — integer match ID (for affiliate_events tracking)
  *   onDismiss      — callback to clear affiliateSheetData in parent
  */
-const PostPredictionSheet = ({ cardType, selectionLabel, odds, matchName, matchId, onDismiss }) => {
+const PostPredictionSheet = ({ cardType, selectionLabel, odds, matchName, matchId, prediction, onDismiss }) => {
   const { userProfile, supabase } = useGame();
   const { operator, affiliateUrl, displayReturn, stakeDisplay } = useAffiliateLink({
     cardType,
@@ -147,6 +148,13 @@ const PostPredictionSheet = ({ cardType, selectionLabel, odds, matchName, matchI
         >
           Bet at {operator.name} →
         </button>
+
+        {/* Share your call */}
+        {prediction?.share_token && (
+          <div className="mb-4">
+            <ShareCardButton prediction={prediction} variant="pre" className="w-full py-3" />
+          </div>
+        )}
 
         {/* Required disclaimer */}
         <AffiliateDisclaimer />

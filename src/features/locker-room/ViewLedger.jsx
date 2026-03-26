@@ -1,6 +1,7 @@
 import React from 'react';
 import { usePredictions } from '../../shared/hooks/usePredictions';
 import { Coins, TrendingUp, TrendingDown } from 'lucide-react';
+import ShareCardButton from '../../shared/ui/ShareCardButton';
 
 const ViewLedger = () => {
     const { predictions: settledBets, loading } = usePredictions('SETTLED');
@@ -124,9 +125,18 @@ const ViewLedger = () => {
                             </div>
                         </div>
 
-                        {/* Timestamp */}
-                        <div className="mt-2 text-xs text-amber-600">
-                            Settled: {new Date(bet.updated_at).toLocaleString()}
+                        {/* Timestamp + Share */}
+                        <div className="mt-2 flex items-center justify-between">
+                            <div className="text-xs text-amber-600">
+                                Settled: {new Date(bet.updated_at).toLocaleString()}
+                            </div>
+                            {bet.share_token && (
+                                <ShareCardButton
+                                    prediction={bet}
+                                    variant={bet.settled_status === 'WON' ? 'won' : 'lost'}
+                                    className="text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100"
+                                />
+                            )}
                         </div>
                     </div>
                 ))}

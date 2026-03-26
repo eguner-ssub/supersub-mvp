@@ -315,7 +315,6 @@ export default function Dashboard() {
           <WinCelebrationModal
             prediction={unseenSettlements.find(p => p.settled_status === 'WON')}
             onDismiss={() => markPredictionsSeen([unseenSettlements.find(p => p.settled_status === 'WON').id])}
-            onShare={() => {/* share flow added in Shareable Cards sprint */}}
           />
         )}
 
