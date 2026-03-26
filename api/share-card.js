@@ -1,7 +1,9 @@
 import { ImageResponse } from '@vercel/og';
 import { createClient } from '@supabase/supabase-js';
 
-export const config = { runtime: 'edge' };
+// Node.js serverless runtime (default) — compatible with @supabase/supabase-js
+// Edge runtime does NOT support supabase-js, so we intentionally omit:
+//   export const config = { runtime: 'edge' };
 
 // Card type display config — accent colors match cardConfig.js
 const CARD_CONFIG = {
@@ -11,18 +13,19 @@ const CARD_CONFIG = {
   c_player_score:  { label: 'GOALSCORER',       color: '#FF4D6A' },
 };
 
-export default async function handler(req) {
-  const { searchParams } = new URL(req.url);
+export default async function handler(req, res) {
+  // req.url in Node.js serverless is just the path+query, so supply a base
+  const { searchParams } = new URL(req.url, 'http://localhost');
   const token = searchParams.get('token');
 
   if (!token) {
-    return new Response('Missing token', { status: 400 });
+    return res.status(400).send('Missing token');
   }
 
   // Validate UUID format
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(token)) {
-    return new Response('Invalid token format', { status: 400 });
+    return res.status(400).send('Invalid token format');
   }
 
   // Lazy Supabase init (inside handler, not top-level)
@@ -39,10 +42,7 @@ export default async function handler(req) {
 
   // If prediction not found, return a fallback brand image
   if (error || !prediction) {
-    return new ImageResponse(
-      fallbackImage(),
-      { width: 1200, height: 630, headers: cacheHeaders(3600) }
-    );
+    return sendImage(res, fallbackImage(), 1200, 630, 3600);
   }
 
   // Derive display values
@@ -62,16 +62,22 @@ export default async function handler(req) {
   // Cache: short for unsettled, long for settled
   const maxAge = isPre ? 60 : 3600;
 
-  return new ImageResponse(
+  return sendImage(
+    res,
     cardImage({ matchName, selectionLabel, cardConf, isWon, isLost, isPre, points }),
-    { width: 1200, height: 630, headers: cacheHeaders(maxAge) }
+    1200,
+    630,
+    maxAge
   );
 }
 
-function cacheHeaders(maxAge) {
-  return {
-    'Cache-Control': `public, max-age=${maxAge}, s-maxage=${maxAge}`,
-  };
+/** Render an ImageResponse and pipe its bytes into the Node.js res object. */
+async function sendImage(res, jsx, width, height, maxAge) {
+  const imageResponse = new ImageResponse(jsx, { width, height });
+  const buffer = await imageResponse.arrayBuffer();
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', `public, max-age=${maxAge}, s-maxage=${maxAge}`);
+  res.status(200).send(Buffer.from(buffer));
 }
 
 function fallbackImage() {
