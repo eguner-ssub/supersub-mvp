@@ -42,6 +42,14 @@ export default function Dashboard() {
     }
   }, [location, navigate]);
 
+  // Silently mark LOST unseen settlements as seen — no modal shown for losses
+  useEffect(() => {
+    const lostIds = unseenSettlements
+      .filter(p => p.settled_status !== 'WON')
+      .map(p => p.id);
+    if (lostIds.length > 0) markPredictionsSeen(lostIds);
+  }, [unseenSettlements]);
+
 
 
   // --- 2. INTERACTION HANDLERS ---
@@ -303,10 +311,10 @@ export default function Dashboard() {
             Gated on is_age_verified so affiliate CTAs are never shown to
             unverified users. Requires migration 034 + 035.
         ──────────────────────────────────────────────────────────────────────── */}
-        {unseenSettlements.length > 0 && userProfile?.is_age_verified && (
+        {unseenSettlements.some(p => p.settled_status === 'WON') && userProfile?.is_age_verified && (
           <WinCelebrationModal
-            prediction={unseenSettlements[0]}
-            onDismiss={() => markPredictionsSeen([unseenSettlements[0].id])}
+            prediction={unseenSettlements.find(p => p.settled_status === 'WON')}
+            onDismiss={() => markPredictionsSeen([unseenSettlements.find(p => p.settled_status === 'WON').id])}
             onShare={() => {/* share flow added in Shareable Cards sprint */}}
           />
         )}

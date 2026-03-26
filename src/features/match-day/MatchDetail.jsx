@@ -79,83 +79,6 @@ const AssistantDialogue = ({ activeTab }) => (
 );
 
 
-/* ─────────────────────────────────────────────────────────────
-   MOCK DATA — Pre-match analysis & live insights (Backend WIP)
-   ───────────────────────────────────────────────────────────── */
-const PREMATCH_ANALYSIS_MOCK = {
-  greeting: "Hi Boss. I've been studying the opposition all week. Here's what I've found.",
-  sections: [
-    { title: 'Form Guide', content: 'Home team are unbeaten in their last 5 home games (W3 D2). Away side struggling on the road with just 1 win in 6.' },
-    { title: 'Key Matchup', content: 'Watch the battle between the home #10 and the away holding midfielder. If the playmaker gets space, expect chances.' },
-    { title: 'Goals Market', content: 'Both teams have seen Over 2.5 goals in 4 of their last 5 matches. The head-to-head average is 3.2 goals per game.' },
-    { title: 'Prediction', content: "This has goals written all over it. Back the home side if you're feeling confident, but the Over 2.5 market looks solid too." },
-  ],
-};
-
-const LIVE_INSIGHTS_MOCK = {
-  greeting: "Boss, the match is underway. Here's what I'm seeing.",
-  benchPotential: 'Away team has strong options on the bench — their #14 has scored 3 goals as a substitute this season.',
-  subAnalysis: 'Home manager typically makes first substitution around the 60th minute. Watch for the attacking midfielder to come on.',
-};
-
-/* ─────────────────────────────────────────────────────────────
-   PREMATCH ANALYSIS — full-page assistant report (no lineups)
-   ───────────────────────────────────────────────────────────── */
-const PrematchAnalysis = ({ data }) => (
-  <div style={{ padding: '0 12px' }}>
-    {/* Assistant greeting */}
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '10px',
-        marginBottom: '14px',
-        padding: '10px 14px',
-        background: '#f5f0e8',
-        borderRadius: '14px',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
-      }}
-    >
-      <img
-        src="/assets/assistant-head.png"
-        alt="Tactical Expert"
-        style={{
-          width: '44px', height: '44px', borderRadius: '50%',
-          objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)',
-        }}
-      />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
-          Tactical Expert
-        </span>
-        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
-          {data.greeting}
-        </p>
-      </div>
-    </div>
-
-    {/* Analysis sections */}
-    {data.sections.map((section, i) => (
-      <div
-        key={i}
-        style={{
-          background: 'rgba(245, 240, 232, 0.08)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '12px',
-          padding: '14px 16px',
-          marginBottom: '10px',
-        }}
-      >
-        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '10px', color: '#00e5ff', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '6px' }}>
-          {section.title}
-        </p>
-        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 500, fontSize: '12px', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, margin: 0 }}>
-          {section.content}
-        </p>
-      </div>
-    ))}
-  </div>
-);
 
 /* ─────────────────────────────────────────────────────────────
    LIVE SUPERSUB PANEL — swipeable insight carousel
@@ -731,8 +654,6 @@ const MatchDetail = () => {
   const [affiliateSheetData, setAffiliateSheetData] = useState(null);
   const [activeTab, setActiveTab] = useState('LINEUP');
   const [selectedScorerTeam, setSelectedScorerTeam] = useState('home');
-  const [analysisData, setAnalysisData] = useState(null);
-  const [liveInsights, setLiveInsights] = useState(null);
 
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result' },
@@ -767,24 +688,6 @@ const MatchDetail = () => {
 
         // Step 2: fire all secondary requests in parallel
         const secondaryFetches = [];
-
-        if (phase === 'PRE') {
-          secondaryFetches.push(
-            fetch(`/api/intel?match_id=${fixtureId}`)
-              .then(r => r.ok ? r.json() : null)
-              .then(d => { if (d?.analysis) setAnalysisData(d.analysis); })
-              .catch(e => console.warn('[MatchDetail] Intel fetch error:', e))
-          );
-        }
-
-        if (phase === 'LIVE') {
-          secondaryFetches.push(
-            fetch(`/api/intel?match_id=${fixtureId}&phase=live`)
-              .then(r => r.ok ? r.json() : null)
-              .then(d => { if (d?.available) setLiveInsights(d); })
-              .catch(e => console.warn('[MatchDetail] Live insights fetch error:', e))
-          );
-        }
 
         if (phase !== 'POST') {
           secondaryFetches.push(
@@ -848,8 +751,8 @@ const MatchDetail = () => {
     if (result.success) {
       await consumeCard(stagedBet.card);
       setFlowState('resolved');
-      // Show affiliate bottom sheet (only renders if userProfile.is_age_verified is true)
-      setAffiliateSheetData({
+      // Show affiliate bottom sheet — not shown for Supersub (fixed reward, no market odds)
+      if (stagedBet.card !== 'c_supersub') setAffiliateSheetData({
         cardType:       stagedBet.card,
         selectionLabel: stagedBet.displayLabel,
         odds:           stagedBet.odds,
@@ -924,11 +827,9 @@ const MatchDetail = () => {
     return () => { supabase.removeChannel(channel); };
   }, [matchPhase, id, supabase]);
 
-  const viewState = matchPhase === 'PRE'
-    ? (lineupsAnnounced ? 'PRE_LINEUPS' : 'PRE_NO_LINEUPS')
-    : matchPhase; // 'LIVE' or 'POST'
+  const viewState = matchPhase === 'PRE' ? 'PRE_LINEUPS' : matchPhase; // 'LIVE' or 'POST'
 
-  const shelfVisible = viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS';
+  const shelfVisible = viewState === 'PRE_LINEUPS';
   const hasAnyCard = cardTypes.some(c => getCardCount(c.id) > 0);
   const contentBottom = viewState === 'LIVE' ? '140px' : shelfVisible ? (hasAnyCard ? '256px' : '120px') : '0px';
 
@@ -1016,7 +917,7 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {match && viewState !== 'PRE_NO_LINEUPS' && (
+      {match && (
         <div
           className="absolute w-full z-[35]"
           style={{ top: '156px' }}
@@ -1069,33 +970,6 @@ const MatchDetail = () => {
                 )}
               </button>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* PRE_NO_LINEUPS: Full-page assistant analysis, no tabs */}
-      {match && viewState === 'PRE_NO_LINEUPS' && (
-        <div
-          className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
-          style={{
-            top: '132px',
-            bottom: contentBottom,
-            WebkitOverflowScrolling: 'touch',
-          }}
-        >
-          <div
-            style={{
-              margin: '8px 0',
-              background: 'rgba(18,18,18,0.75)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              borderLeft: '1px solid rgba(255,255,255,0.10)',
-              borderRight: '1px solid rgba(255,255,255,0.10)',
-              padding: '16px 0',
-              minHeight: '100%',
-            }}
-          >
-            <PrematchAnalysis data={analysisData || PREMATCH_ANALYSIS_MOCK} />
           </div>
         </div>
       )}
@@ -1297,7 +1171,7 @@ const MatchDetail = () => {
 
       {viewState === 'LIVE' && (
         <LiveSupersubPanel
-          insights={liveInsights || LIVE_INSIGHTS_MOCK}
+          insights={null}
           onUseSupersubCard={() => setActiveTab('SUBS')}
           supersubCount={getCardCount('c_supersub')}
         />

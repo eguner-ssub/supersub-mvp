@@ -46,6 +46,9 @@ const WinCelebrationModal = ({ prediction, onDismiss, onShare }) => {
   // fall back to potential_reward for compatibility
   const pointsEarned = prediction?.points_awarded ?? prediction?.potential_reward ?? 0;
 
+  // Only show for WON predictions — LOST ones are silently marked seen in Dashboard
+  if (!isWon) return null;
+
   if (isWon) {
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center px-5 bg-black/80 backdrop-blur-sm">
@@ -55,9 +58,9 @@ const WinCelebrationModal = ({ prediction, onDismiss, onShare }) => {
           <button
             onClick={onDismiss}
             aria-label="Close"
-            className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 text-white/40 hover:text-white transition-colors"
+            className="absolute top-4 right-4 w-11 h-11 flex items-center justify-center rounded-full bg-white/10 text-white/40 hover:text-white transition-colors"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
 
           {/* Top accent bar */}
@@ -117,51 +120,6 @@ const WinCelebrationModal = ({ prediction, onDismiss, onShare }) => {
     );
   }
 
-  // ── LOST variant ────────────────────────────────────────────────────────────
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center px-5 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-sm bg-zinc-900 border border-white/10 rounded-3xl p-7 relative shadow-2xl">
-
-        <button
-          onClick={onDismiss}
-          aria-label="Close"
-          className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 text-white/40 hover:text-white transition-colors"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Muted accent bar */}
-        <div className="absolute top-0 left-0 w-full h-1 rounded-t-3xl bg-gradient-to-r from-transparent via-zinc-600 to-transparent" />
-
-        {/* Icon */}
-        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
-          <span className="text-2xl">😤</span>
-        </div>
-
-        <h2 className="text-white/60 font-black text-2xl uppercase tracking-tighter text-center mb-1">
-          Unlucky
-        </h2>
-        <p className="text-zinc-500 text-[10px] uppercase tracking-widest text-center mb-5">
-          {prediction?.match_title || 'Match prediction'}
-        </p>
-
-        {/* Softer affiliate CTA copy */}
-        <p className="text-zinc-400 text-xs text-center mb-3 leading-relaxed">
-          Back your next call at {operator.name} — sometimes the real money hits when the points don't.
-        </p>
-
-        <button
-          onClick={handleCTAClick}
-          className="w-full py-3.5 rounded-2xl font-black uppercase text-sm tracking-widest transition-all active:scale-95 mb-4"
-          style={{ background: `#${operator.brandColor}`, color: '#ffffff' }}
-        >
-          Place a bet →
-        </button>
-
-        <AffiliateDisclaimer />
-      </div>
-    </div>
-  );
 };
 
 export default WinCelebrationModal;
