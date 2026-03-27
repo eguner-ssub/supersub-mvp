@@ -2,6 +2,7 @@
 
 > Cross-referenced against pitch deck (`supersub_pitch.pptx`), live codebase, and `SUPERSUB_PROJECT_SUMMARY.md`.
 > Priorities: **P0** = World Cup blocker (ship by April 2026) · **P1** = Required before affiliate conversations · **P2** = Retention & organic growth · **P3** = Future market expansion
+> Last updated: 2026-03-27 — reflects 5 commits shipped on 2026-03-26.
 
 ---
 
@@ -9,37 +10,30 @@
 
 Everything in this epic is a hard prerequisite for any affiliate revenue conversation. No operator will sign a deal without these in place. None of it exists today.
 
-### Privacy Policy and Terms of Service documents
+### ~~Privacy Policy and Terms of Service documents~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** S
-- **Why (commercial link):** UKGC affiliate registration requires a live ToS and PP before any operator will discuss commercial terms. Also required before collecting country_code or DOB at signup (GDPR data processing basis).
-- **What exists today:** No ToS or PP pages, no `/terms` or `/privacy` routes, no legal copy anywhere in the app.
-- **What needs building:** Two static pages: `/terms` and `/privacy`. Add routes in `App.jsx` (public, no `ProtectedRoute`). Add to `vercel.json` rewrites. Content: standard SaaS ToS adapted for a free-to-play prediction game (no real money, no gambling licence required at this stage) plus a GDPR-compliant PP covering Supabase data storage, Sportmonks data use, and affiliate link tracking. Add footer links on `Landing.jsx`, `Signup.jsx`, and all affiliate CTA components.
-- **Dependencies:** None — can be written and deployed independently of all other stories.
+- **Shipped in:** commit `b39408f`
+- **What was built:** `src/pages/Terms.jsx` and `src/pages/Privacy.jsx` — mobile-first dark-themed pages with 9 sections each, back navigation, cross-links, and footer BeGambleAware + 18+ badge. Public routes added in `App.jsx` (no `ProtectedRoute`). `/terms` and `/privacy` rewrites added to `vercel.json`. Footer `<Link>` components added to `Landing.jsx` and `Signup.jsx`.
 
-### ToS acceptance and 18+ confirmation at signup
+### ~~ToS acceptance and 18+ confirmation at signup~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** S
-- **Why (commercial link):** UKGC affiliate operators require evidence that users have confirmed they are 18+ and accepted terms before being shown affiliate content. This is also required before any partner will share a tracking link.
-- **What exists today:** `Signup.jsx` has email + password only. No checkbox, no age confirmation, no legal acceptance. The `profiles` table has no `terms_accepted_at` or `dob` column.
-- **What needs building:** (1) Add a migration: `ALTER TABLE profiles ADD COLUMN terms_accepted_at TIMESTAMPTZ; ADD COLUMN is_age_verified BOOLEAN DEFAULT false;`. (2) In `Signup.jsx`, add two required checkboxes below the password field: "I confirm I am 18 or over" and "I agree to the Terms of Service and Privacy Policy" (with inline links to `/terms` and `/privacy`). Block form submission unless both are checked. (3) On successful signup, write `terms_accepted_at = NOW()` and `is_age_verified = true` to `profiles` via `supabase.from('profiles').update(...)`. (4) Gate all affiliate CTA rendering in `PostPredictionSheet.jsx` and `WinCelebrationModal.jsx` on `userProfile.is_age_verified === true`.
-- **Dependencies:** Privacy Policy and Terms of Service pages (must be live before linking from signup).
+- **Shipped in:** commit `b39408f`
+- **What was built:** Two required checkboxes added to `Signup.jsx` below the password field: "I confirm I am 18 years of age or older" (`isAgeVerified`) and "I agree to the Terms of Service and Privacy Policy" (`hasAcceptedTerms`, with inline `<Link>` components). Form submission is blocked with an inline error if either is unchecked. On successful signup, `terms_accepted_at` and `is_age_verified: true` are written to `profiles` via `upsert` (safe against trigger timing). DB migration skipped — `terms_accepted_at` and `is_age_verified` already existed on the table. Both `PostPredictionSheet` and `WinCelebrationModal` gated on `userProfile?.is_age_verified === true`.
+- **Note:** LOST prediction variant removed from `WinCelebrationModal` — only WON predictions show the modal. LOST predictions are silently marked as seen.
 
-### `<AffiliateDisclaimer />` component
+### ~~`<AffiliateDisclaimer />` component~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** XS
-- **Why (commercial link):** Every affiliate placement must display "18+ | BeGambleAware.org | T&Cs apply" to satisfy UKGC affiliate guidelines. Operators will check for this before approving creatives.
-- **What exists today:** Nothing. No responsible gambling copy anywhere.
-- **What needs building:** A small shared component at `src/shared/ui/AffiliateDisclaimer.jsx`. Renders a single line: "18+ · BeGambleAware.org · T&Cs apply · Play responsibly." with a link to `https://www.begambleaware.org`. Style: `text-[9px] text-white/30 uppercase tracking-widest text-center`. Render this component at the bottom of every `PostPredictionSheet`, `WinCelebrationModal`, and any future affiliate placement. Takes an optional `operator` prop to add "Bet with [Operator]" text.
-- **Dependencies:** None.
+- **Shipped in:** commit `f36bf3a`
+- **What was built:** `src/shared/ui/AffiliateDisclaimer.jsx` — renders "18+ · BeGambleAware.org · T&Cs apply · Play responsibly." with linked BeGambleAware.org. Accepts optional `className` prop. Rendered at the bottom of `PostPredictionSheet` and `WinCelebrationModal`.
 
-### 18+ badge on Landing.jsx
+### ~~18+ badge on Landing.jsx~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** XS
-- **Why (commercial link):** A visible 18+ marker on the entry point is a basic requirement for any operator to list Supersub as a partner on their affiliate directory. Takes 10 minutes to build.
-- **What exists today:** `Landing.jsx` has a logo, two buttons (Join / Login), and a stadium background. No compliance markers.
-- **What needs building:** Add a small "18+" pill in the bottom-right corner of `Landing.jsx`. Style to match the existing design language — dark background, white/grey text, same font weight as other small labels. Also add "BeGambleAware.org" as a subtle text link in the footer of the landing view.
-- **Dependencies:** None.
+- **Shipped in:** commits `f36bf3a` + `b39408f`
+- **What was built:** Compliance footer bar added to `Landing.jsx` (absolute bottom, full width). Left side: BeGambleAware.org external link · Terms (React Router `<Link>`) · Privacy (React Router `<Link>`). Right side: "18+" pill with muted border. All items styled at `text-[9px] text-white/25 uppercase tracking-widest` to avoid competing with CTAs.
 
 ---
 
@@ -47,45 +41,37 @@ Everything in this epic is a hard prerequisite for any affiliate revenue convers
 
 The pitch deck's core commercial model. Three revenue streams: post-prediction contextual ads, post-win affiliate offers, and bench analytics data licensing. None are live.
 
-### `seen_by_user` flag on predictions (DB migration)
+### ~~`seen_by_user` flag on predictions (DB migration)~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** XS
-- **Why (commercial link):** The post-settlement CTA depends on detecting unseen settled bets when the user opens the app. Without this flag, there is no way to show the modal exactly once per settled prediction.
-- **What exists today:** `predictions` table has no `seen_by_user` column. The `settle_prediction()` RPC sets `status = 'SETTLED'` but does not track user awareness.
-- **What needs building:** Migration: `ALTER TABLE predictions ADD COLUMN seen_by_user BOOLEAN NOT NULL DEFAULT false;`. Update `settle_prediction()` RPC to leave `seen_by_user = false` on settlement (it already does — this is the default). Add a `markPredictionsSeen(ids[])` helper to `GameContext.jsx` that sets `seen_by_user = true` for a batch of prediction IDs. This helper is called when the `WinCelebrationModal` dismisses.
-- **Dependencies:** None — pure DB change, no UI impact.
+- **Shipped in:** commit `f36bf3a` — migration `034_add_affiliate_columns.sql`
+- **What was built:** `predictions.seen_by_user BOOLEAN NOT NULL DEFAULT false` + `predictions.share_token UUID NOT NULL DEFAULT gen_random_uuid() UNIQUE`. Indexes on `(user_id, status, seen_by_user)` for the unseen-settlements query. `markPredictionsSeen(ids[])` added to `GameContext.jsx`. `unseenSettlements` state fed from `loadProfile()` query (`status='SETTLED' AND seen_by_user=false`, limit 5). Also created `affiliate_events` table in the same migration.
 
-### `useAffiliateLink()` utility and operator config
+### ~~`useAffiliateLink()` utility and operator config~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** S
-- **Why (commercial link):** Both affiliate CTA components (post-prediction and post-settlement) need a shared, tested utility that constructs affiliate URLs with correct tracking parameters. Without this, each operator integration is a one-off hack.
-- **What exists today:** Nothing. No operator config, no link builder, no tracking parameter schema.
-- **What needs building:** (1) A config file at `src/shared/config/affiliates.js` that exports a list of operators: `{ id: 'sky_bet', name: 'Sky Bet', baseUrl: 'https://...', trackingParam: 'btag', brandColor: '#...' }`. Initially one entry (Bet365 or Sky Bet, whichever signs first — use a placeholder). (2) A `useAffiliateLink(operator, cardType, selection, odds)` hook at `src/shared/hooks/useAffiliateLink.js` that returns a full affiliate URL with deep link to the relevant market where possible. (3) The hook also computes the display return figure: `(stake * odds).toFixed(2)` using a default stake (£10 GBP, configurable). (4) Currency/locale is read from `userProfile.country_code` — UK = £, DE = €, ES = €. Initially only GBP.
-- **Dependencies:** `seen_by_user` migration (same sprint). Operator agreement (provides real tracking URL and btag format).
+- **Shipped in:** commit `f36bf3a`
+- **What was built:** `src/shared/config/affiliates.js` — operator array with `{ id, name, baseUrl, trackingParam, affiliateId, brandColor, active }`. Placeholder Bet365 entry with real base URL. `src/shared/hooks/useAffiliateLink.js` — returns `{ operator, affiliateUrl, displayReturn, stakeDisplay }`. Computes `displayReturn` as `(DEFAULT_STAKE_GBP * odds).toFixed(2)`; returns `null` when `odds <= 0` (Supersub fixed reward). GBP only (£10 default stake). Tracking param appended to URL when `operator.affiliateId` is set.
+- **Open:** Replace Bet365 placeholder with real tracking URL + affiliate ID when operator agreement is signed.
 
-### Post-prediction bottom sheet (`PostPredictionSheet.jsx`)
+### ~~Post-prediction bottom sheet (`PostPredictionSheet.jsx`)~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** M
-- **Why (commercial link):** Slide 7 — "After placing a card, users see: 'This call could return £35 for £10 at Sky Bet.'" This is the highest-volume affiliate touchpoint — every single card placement triggers it.
-- **What exists today:** In `MatchDetail.jsx`, after `consumeCard()` succeeds at line ~846, a success toast fires and the UI returns to the match view. No interstitial, no offer, no upsell.
-- **What needs building:** (1) Create `src/features/match-day/PostPredictionSheet.jsx` — a slide-up bottom sheet that appears for 8 seconds after a successful card placement. Props: `{ cardType, selectionLabel, odds, onDismiss }`. Shows: "Nice call — [SELECTION LABEL]" headline, the computed return figure ("£10 → £35 at Sky Bet"), operator logo, a primary CTA button ("Place at Sky Bet →"), and a secondary "Dismiss" link. Renders `<AffiliateDisclaimer />` at the bottom. (2) In `MatchDetail.jsx`, after the `consumeCard()` success branch, set state `showAffiliatSheet: true` and pass the staged bet details. (3) On CTA click: call `trackAffiliate({ type: 'click', ... })` then `window.open(affiliateUrl, '_blank')`. On impression: call `trackAffiliate({ type: 'impression', ... })`. Auto-dismiss after 8s. (4) Only render if `userProfile.is_age_verified === true`.
-- **Dependencies:** `useAffiliateLink()` utility. `<AffiliateDisclaimer />` component. ToS/18+ acceptance at signup.
+- **Shipped in:** commits `f36bf3a` + `b39408f`
+- **What was built:** `src/features/match-day/PostPredictionSheet.jsx` — slide-up bottom sheet (`fixed inset-x-0 bottom-0 z-[130]`) with `requestAnimationFrame` slide-in animation, 8-second countdown with depleting green progress bar, operator CTA, `<AffiliateDisclaimer />`. Fires `affiliate_events` impression on mount and click on CTA tap (fire-and-forget). Wired into `MatchDetail.jsx` via `affiliateSheetData` state — set after `consumeCard()` succeeds. **Supersub cards excluded** from triggering the sheet (fixed reward, no market odds). Gated on `userProfile?.is_age_verified`.
 
-### Post-settlement celebration modal with affiliate CTA (`WinCelebrationModal.jsx`)
+### ~~Post-settlement celebration modal with affiliate CTA (`WinCelebrationModal.jsx`)~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** M
-- **Why (commercial link):** Slide 7 — "Settled winning prediction: the win context makes the offer feel like a reward, not a push. Highest CTR moment." Post-win is the single highest-intent moment in the app.
-- **What exists today:** `WinModal.jsx` is used only in `InteractiveOnboarding.jsx` (the 1999 tutorial). It has a trophy, confetti, and points display — but no share button and no affiliate CTA. `ViewLedger.jsx` shows settled bets in a plain list. No modal fires when a real prediction settles. `GameContext.jsx` `loadProfile()` fetches the user profile but does not check for unseen settled bets.
-- **What needs building:** (1) Create `src/shared/ui/WinCelebrationModal.jsx` — different from the existing `WinModal.jsx` (keep that for onboarding). Props: `{ prediction, onShare, onAffiliateCTA, onDismiss }`. WON variant: trophy icon, "YOU CALLED IT" heading, points earned, share button, and affiliate CTA ("You could have won £87.50 on this at Sky Bet"). LOST variant: muted styling, "Unlucky" heading, and softer affiliate CTA ("Place it for real next time at Sky Bet"). Both variants include `<AffiliateDisclaimer />`. (2) In `GameContext.jsx` `loadProfile()`, after fetching the profile, query `predictions` for `status = 'SETTLED' AND seen_by_user = false` — if any exist, store them in context state as `unseenSettlements`. (3) In `Dashboard.jsx` or a root-level component, when `unseenSettlements.length > 0`, show `WinCelebrationModal` for the first unseen prediction. On dismiss, call `markPredictionsSeen([id])` and advance to the next if any remain. (4) Add a share button — hooks into the shareable card flow (see SHAREABLE CARDS epic). (5) Only render if `userProfile.is_age_verified === true`.
-- **Dependencies:** `seen_by_user` DB migration. `useAffiliateLink()` utility. `<AffiliateDisclaimer />` component. Pre-settlement shareable card (for the share button — can ship modal without share and add it in sprint 2).
+- **Shipped in:** commits `f36bf3a` + `843f2f3` + `b39408f`
+- **What was built:** `src/shared/ui/WinCelebrationModal.jsx` — WON-only modal (LOST variant removed by design; LOST predictions are silently marked seen in Dashboard `useEffect`). Trophy icon, "You called it" heading, match title, points earned (`points_awarded ?? potential_reward`), `<ShareCardButton>`, affiliate CTA with `displayReturn` or fallback copy, `<AffiliateDisclaimer />`. 44px close button (mobile-safe tap target). `Dashboard.jsx` updated: filters `unseenSettlements` to first WON prediction, auto-marks LOST ones seen. Gated on `userProfile?.is_age_verified`.
 
-### Affiliate impression & click tracking
+### ~~Affiliate impression & click tracking~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P1
 - **Effort:** S
-- **Why (commercial link):** Operators require CTR and conversion data before committing to commercial terms. This is the proof of volume needed to negotiate a CPA rate.
-- **What exists today:** Nothing. No tracking tables, no analytics events.
-- **What needs building:** (1) Migration: create `affiliate_events` table `(id UUID, user_id UUID, event_type TEXT CHECK IN ('impression','click'), operator TEXT, card_type TEXT, match_id INT, odds FLOAT, created_at TIMESTAMPTZ)`. RLS: users can insert their own rows, no select. (2) `src/shared/utils/trackAffiliate.js` — lightweight fire-and-forget utility: `supabase.from('affiliate_events').insert(event)`. No await needed (best-effort logging). (3) A Supabase view `affiliate_summary` grouping by operator/date/card_type for reporting. Export as CSV for operator conversations.
-- **Dependencies:** `PostPredictionSheet.jsx` and `WinCelebrationModal.jsx` (the callers).
+- **Shipped in:** commits `f36bf3a` + `b39408f` — migrations `034_add_affiliate_columns.sql` + `036_add_share_event_type.sql`
+- **What was built:** `affiliate_events` table with `(id, user_id, event_type CHECK IN ('impression','click','share'), operator, card_type, match_id, odds, created_at)`. RLS INSERT-only for authenticated users. Migration 036 added `'share'` to the event_type enum. Tracking is fire-and-forget (`void supabase.from('affiliate_events').insert(...)`) in `PostPredictionSheet` (impression on mount + click on CTA), `WinCelebrationModal` (click on CTA), and `ShareCardButton` (share events).
+- **Open:** Create a Supabase view `affiliate_summary` grouping by `operator/date/card_type` — needed before operator conversations.
 
 ### Ad provider integration for energy refills
 - **Priority:** P2
@@ -101,53 +87,41 @@ The pitch deck's core commercial model. Three revenue streams: post-prediction c
 
 The pitch deck's organic growth engine. Every share during the World Cup is free acquisition. Build the infrastructure once; both card variants (pre- and post-settlement) reuse it.
 
-### `share_token` column on predictions (DB migration)
+### ~~`share_token` column on predictions (DB migration)~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** XS
-- **Why (commercial link):** Public share URLs cannot expose internal prediction UUIDs. A short opaque token enables public links without leaking user data.
-- **What exists today:** `predictions` table has a UUID primary key — unsuitable for public URLs.
-- **What needs building:** Migration: `ALTER TABLE predictions ADD COLUMN share_token UUID NOT NULL DEFAULT gen_random_uuid() UNIQUE;`. Add index: `CREATE INDEX idx_predictions_share_token ON predictions(share_token)`. The share URL becomes `supersub.mobi/share/<share_token>` — opaque, unguessable, non-sequential. No RLS change needed; the `/share/:token` route uses the service role key server-side (or anon key with a policy allowing SELECT on share_token lookups for non-sensitive columns only).
-- **Dependencies:** None — pure DB migration, no UI impact.
+- **Shipped in:** commit `f36bf3a` — migration `034_add_affiliate_columns.sql`
+- **What was built:** `predictions.share_token UUID NOT NULL DEFAULT gen_random_uuid()` with unique index `idx_predictions_share_token`. Share URL pattern: `supersub.mobi/share/<share_token>`.
 
-### `/api/share-card` image generation endpoint
+### ~~`/api/share-card` image generation endpoint~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** M
-- **Why (commercial link):** Without a server-generated OG image, links shared on Twitter/WhatsApp/iMessage render as plain text. A rich preview image is the difference between a click and a scroll-past. This is the visual hook that drives World Cup acquisition.
-- **What exists today:** Nothing. No image generation anywhere in the codebase. Currently 6/12 Vercel functions used — this would be the 7th, leaving 5 slots.
-- **What needs building:** New `api/share-card.js` endpoint using `@vercel/og`. Accepts `?token=<share_token>`. Looks up the prediction by share_token (service role). Renders a 1200×630 OG image with: Supersub branding (logo top-left), match name (e.g., "Arsenal vs Chelsea"), card type badge, selection text ("Supersub — Trossard to Score"), odds or points awarded (for settled cards), team colours, and a footer: "Play free at supersub.mobi". For WON predictions: adds a green "✓ CALLED IT" badge and points earned. For LOST: adds a muted "X" badge. The image uses inline styles (Satori/Vercel OG constraints — no Tailwind classes, no external CSS). Cache with `Cache-Control: public, max-age=3600` for performance.
-- **Dependencies:** `share_token` migration. `@vercel/og` package install (`npm install @vercel/og`).
+- **Shipped in:** commits `b39408f` + `87f0de0` (deployment fix)
+- **What was built:** `api/share-card.js` using `@vercel/og` (`@vercel/og` added to `package.json`). Accepts `?token=<share_token>`. Fetches prediction via Supabase service role key. Renders 1200×630 OG image: Supersub branding, match title, card type, selection, WON/LOST badge. Cache-Control headers set for performance. Runs on Node.js serverless runtime (Edge runtime skipped — incompatible with supabase-js). Deployment fix in `87f0de0` resolved a runtime conflict. Now 7/12 Vercel functions used.
 
-### `ShareCardButton.jsx` — share trigger component
+### ~~`ShareCardButton.jsx` — share trigger component~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** S
-- **Why (commercial link):** The share button needs to appear in four places. A single reusable component ensures consistent behaviour and tracking across all placement points.
-- **What exists today:** Nothing. No share UI anywhere in the app.
-- **What needs building:** Create `src/shared/ui/ShareCardButton.jsx`. Props: `{ prediction, variant: 'pre' | 'won' | 'lost' }`. On tap: (1) Build the share URL: `https://supersub.mobi/share/${prediction.share_token}`. (2) Use the Web Share API (`navigator.share({ title, text, url })`) on mobile — this surfaces native iOS/Android share sheets covering WhatsApp, iMessage, Twitter, Instagram. (3) Fall back to `navigator.clipboard.writeText(url)` + a "Link copied!" toast (`sonner`) on desktop. (4) Log a `trackAffiliate({ type: 'share', ... })` event for tracking. Mount this button in: `MatchDetail.jsx` confirmation screen (pre-settlement), `WinCelebrationModal.jsx` (post-win), `ViewLedger.jsx` card rows (post-settlement), `ViewLive.jsx` active bet rows.
-- **Dependencies:** `share_token` migration. `/api/share-card` endpoint (for the OG image — button works before image endpoint is live, just with plain link previews).
+- **Shipped in:** commit `b39408f`
+- **What was built:** `src/shared/ui/ShareCardButton.jsx`. Web Share API on mobile with `navigator.clipboard` + Sonner toast fallback. Fires `affiliate_events` share event (fire-and-forget). Placed in: `WinCelebrationModal.jsx` (post-win), `MatchDetail.jsx` confirmation screen (pre-settlement), `ViewLedger.jsx` settled rows, `ViewLive.jsx` active bet rows.
 
-### Pre-settlement shareable card ("I'm calling this")
-- **Priority:** P0
-- **Effort:** S (reduced — infrastructure now handled by the two stories above)
-- **Why (commercial link):** Slide 9 — "Pre-settlement bravado cards." Shared before a match, these drive awareness and bring new users into the onboarding funnel before they know the result.
-- **What exists today:** No share button on the prediction confirmation screen in `MatchDetail.jsx`.
-- **What needs building:** After `consumeCard()` succeeds and `PostPredictionSheet.jsx` is shown, add a "Share your call" secondary action inside the sheet. On tap: invoke `ShareCardButton` with `variant='pre'`. The shared OG image (generated by `/api/share-card`) will show the selection, odds, and "I'm calling this" framing. The shared link `/share/:token` opens `PublicShareView.jsx` (see below) with a "Can you call it? Play free →" CTA pointing to `/signup`. Copy template for pre-settlement Twitter/WhatsApp share: *"I'm calling [SELECTION] on [MATCH]. Can you call it? Play free at supersub.mobi 🎯"*.
-- **Dependencies:** `ShareCardButton.jsx`. `PostPredictionSheet.jsx` (affiliate story). `/api/share-card` endpoint.
-
-### Post-win shareable card ("I called it")
-- **Priority:** P0
-- **Effort:** XS (incremental — infrastructure complete)
-- **Why (commercial link):** Slide 9 — "Post-win celebration cards ('I called it — 2,500 pts')." The emotional peak moment is the highest-conversion share trigger. A won Supersub call on a World Cup match going viral is the PR story the pitch deck is built around.
-- **What exists today:** `WinModal.jsx` has a celebration UI but no share button. `ViewLedger.jsx` shows settled bets with no sharing.
-- **What needs building:** Add `<ShareCardButton prediction={prediction} variant='won' />` inside `WinCelebrationModal.jsx` (between the points display and the affiliate CTA). Also add a smaller share icon to each WON row in `ViewLedger.jsx`. Copy template for post-win share: *"I called it. [SELECTION] — [MATCH]. +[POINTS] pts on Supersub 🏆 supersub.mobi/share/[token]"*. The `/api/share-card` endpoint already handles the WON badge for won predictions — no additional endpoint work needed.
-- **Dependencies:** `ShareCardButton.jsx`. `WinCelebrationModal.jsx` (affiliate story).
-
-### Public share view and OG meta tags (`PublicShareView.jsx`)
+### ~~Pre-settlement shareable card ("I'm calling this")~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** S
-- **Why (commercial link):** The share link must resolve to a page that (a) shows the prediction to non-users, (b) prompts signup, and (c) renders correct OG meta tags so Twitter/WhatsApp display the card image rather than a blank link. Without this, the share loop breaks at the click.
-- **What exists today:** No public routes for shared predictions. `index.html` has no OG meta tags at all.
-- **What needs building:** (1) Add default OG tags to `index.html`: `og:title` ("Supersub — Call the sub"), `og:description`, `og:image` (a static default card image), `og:url`. (2) Create `src/pages/PublicShareView.jsx` — a public route (no `ProtectedRoute`) that reads `:token` from the URL, fetches prediction details from `/api/matches` (or a new thin public endpoint), and renders: the prediction card, match context, and a prominent "Play free — make your own call" CTA pointing to `/intro` (re-enter the onboarding funnel). (3) For dynamic OG images: Twitter/WhatsApp crawlers hit the `/share/:token` URL. Inject per-page OG meta via a lightweight `react-helmet` or meta tag update in the route component (`document.querySelector('meta[property="og:image"]').content = ...`). This works for in-app browsers (WhatsApp preview). For Twitter's crawler: the `/api/share-card` endpoint returns the image at a predictable URL structure so the OG tag can reference it directly. (4) Add `/share/:token` to `App.jsx` routes and `vercel.json` rewrites.
-- **Dependencies:** `share_token` migration. `/api/share-card` endpoint. `ShareCardButton.jsx`.
+- **Shipped in:** commit `b39408f`
+- **What was built:** Share button added to `MatchDetail.jsx` prediction confirmation screen using `<ShareCardButton prediction={...} variant='pre' />`. Share URL: `supersub.mobi/share/<share_token>`. OG image rendered by `/api/share-card`. Destination: `PublicShareView.jsx` with signup CTA.
+
+### ~~Post-win shareable card ("I called it")~~ ✅ SHIPPED 2026-03-26
+- **Priority:** P0
+- **Effort:** XS
+- **Shipped in:** commit `b39408f`
+- **What was built:** `<ShareCardButton prediction={prediction} variant='won' />` added to `WinCelebrationModal.jsx` between points display and affiliate CTA. Share icon added to WON rows in `ViewLedger.jsx`. OG image generated by existing `/api/share-card` endpoint (WON badge already handled).
+
+### ~~Public share view and OG meta tags (`PublicShareView.jsx`)~~ ✅ SHIPPED 2026-03-26
+- **Priority:** P0
+- **Effort:** S
+- **Shipped in:** commit `b39408f`
+- **What was built:** `src/pages/PublicShareView.jsx` — public route (no `ProtectedRoute`), reads `:token` param, fetches prediction, renders card with "Play free" CTA pointing to `/intro`. Default OG meta tags added to `index.html`. Per-page dynamic OG image tag updated client-side pointing to `/api/share-card?token=<token>`. `/share/:token` added to `App.jsx` (lazy-loaded) and `vercel.json` rewrites.
 
 ---
 

@@ -254,7 +254,77 @@ const getAssistantGreeting = (tab) => {
     }
 };
 
-const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP' }) => {
+const PreMatchPlaceholder = ({ odds }) => (
+    <div style={{ padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Lineups notice */}
+        <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: '12px',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '12px', padding: '14px 16px',
+        }}>
+            <span style={{ fontSize: '20px', lineHeight: 1 }}>🕐</span>
+            <div>
+                <p style={{ margin: 0, fontSize: '12px', fontWeight: 800, color: 'rgba(255,255,255,0.9)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Lineups not yet announced
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+                    Teams are usually confirmed ~1 hour before kick-off. Check back closer to the match.
+                </p>
+            </div>
+        </div>
+
+        {/* Odds preview — only if available */}
+        {odds && (odds.home > 0 || odds.draw > 0 || odds.away > 0) && (
+            <div>
+                <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '2px' }}>
+                    Pre-match odds
+                </p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    {[
+                        { label: 'Home', value: odds.home },
+                        { label: 'Draw', value: odds.draw },
+                        { label: 'Away', value: odds.away },
+                    ].map(({ label, value }) => value > 0 && (
+                        <div key={label} style={{
+                            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '10px', padding: '12px 8px',
+                        }}>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</span>
+                            <span style={{ fontSize: '20px', fontWeight: 900, color: '#00e5ff', fontVariantNumeric: 'tabular-nums' }}>{value.toFixed(2)}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* Total goals */}
+        {odds && (odds.goals_over > 0 || odds.goals_under > 0) && (
+            <div>
+                <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '2px' }}>
+                    Total goals
+                </p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    {[
+                        { label: 'Over 2.5', value: odds.goals_over },
+                        { label: 'Under 2.5', value: odds.goals_under },
+                    ].map(({ label, value }) => value > 0 && (
+                        <div key={label} style={{
+                            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '10px', padding: '12px 8px',
+                        }}>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</span>
+                            <span style={{ fontSize: '20px', fontWeight: 900, color: '#FFB800', fontVariantNumeric: 'tabular-nums' }}>{value.toFixed(2)}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+    </div>
+);
+
+const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP', odds = null }) => {
     const [lineups, setLineups] = useState(null);
     const [lineupStatus, setLineupStatus] = useState(null); // 'probable' | 'confirmed'
     const [loading, setLoading] = useState(true);
@@ -302,7 +372,7 @@ const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP' 
         fetchLineups();
     }, [fixtureId, fixtureDate]);
 
-    // Don't render anything on error or empty
+    // No data despite lineups being announced — render nothing (parent handles the pre-match state)
     if (error) return null;
 
     // Loading state

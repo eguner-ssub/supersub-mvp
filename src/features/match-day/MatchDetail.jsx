@@ -81,6 +81,109 @@ const AssistantDialogue = ({ activeTab }) => (
 
 
 /* ─────────────────────────────────────────────────────────────
+   PREMATCH ANALYSIS PANEL — data-driven from real odds
+   Shows when lineups have not yet been announced.
+   ───────────────────────────────────────────────────────────── */
+const PrematchAnalysisPanel = ({ match, odds }) => {
+  const home = match?.teams?.home?.name || 'Home';
+  const away = match?.teams?.away?.name || 'Away';
+
+  // Contextual greeting based on odds
+  const favourite = odds?.home && odds?.away
+    ? (odds.home < odds.away ? home : odds.home > odds.away ? away : null)
+    : null;
+  const greeting = favourite
+    ? `Hi Boss. The markets have ${favourite} as favourites here. Let me break it down for you.`
+    : `Hi Boss. The markets have this one close. Here's what the numbers are saying.`;
+
+  // Build sections from real data only — no fabricated text
+  const sections = [];
+
+  if (odds?.home > 0 || odds?.draw > 0 || odds?.away > 0) {
+    const parts = [
+      odds?.home > 0 && { label: home,   value: odds.home },
+      odds?.draw > 0 && { label: 'Draw', value: odds.draw },
+      odds?.away > 0 && { label: away,   value: odds.away },
+    ].filter(Boolean);
+    sections.push({
+      title: 'Match Odds',
+      content: parts.map(p => `${p.label}: ${p.value.toFixed(2)} (${Math.round(100 / p.value)}%)`).join('  ·  '),
+    });
+  }
+
+  if (odds?.goals_over > 0 || odds?.goals_under > 0) {
+    const parts = [
+      odds?.goals_over  > 0 && `Over 2.5: ${odds.goals_over.toFixed(2)}`,
+      odds?.goals_under > 0 && `Under 2.5: ${odds.goals_under.toFixed(2)}`,
+    ].filter(Boolean);
+    sections.push({ title: 'Goals Market', content: parts.join('  ·  ') });
+  }
+
+  const topScorers = (odds?.goalscorers || []).slice(0, 3);
+  if (topScorers.length > 0) {
+    sections.push({
+      title: 'Top Scorer Picks',
+      content: topScorers.map(s => `${s.player_name}: ${parseFloat(s.odds).toFixed(2)}`).join('  ·  '),
+    });
+  }
+
+  const hasOdds = sections.length > 0;
+
+  return (
+    <div style={{ padding: '12px 12px' }}>
+      {/* Assistant greeting bubble */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-start', gap: '10px',
+        marginBottom: '14px', padding: '10px 14px',
+        background: '#f5f0e8', borderRadius: '14px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
+      }}>
+        <img
+          src="/assets/assistant-head.png"
+          alt="Tactical Expert"
+          style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)' }}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            Tactical Expert
+          </span>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
+            {hasOdds ? greeting : "Hi Boss. Lineups aren't out yet — check back closer to kick-off. I'll have the full breakdown ready."}
+          </p>
+        </div>
+      </div>
+
+      {/* Odds sections */}
+      {sections.map((section, i) => (
+        <div key={i} style={{
+          background: 'rgba(245,240,232,0.06)', border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '12px', padding: '14px 16px', marginBottom: '10px',
+        }}>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '10px', color: '#00e5ff', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '6px', margin: '0 0 6px' }}>
+            {section.title}
+          </p>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 500, fontSize: '12px', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, margin: 0 }}>
+            {section.content}
+          </p>
+        </div>
+      ))}
+
+      {/* Lineups notice */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '10px',
+        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: '10px', padding: '10px 14px', marginTop: '4px',
+      }}>
+        <span style={{ fontSize: '16px' }}>🕐</span>
+        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 500, fontSize: '11px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.4, margin: 0 }}>
+          Lineups usually drop ~1 hour before kick-off. Come back then for the full tactical view.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────
    LIVE SUPERSUB PANEL — swipeable insight carousel
    ───────────────────────────────────────────────────────────── */
 const INSIGHT_ICONS = { bench: '⚡', sub: '🔄' };
@@ -830,9 +933,11 @@ const MatchDetail = () => {
     return () => { supabase.removeChannel(channel); };
   }, [matchPhase, id, supabase]);
 
-  const viewState = matchPhase === 'PRE' ? 'PRE_LINEUPS' : matchPhase; // 'LIVE' or 'POST'
+  const viewState = matchPhase === 'PRE'
+    ? (lineupsAnnounced ? 'PRE_LINEUPS' : 'PRE_NO_LINEUPS')
+    : matchPhase; // 'LIVE' or 'POST'
 
-  const shelfVisible = viewState === 'PRE_LINEUPS';
+  const shelfVisible = viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS';
   const hasAnyCard = cardTypes.some(c => getCardCount(c.id) > 0);
   const contentBottom = viewState === 'LIVE' ? '140px' : shelfVisible ? (hasAnyCard ? '256px' : '120px') : '0px';
 
@@ -920,7 +1025,7 @@ const MatchDetail = () => {
         </div>
       )}
 
-      {match && (
+      {match && viewState !== 'PRE_NO_LINEUPS' && (
         <div
           className="absolute w-full z-[35]"
           style={{ top: '156px' }}
@@ -977,6 +1082,33 @@ const MatchDetail = () => {
         </div>
       )}
 
+      {/* PRE_NO_LINEUPS: Full-page analyst report, no tabs */}
+      {match && viewState === 'PRE_NO_LINEUPS' && (
+        <div
+          className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
+          style={{
+            top: '156px',
+            bottom: contentBottom,
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          <div
+            style={{
+              margin: '8px 0',
+              background: 'rgba(18,18,18,0.75)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              borderLeft: '1px solid rgba(255,255,255,0.10)',
+              borderRight: '1px solid rgba(255,255,255,0.10)',
+              padding: '16px 0',
+              minHeight: '100%',
+            }}
+          >
+            <PrematchAnalysisPanel match={match} odds={odds} />
+          </div>
+        </div>
+      )}
+
       {/* PRE_LINEUPS / LIVE: Tabbed content */}
       {match && (viewState === 'PRE_LINEUPS' || viewState === 'LIVE') && (
         <div
@@ -1019,6 +1151,7 @@ const MatchDetail = () => {
                 matchPhase={matchPhase}
                 fixtureDate={match.fixture?.date}
                 activeTab={activeTab}
+                odds={odds}
               />
             )}
 
@@ -1084,6 +1217,7 @@ const MatchDetail = () => {
                 matchPhase={matchPhase}
                 fixtureDate={match.fixture?.date}
                 activeTab={activeTab}
+                odds={odds}
               />
             )}
 
