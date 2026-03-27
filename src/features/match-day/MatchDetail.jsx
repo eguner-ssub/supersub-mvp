@@ -81,23 +81,78 @@ const AssistantDialogue = ({ activeTab }) => (
 
 
 /* ─────────────────────────────────────────────────────────────
-   PREMATCH ANALYSIS PANEL — data-driven from real odds
+   PREMATCH ANALYSIS PANEL
    Shows when lineups have not yet been announced.
+   Priority: real intel from /api/intel → odds fallback → loading state
    ───────────────────────────────────────────────────────────── */
-const PrematchAnalysisPanel = ({ match, odds }) => {
+const SECTION_CARD_STYLE = {
+  background: 'rgba(245,240,232,0.06)', border: '1px solid rgba(255,255,255,0.06)',
+  borderRadius: '12px', padding: '14px 16px', marginBottom: '10px',
+};
+const SECTION_TITLE_STYLE = {
+  fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '10px',
+  color: '#00e5ff', textTransform: 'uppercase', letterSpacing: '1.5px', margin: '0 0 6px',
+};
+const SECTION_BODY_STYLE = {
+  fontFamily: "'Montserrat', sans-serif", fontWeight: 500, fontSize: '12px',
+  color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, margin: 0,
+};
+
+const PrematchAnalysisPanel = ({ match, odds, analysisData }) => {
   const home = match?.teams?.home?.name || 'Home';
   const away = match?.teams?.away?.name || 'Away';
 
-  // Contextual greeting based on odds
-  const favourite = odds?.home && odds?.away
-    ? (odds.home < odds.away ? home : odds.home > odds.away ? away : null)
-    : null;
-  const greeting = favourite
-    ? `Hi Boss. The markets have ${favourite} as favourites here. Let me break it down for you.`
-    : `Hi Boss. The markets have this one close. Here's what the numbers are saying.`;
+  // ── Intel sections from /api/intel (SportMonks predictions) ──
+  if (analysisData?.sections?.length) {
+    return (
+      <div style={{ padding: '12px 12px' }}>
+        {/* Assistant greeting bubble */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: '10px',
+          marginBottom: '14px', padding: '10px 14px',
+          background: '#f5f0e8', borderRadius: '14px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
+        }}>
+          <img
+            src="/assets/assistant-head.png"
+            alt="Tactical Expert"
+            style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)' }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Tactical Expert
+            </span>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
+              {analysisData.greeting}
+            </p>
+          </div>
+        </div>
 
-  // Build sections from real data only — no fabricated text
-  const sections = [];
+        {/* Intel narrative sections (Form Guide, Key Matchup, Goals Market, Prediction) */}
+        {analysisData.sections.map((section, i) => (
+          <div key={i} style={SECTION_CARD_STYLE}>
+            <p style={SECTION_TITLE_STYLE}>{section.title}</p>
+            <p style={SECTION_BODY_STYLE}>{section.content}</p>
+          </div>
+        ))}
+
+        {/* Lineups notice */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '10px', padding: '10px 14px', marginTop: '4px',
+        }}>
+          <span style={{ fontSize: '16px' }}>🕐</span>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 500, fontSize: '11px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.4, margin: 0 }}>
+            Lineups usually drop ~1 hour before kick-off. Come back then for the full tactical view.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Odds fallback (intel not yet synced or unavailable) ──────
+  const oddsSections = [];
 
   if (odds?.home > 0 || odds?.draw > 0 || odds?.away > 0) {
     const parts = [
@@ -105,7 +160,7 @@ const PrematchAnalysisPanel = ({ match, odds }) => {
       odds?.draw > 0 && { label: 'Draw', value: odds.draw },
       odds?.away > 0 && { label: away,   value: odds.away },
     ].filter(Boolean);
-    sections.push({
+    oddsSections.push({
       title: 'Match Odds',
       content: parts.map(p => `${p.label}: ${p.value.toFixed(2)} (${Math.round(100 / p.value)}%)`).join('  ·  '),
     });
@@ -116,18 +171,23 @@ const PrematchAnalysisPanel = ({ match, odds }) => {
       odds?.goals_over  > 0 && `Over 2.5: ${odds.goals_over.toFixed(2)}`,
       odds?.goals_under > 0 && `Under 2.5: ${odds.goals_under.toFixed(2)}`,
     ].filter(Boolean);
-    sections.push({ title: 'Goals Market', content: parts.join('  ·  ') });
+    oddsSections.push({ title: 'Goals Market', content: parts.join('  ·  ') });
   }
 
   const topScorers = (odds?.goalscorers || []).slice(0, 3);
   if (topScorers.length > 0) {
-    sections.push({
+    oddsSections.push({
       title: 'Top Scorer Picks',
       content: topScorers.map(s => `${s.player_name}: ${parseFloat(s.odds).toFixed(2)}`).join('  ·  '),
     });
   }
 
-  const hasOdds = sections.length > 0;
+  const favourite = odds?.home && odds?.away
+    ? (odds.home < odds.away ? home : odds.home > odds.away ? away : null)
+    : null;
+  const oddsGreeting = favourite
+    ? `Hi Boss. The markets have ${favourite} as favourites here. Full analysis syncing — check back soon.`
+    : `Hi Boss. Lineups aren't out yet — check back closer to kick-off. I'll have the full breakdown ready.`;
 
   return (
     <div style={{ padding: '12px 12px' }}>
@@ -148,23 +208,16 @@ const PrematchAnalysisPanel = ({ match, odds }) => {
             Tactical Expert
           </span>
           <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
-            {hasOdds ? greeting : "Hi Boss. Lineups aren't out yet — check back closer to kick-off. I'll have the full breakdown ready."}
+            {oddsGreeting}
           </p>
         </div>
       </div>
 
       {/* Odds sections */}
-      {sections.map((section, i) => (
-        <div key={i} style={{
-          background: 'rgba(245,240,232,0.06)', border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '12px', padding: '14px 16px', marginBottom: '10px',
-        }}>
-          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '10px', color: '#00e5ff', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '6px', margin: '0 0 6px' }}>
-            {section.title}
-          </p>
-          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 500, fontSize: '12px', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, margin: 0 }}>
-            {section.content}
-          </p>
+      {oddsSections.map((section, i) => (
+        <div key={i} style={SECTION_CARD_STYLE}>
+          <p style={SECTION_TITLE_STYLE}>{section.title}</p>
+          <p style={SECTION_BODY_STYLE}>{section.content}</p>
         </div>
       ))}
 
@@ -755,6 +808,7 @@ const MatchDetail = () => {
   const [stagedBet, setStagedBet] = useState(null);
   // Affiliate sheet — set after successful card placement, cleared on dismiss
   const [affiliateSheetData, setAffiliateSheetData] = useState(null);
+  const [analysisData, setAnalysisData] = useState(null);
   const [activeTab, setActiveTab] = useState('LINEUP');
   const [selectedScorerTeam, setSelectedScorerTeam] = useState('home');
 
@@ -791,6 +845,15 @@ const MatchDetail = () => {
 
         // Step 2: fire all secondary requests in parallel
         const secondaryFetches = [];
+
+        if (phase === 'PRE') {
+          secondaryFetches.push(
+            fetch(`/api/intel?match_id=${fixtureId}`)
+              .then(r => r.ok ? r.json() : null)
+              .then(d => { if (d?.available && d?.analysis) setAnalysisData(d.analysis); })
+              .catch(e => console.warn('[MatchDetail] Intel fetch error:', e))
+          );
+        }
 
         if (phase !== 'POST') {
           secondaryFetches.push(
@@ -1104,7 +1167,7 @@ const MatchDetail = () => {
               minHeight: '100%',
             }}
           >
-            <PrematchAnalysisPanel match={match} odds={odds} />
+            <PrematchAnalysisPanel match={match} odds={odds} analysisData={analysisData} />
           </div>
         </div>
       )}
