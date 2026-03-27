@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGame } from '../shared/context/GameContext';
+import { supabase } from '../supabaseClient';
+import { toast } from 'sonner';
 import { Zap, Loader2, ShoppingBag, X, TrendingUp, Cone } from 'lucide-react';
 import gameDataRaw from '../data/gameData.json';
 import { getCardConfig } from '../utils/cardConfig';
@@ -112,6 +114,19 @@ export default function Dashboard() {
     setShowBagOverlay(false);
     setBagStage('closed');
     setNewCards([]);
+
+    // Persist welcome as seen (fire-and-forget) + nudge toast
+    if (userProfile?.id) {
+      void supabase
+        .from('profiles')
+        .update({ has_seen_welcome: true })
+        .eq('id', userProfile.id);
+    }
+
+    toast.success('Your starter cards are ready — make your first call.', {
+      action: { label: 'Go →', onClick: () => navigate('/match-hub') },
+      duration: 6000,
+    });
   };
 
   if (loading) return (

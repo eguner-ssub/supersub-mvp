@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { trackFunnelEvent } from '../shared/utils/trackFunnelEvent';
 
 // ── CSS Keyframe Animations ───────────────────────────────────────────────
 const KEYFRAMES = `
@@ -123,12 +124,23 @@ export default function InteractiveOnboarding() {
 
   const progressStep = PHASE_TO_STEP[phase] ?? 0;
 
+  // ── Funnel analytics ─────────────────────────────────────────────────
+  useEffect(() => { trackFunnelEvent('onboarding_started'); }, []);
+
+  useEffect(() => {
+    if (['bench', 'lineup', 'subs', 'payoff'].includes(phase)) {
+      trackFunnelEvent('onboarding_phase', { phase });
+    }
+  }, [phase]);
+
   const handleSkip = () => {
+    trackFunnelEvent('onboarding_skipped', { phase });
     localStorage.setItem('ss_onboarding_seen', '1');
     navigate('/login', { replace: true });
   };
 
   const handleComplete = () => {
+    trackFunnelEvent('onboarding_completed');
     localStorage.setItem('ss_onboarding_seen', '1');
     localStorage.setItem('ss_onboarding_points', '2500');
     navigate('/signup', { replace: true });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../shared/context/GameContext';
+import { trackFunnelEvent } from '../shared/utils/trackFunnelEvent';
 import { ArrowRight, PenTool, CheckCircle, Star, Zap } from 'lucide-react';
 import MobileLayout from '../shared/ui/MobileLayout';
 
@@ -34,7 +35,10 @@ const Onboarding = () => {
     if (managerName.trim()) {
       // This will update 'userProfile' in context, triggering a re-render
       // which switches 'hasSignedContract' to true instantly.
-      await createProfile(managerName.trim());
+      const result = await createProfile(managerName.trim());
+      if (result?.success) {
+        trackFunnelEvent('club_name_set', {}, result.data?.id ?? null);
+      }
     }
   };
 
@@ -85,11 +89,27 @@ const Onboarding = () => {
                 </p>
               </div>
 
-              <div className="space-y-6 mt-8">
+              {/* Card type preview */}
+              <div className="flex justify-center gap-2 mt-6 mb-2">
+                {[
+                  { label: 'Result', color: 'bg-blue-500/15 border-blue-500/40 text-blue-300' },
+                  { label: 'Goals', color: 'bg-purple-500/15 border-purple-500/40 text-purple-300' },
+                  { label: 'Supersub', color: 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' },
+                ].map(({ label, color }) => (
+                  <span key={label} className={`px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest ${color}`}>
+                    {label}
+                  </span>
+                ))}
+              </div>
+
+              <div className="space-y-6 mt-4">
                 <div className="relative group">
-                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2 text-center">
-                    Sign Here
+                  <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-gray-500 mb-1 text-center">
+                    Name your club
                   </label>
+                  <p className="text-[9px] text-gray-400 text-center mb-3 tracking-wide">
+                    This is how rivals will know you on the leaderboard.
+                  </p>
                   <input
                     type="text"
                     value={managerName}

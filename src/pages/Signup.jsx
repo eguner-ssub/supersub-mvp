@@ -1,19 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Loader2, ArrowLeft, Mail, Eye, EyeOff, UserPlus } from 'lucide-react';
+import { trackFunnelEvent } from '../shared/utils/trackFunnelEvent';
+
+const COUNTRIES = [
+  { code: 'GB', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', label: 'England' },
+  { code: 'DE', flag: '🇩🇪', label: 'Germany' },
+  { code: 'ES', flag: '🇪🇸', label: 'Spain' },
+  { code: 'IT', flag: '🇮🇹', label: 'Italy' },
+  { code: 'BR', flag: '🇧🇷', label: 'Brazil' },
+  { code: 'FR', flag: '🇫🇷', label: 'France' },
+  { code: 'AR', flag: '🇦🇷', label: 'Argentina' },
+  { code: 'NL', flag: '🇳🇱', label: 'Netherlands' },
+  { code: 'PT', flag: '🇵🇹', label: 'Portugal' },
+  { code: 'TR', flag: '🇹🇷', label: 'Turkey' },
+  { code: 'NG', flag: '🇳🇬', label: 'Nigeria' },
+  { code: 'GH', flag: '🇬🇭', label: 'Ghana' },
+  { code: 'US', flag: '🇺🇸', label: 'United States' },
+  { code: 'MX', flag: '🇲🇽', label: 'Mexico' },
+  { code: 'CO', flag: '🇨🇴', label: 'Colombia' },
+  { code: 'ZA', flag: '🇿🇦', label: 'South Africa' },
+  { code: 'EG', flag: '🇪🇬', label: 'Egypt' },
+  { code: 'MA', flag: '🇲🇦', label: 'Morocco' },
+  { code: 'JP', flag: '🇯🇵', label: 'Japan' },
+  { code: 'KR', flag: '🇰🇷', label: 'South Korea' },
+  { code: 'OTHER', flag: '🌍', label: 'Other' },
+];
+
+const FEATURES = [
+  { icon: '⚡', text: 'Play free — no real money' },
+  { icon: '🏆', text: 'Earn points. Beat your rivals.' },
+  { icon: '🌍', text: 'Compete globally' },
+];
 
 const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [countryCode, setCountryCode] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [showReferral, setShowReferral] = useState(false);
   const [isAgeVerified, setIsAgeVerified] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [complianceError, setComplianceError] = useState(null);
   const [error, setError] = useState(null);
   const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
   const navigate = useNavigate();
+
+  // F-004: signup page view (fires on mount, before auth)
+  useEffect(() => { trackFunnelEvent('signup_page_viewed'); }, []);
 
   const carbonStyle = {
     background: `radial-gradient(circle, #333 1px, transparent 1px), radial-gradient(circle, #333 1px, transparent 1px), #1a1a1a`,
@@ -35,6 +72,7 @@ const Signup = () => {
     setLoading(true);
 
     try {
+      trackFunnelEvent('signup_submitted');
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
 
@@ -44,7 +82,7 @@ const Signup = () => {
         return;
       }
 
-      // Write compliance fields to profiles.
+      // Write compliance + funnel fields to profiles.
       // The profile row is created by a Supabase trigger on auth.users insert.
       // Use upsert so this is safe even if the trigger hasn't fired yet.
       await supabase
@@ -53,7 +91,11 @@ const Signup = () => {
           id: data.user.id,
           terms_accepted_at: new Date().toISOString(),
           is_age_verified: true,
+          country_code: countryCode || null,
+          referral_code: referralCode.trim() || null,
         }, { onConflict: 'id' });
+
+      trackFunnelEvent('signup_completed', { country_code: countryCode || null }, data.user.id);
 
       // SUCCESS: Navigate to Onboarding, NOT Dashboard.
       // The GameContext listener will detect the new session automatically.
@@ -73,12 +115,12 @@ const Signup = () => {
       <div className="min-h-screen bg-black text-white p-6 flex flex-col justify-center items-center text-center">
         <div className="max-w-md w-full bg-[#1a1a1a] p-8 rounded-3xl border border-white/10 shadow-2xl" style={carbonStyle}>
           <Mail className="w-16 h-16 text-green-400 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(34,197,94,0.4)]" />
-          <h2 className="text-2xl font-black italic mb-2 tracking-tight uppercase">Verify Access</h2>
+          <h2 className="text-2xl font-black italic mb-2 tracking-tight uppercase">Check Your Inbox</h2>
           <p className="text-gray-400 mb-8 text-sm leading-relaxed">
-            Activation link sent to <span className="text-white font-bold">{email}</span>.
+            We've sent a link to <span className="text-white font-bold">{email}</span> to get you started.
           </p>
           <Link to="/login" className="text-green-400 hover:text-white font-black text-xs uppercase tracking-widest transition-colors">
-            Return to Gate
+            Return to Login
           </Link>
         </div>
       </div>
@@ -99,13 +141,24 @@ const Signup = () => {
           <ArrowLeft className="w-3 h-3" /> Back
         </Link>
 
+        {/* Feature rows */}
+        <div className="flex flex-col gap-2">
+          {FEATURES.map(({ icon, text }) => (
+            <div key={text} className="flex items-center gap-2 text-sm text-white/55">
+              <span>{icon}</span>
+              <span>{text}</span>
+            </div>
+          ))}
+        </div>
+
         <div>
           <h2 className="text-4xl font-black italic mb-2 tracking-tighter uppercase">Join the Club</h2>
-          <p className="text-gray-500 text-sm font-medium">Initialize your performance profile.</p>
+          <p className="text-gray-500 text-sm font-medium">Call the sub before the manager does.</p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-6">
           <div className="space-y-4">
+            {/* Email */}
             <div>
               <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Email</label>
               <input
@@ -118,6 +171,7 @@ const Signup = () => {
               />
             </div>
 
+            {/* Password */}
             <div>
               <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Password</label>
               <div className="relative">
@@ -138,6 +192,41 @@ const Signup = () => {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+            </div>
+
+            {/* Country picker */}
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Your Country</label>
+              <select
+                value={countryCode}
+                onChange={e => setCountryCode(e.target.value)}
+                className="w-full bg-[#0f0f0f] border border-white/5 rounded-2xl p-4 text-white appearance-none focus:outline-none focus:border-green-500/50 transition-all shadow-inner"
+              >
+                <option value="">Select your country</option>
+                {COUNTRIES.map(c => (
+                  <option key={c.code} value={c.code}>{c.flag} {c.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Referral code (collapsed) */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowReferral(v => !v)}
+                className="text-[10px] text-white/25 hover:text-white/45 transition-colors uppercase tracking-widest"
+              >
+                {showReferral ? '▾' : '▸'} Have a referral code?
+              </button>
+              {showReferral && (
+                <input
+                  type="text"
+                  value={referralCode}
+                  onChange={e => setReferralCode(e.target.value)}
+                  placeholder="Enter code"
+                  className="mt-2 w-full bg-[#0f0f0f] border border-white/5 rounded-2xl p-4 text-white placeholder:text-gray-700 focus:outline-none focus:border-green-500/50 transition-all shadow-inner"
+                />
+              )}
             </div>
           </div>
 
