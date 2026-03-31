@@ -43,8 +43,8 @@ const Onboarding = () => {
   };
 
   const handleGetToWork = () => {
-    // Navigate with state to trigger the Bag Animation on Dashboard
-    navigate('/dashboard', { state: { firstLogin: true } });
+    // Daily Supply bag suppressed for new users — replaced by Joseba onboarding flow in ManagerOffice.
+    navigate('/manager-office');
   };
 
   // Prevent flash while loading

@@ -3,15 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { Trophy, BookOpen, Monitor, Smartphone, TrendingUp, Globe2 } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 import { normalizeMatch } from '../../shared/utils/normalizeMatch';
+import OfficeOnboarding from './OfficeOnboarding';
 
 const ManagerOffice = () => {
     const navigate = useNavigate();
-    useGame();
+    const { userProfile } = useGame();
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     const [anyLiveMatches, setAnyLiveMatches] = useState(false);
     // Separate loaded state for each image to enable crossfade
     const [packedLoaded, setPackedLoaded] = useState(false);
     const [emptyLoaded, setEmptyLoaded] = useState(false);
+
+    useEffect(() => {
+        if (userProfile && userProfile.onboarding_complete === false) {
+            setShowOnboarding(true);
+        }
+    }, [userProfile]);
 
     /**
      * EFFECT: Global Live Match Check
@@ -145,6 +153,10 @@ const ManagerOffice = () => {
                 </div>
 
                 {/* HUD provided by NavigationShell > GameHeader */}
+
+                {showOnboarding && (
+                    <OfficeOnboarding onComplete={() => setShowOnboarding(false)} />
+                )}
             </div>
         </div>
     );

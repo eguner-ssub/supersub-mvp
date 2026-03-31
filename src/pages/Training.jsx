@@ -18,7 +18,7 @@ const REWARD_CARDS = [
 const TIMER_SECONDS = 10;
 
 const Training = () => {
-  const { userProfile, spendEnergy, gainEnergy, updateInventory, loading } = useGame();
+  const { userProfile, spendEnergy, claimAdReward, updateInventory, loading } = useGame();
   const navigate = useNavigate();
 
   const [phase, setPhase]                     = useState('briefing');
@@ -109,13 +109,13 @@ const Training = () => {
 
   const handleAdReward = async () => {
     try {
-      await gainEnergy(3);
-      setShowAd(false);
+      await claimAdReward();
+      // showAd is closed by AdOverlay after onReward resolves (via onClose)
       setShowReward(true);
       setTimeout(() => setShowReward(false), 3000);
-    } catch {
-      alert('Failed to grant reward. Please try again.');
-      setShowAd(false);
+    } catch (err) {
+      console.error('Ad reward failed:', err.message);
+      alert(err.message || 'Failed to grant reward. Please try again.');
     }
   };
 
@@ -387,7 +387,9 @@ const Training = () => {
         </div>
       </MobileLayout>
 
-      {showAd && <AdOverlay onReward={handleAdReward} onClose={() => setShowAd(false)} />}
+      {/* AdOverlay is only triggered from the briefing phase (energy=0 CTA).
+          It does not render here in the quiz phase — showAd is always false
+          once the quiz has started. */}
 
       {showReward && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">

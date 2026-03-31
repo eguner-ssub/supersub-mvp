@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "vite-dev",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/Users/erenguner/.nvm/versions/node/v24.14.0/bin/node",
+      "runtimeArgs": ["/Users/erenguner/.nvm/versions/node/v24.14.0/bin/npm", "run", "dev"],
       "port": 5173
     },
     {

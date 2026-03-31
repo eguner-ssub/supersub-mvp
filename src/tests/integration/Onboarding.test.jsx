@@ -143,12 +143,10 @@ describe('Onboarding Page', () => {
       expect(screen.getByText('GET TO WORK')).toBeInTheDocument();
     });
 
-    it('navigates to /dashboard with state { firstLogin: true } when "GET TO WORK" is clicked', () => {
+    it('navigates to /manager-office when "GET TO WORK" is clicked', () => {
       renderOnboarding();
       fireEvent.click(screen.getByText('GET TO WORK'));
-      expect(mockNavigate).toHaveBeenCalledWith('/dashboard', {
-        state: { firstLogin: true },
-      });
+      expect(mockNavigate).toHaveBeenCalledWith('/manager-office');
     });
 
     it('does not render the contract form on the bonus screen', () => {

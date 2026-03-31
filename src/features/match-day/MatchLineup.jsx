@@ -483,3 +483,7 @@ const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP',
 };
 
 export default MatchLineup;
+
+// Named exports — allow simulation screens to reuse pitch rendering
+// without duplicating styles or component logic.
+export { PlayerNode, PitchMarkings, TeamHalf, pitchContainerStyle, grainOverlayStyle, mapFormation, parseFormation };

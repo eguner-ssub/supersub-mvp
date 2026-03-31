@@ -228,7 +228,8 @@ export const GameProvider = ({ children }) => {
   /**
    * GAIN ENERGY
    * Increments the user's energy by `amount`, capped at max_energy.
-   * Used by: ad reward flow (Training), energy drink flow (Dashboard/ViewFridge).
+   * Used by: energy drink flow (Dashboard/ViewFridge).
+   * NOT used for ad rewards — see claimAdReward() below.
    */
   const gainEnergy = async (amount) => {
     if (!userProfile) return;
@@ -236,6 +237,50 @@ export const GameProvider = ({ children }) => {
     const newEnergy = Math.min(userProfile.energy + amount, maxEnergy);
     setUserProfile(prev => ({ ...prev, energy: newEnergy }));
     await supabase.from('profiles').update({ energy: newEnergy }).eq('id', userProfile.id);
+  };
+
+  /**
+   * CLAIM AD REWARD
+   * Called after the user watches a rewarded ad and taps "Claim Reward".
+   * Calls the watch_ad_reward() RPC which atomically:
+   *   - Sets energy = max_energy (full refill)
+   *   - Increments ads_watched counter
+   * Reflects the server response back into local state.
+   *
+   * Client-side frequency guard: blocks claims within AD_COOLDOWN_MS of the
+   * last successful claim (stored in localStorage). This is a UX guard only —
+   * the RPC itself is the authoritative enforcement layer.
+   */
+  const AD_COOLDOWN_MS = 60_000; // 60 seconds between ad claims
+
+  const claimAdReward = async () => {
+    if (!userProfile) return;
+
+    // Client-side frequency cap
+    const lastClaim = parseInt(localStorage.getItem('last_ad_claim_at') || '0', 10);
+    if (Date.now() - lastClaim < AD_COOLDOWN_MS) {
+      const remaining = Math.ceil((AD_COOLDOWN_MS - (Date.now() - lastClaim)) / 1000);
+      throw new Error(`Please wait ${remaining}s before watching another ad.`);
+    }
+
+    const { data, error } = await supabase.rpc('watch_ad_reward', { p_user_id: userProfile.id });
+
+    if (error) {
+      console.error('claimAdReward: RPC failed', error.message);
+      throw new Error(error.message);
+    }
+
+    // RPC returns a single-row table: { new_energy, ads_watched }
+    const result = Array.isArray(data) ? data[0] : data;
+    if (result) {
+      setUserProfile(prev => prev ? {
+        ...prev,
+        energy: result.new_energy,
+        ads_watched: result.ads_watched,
+      } : prev);
+    }
+
+    localStorage.setItem('last_ad_claim_at', String(Date.now()));
   };
 
   /**
@@ -259,6 +304,7 @@ export const GameProvider = ({ children }) => {
       energy: 3,        // signing bonus
       max_energy: 5,
       ads_watched: 0,
+      onboarding_complete: false,
     };
 
     // Upsert instead of insert so re-submitting the onboarding form (e.g. after
@@ -379,6 +425,6 @@ export const GameProvider = ({ children }) => {
     };
   }, [userProfile?.id]);
 
-  const value = { userProfile, loading, statDictionary, supabase, placeBet, consumeCard, spendEnergy, gainEnergy, updateInventory, loadProfile, createProfile, unseenSettlements, markPredictionsSeen };
+  const value = { userProfile, loading, statDictionary, supabase, placeBet, consumeCard, spendEnergy, gainEnergy, claimAdReward, updateInventory, loadProfile, createProfile, unseenSettlements, markPredictionsSeen };
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 };
