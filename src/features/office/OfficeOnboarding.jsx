@@ -89,19 +89,6 @@ const OfficeOnboarding = ({ onComplete }) => {
   return (
     <div className="fixed inset-0 z-[300] pointer-events-none">
 
-      {/* Pitch-black overlay from the base of the stadium window downward.
-          top-[50%] = window bottom edge (top-[8%] + h-[42%] = 50%).
-          bg-black (fully opaque) hides the desk. */}
-      <div className="absolute top-[50%] left-0 right-0 bottom-0 bg-black/60 pointer-events-auto" />
-
-      {/* Left-side directional vignette — dims trophy/desk area so users
-          don't think they can interact with it. Leaves the stadium window
-          (right side) naturally brighter as the visual focus. */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.55) 0%, transparent 60%)' }}
-      />
-
       {/* Stadium window tap zone — active only after step 1.
           Matches ManagerOffice hotspot-window: top-[8%] left-[42%] w-[58%] h-[42%] */}
       <div

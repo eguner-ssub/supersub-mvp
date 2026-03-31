@@ -89,9 +89,11 @@ const ManagerOffice = () => {
                         onClick={() => navigate('/match-hub')}
                         className="absolute top-[8%] left-[42%] w-[58%] h-[42%] z-10 cursor-pointer active:scale-[0.98] transition-all duration-100"
                     >
-                        <div className={`absolute top-[40%] right-[30%] glass-dark p-2 rounded-full shadow-office ${anyLiveMatches ? 'animate-pulse' : ''}`}>
-                            <Trophy className={`w-4 h-4 ${anyLiveMatches ? 'text-yellow-400' : 'text-white'}`} />
-                        </div>
+                        {!showOnboarding && (
+                            <div className={`absolute top-[40%] right-[30%] glass-dark p-2 rounded-full shadow-office ${anyLiveMatches ? 'animate-pulse' : ''}`}>
+                                <Trophy className={`w-4 h-4 ${anyLiveMatches ? 'text-yellow-400' : 'text-white'}`} />
+                            </div>
+                        )}
                     </div>
 
                     {/* B. BOOKCASE (History) — Left wall */}
@@ -100,9 +102,11 @@ const ManagerOffice = () => {
                         onClick={() => navigate('/history')}
                         className="absolute top-[12%] left-0 w-[32%] h-[50%] z-10 cursor-pointer active:scale-[0.98] transition-all duration-100"
                     >
-                        <div className="absolute top-[50%] left-[40%] glass-dark shadow-office-warm p-2 rounded-full">
-                            <BookOpen className="w-4 h-4 text-purple-400" />
-                        </div>
+                        {!showOnboarding && (
+                            <div className="absolute top-[50%] left-[40%] glass-dark shadow-office-warm p-2 rounded-full">
+                                <BookOpen className="w-4 h-4 text-purple-400" />
+                            </div>
+                        )}
                     </div>
 
                     {/* C. LAPTOP SCREEN (League Hub) — Desk center */}
@@ -115,9 +119,11 @@ const ManagerOffice = () => {
                             transformOrigin: 'bottom left',
                         }}
                     >
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 diegetic-screen p-2 rounded-full shadow-office">
-                            <Globe2 className="w-4 h-4 text-blue-400" />
-                        </div>
+                        {!showOnboarding && (
+                            <div className="absolute -top-4 left-1/2 -translate-x-1/2 diegetic-screen p-2 rounded-full shadow-office">
+                                <Globe2 className="w-4 h-4 text-blue-400" />
+                            </div>
+                        )}
                     </div>
 
                     {/* D. TABLET STAND (Leaderboard) — Desk right */}
@@ -130,9 +136,11 @@ const ManagerOffice = () => {
                             transformOrigin: 'bottom right',
                         }}
                     >
-                        <div className="absolute top-0 right-[30%] diegetic-screen p-2 rounded-full shadow-office">
-                            <TrendingUp className="w-4 h-4 text-green-400" />
-                        </div>
+                        {!showOnboarding && (
+                            <div className="absolute top-0 right-[30%] diegetic-screen p-2 rounded-full shadow-office">
+                                <TrendingUp className="w-4 h-4 text-green-400" />
+                            </div>
+                        )}
                     </div>
 
                     {/* E. PHONE ON PAPERS (Inbox) — Desk bottom-left */}
@@ -145,9 +153,11 @@ const ManagerOffice = () => {
                             transformOrigin: 'bottom left',
                         }}
                     >
-                        <div className="absolute top-[-10%] right-[20%] diegetic-screen shadow-office-warm p-2 rounded-full">
-                            <Smartphone className="w-4 h-4 text-yellow-400" />
-                        </div>
+                        {!showOnboarding && (
+                            <div className="absolute top-[-10%] right-[20%] diegetic-screen shadow-office-warm p-2 rounded-full">
+                                <Smartphone className="w-4 h-4 text-yellow-400" />
+                            </div>
+                        )}
                     </div>
 
                 </div>

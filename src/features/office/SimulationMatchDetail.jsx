@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, X, Trophy } from 'lucide-react';
 import CardBase from '../../shared/ui/CardBase';
-import JosebaBubble from '../../shared/ui/JosebaBubble';
 import {
   PlayerNode,
   PitchMarkings,
@@ -11,14 +10,20 @@ import {
   mapFormation,
 } from '../match-day/MatchLineup';
 
+/* ─── Settlement keyframe animations ─────────────────────────── */
+const SETTLEMENT_KEYFRAMES = `
+  @keyframes clockTick { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  @keyframes winner-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+`;
+
 /* ─── Static match data ───────────────────────────────────────── */
 
 const SIM_MATCH = {
   id: 'sim_lfc_barca_2019',
   home_team: 'Liverpool',
   away_team: 'Barcelona',
-  home_logo: '/assets/sim/lfc-crest.webp',
-  away_logo: '/assets/sim/barca-crest.webp',
+  home_logo: 'https://cdn.sportmonks.com/images/soccer/teams/8/8.png',
+  away_logo: 'https://cdn.sportmonks.com/images/soccer/teams/19/83.png',
   date_display: '7 May 2019',
   league_name: 'UEFA Champions League — Semi-Final 2nd Leg',
 };
@@ -27,17 +32,17 @@ const SIM_MATCH = {
 
 const LFC_FORMATION = '4-3-3';
 const LFC_XI = [
-  { player: { id: 1,  name: 'Alisson',          number: '1',  grid: '1:1' } },
-  { player: { id: 2,  name: 'Alexander-Arnold', number: '66', grid: '2:4' } },
-  { player: { id: 3,  name: 'Matip',            number: '32', grid: '2:3' } },
-  { player: { id: 4,  name: 'Van Dijk',         number: '4',  grid: '2:2' } },
-  { player: { id: 5,  name: 'Robertson',        number: '26', grid: '2:1' } },
-  { player: { id: 6,  name: 'Henderson',        number: '14', grid: '3:3' } },
-  { player: { id: 7,  name: 'Fabinho',          number: '3',  grid: '3:2' } },
-  { player: { id: 8,  name: 'Milner',           number: '7',  grid: '3:1' } },
-  { player: { id: 9,  name: 'Shaqiri',          number: '23', grid: '4:3' } },
-  { player: { id: 10, name: 'Mané',             number: '10', grid: '4:2' } },
-  { player: { id: 11, name: 'Origi',            number: '27', grid: '4:1' } },
+  { player: { id: 1,  name: 'Alisson',    number: '1',  grid: '1:1' } },
+  { player: { id: 2,  name: 'Trent',      number: '66', grid: '2:4' } },
+  { player: { id: 3,  name: 'Matip',      number: '32', grid: '2:2' } },
+  { player: { id: 4,  name: 'Van Dijk',   number: '4',  grid: '2:3' } },
+  { player: { id: 5,  name: 'Robertson',  number: '26', grid: '2:1' } },
+  { player: { id: 6,  name: 'Henderson',  number: '14', grid: '3:3' } },
+  { player: { id: 7,  name: 'Fabinho',    number: '3',  grid: '3:2' } },
+  { player: { id: 8,  name: 'Milner',     number: '7',  grid: '3:1' } },
+  { player: { id: 9,  name: 'Shaqiri',    number: '23', grid: '4:3' } },
+  { player: { id: 10, name: 'Origi',      number: '27', grid: '4:2' } },
+  { player: { id: 11, name: 'Mané',       number: '10', grid: '4:1' } },
 ];
 
 const BAR_FORMATION = '4-3-3';
@@ -87,28 +92,29 @@ const CARD_TYPES = [
 
 const TABS = ['LINEUP', 'SUBS', 'EVENTS', 'STATS'];
 
+/* ─── Sim rewards ─────────────────────────────────────────────── */
+
+const SIM_REWARDS = {
+  HOME_WIN: 200, DRAW: 400, AWAY_WIN: 1000,
+  OVER_2_5: 200, UNDER_2_5: 350,
+  'D. Origi': 600, 'S. Mané': 450, 'X. Shaqiri': 800,
+  BENCH: 500, 'G. Wijnaldum': 2500, 'D. Sturridge': 1500,
+  DEFAULT_SCORER: 600,
+};
+
 /* ─── Joseba messages ─────────────────────────────────────────── */
 
 const JOSEBA_MESSAGES = [
-  "7th of May, 2019. Anfield. Liverpool are 3-0 down from the first leg. Salah and Firmino are both injured. The whole world has written them off. This is exactly when the bench matters most. Let's make some calls. Tap Match Result first.",
+  "7th of May, 2019. Anfield. Liverpool are 3-0 down from the first leg. Salah and Firmino are both injured. The whole world has written them off. This is exactly when the bench matters most. Tap Match Result to make your call.",
   "Liverpool haven't lost a home European match in over five years. 22 unbeaten at Anfield in Europe. Barcelona are 3-0 up on aggregate. But this ground has a history of the impossible. Pick your result.",
   "Now the goals. Tap Total Goals.",
   "No Salah. No Firmino. The obvious read is fewer goals. But Liverpool's home European games this season averaged more than 3 goals in total. A team chasing four goals has no reason to sit back. Trust the pattern, not the headline.",
   "Now pick a scorer. Tap Player Score.",
-  "With Salah and Firmino out, Klopp needs someone else up front. Divock Origi starts tonight. He scored against Everton in the 96th minute in December. He hit the winner at Newcastle three days ago. He saves his best for when it matters. Pick your goalscorer.",
+  "With Salah and Firmino out, Klopp needs someone else up front. Divock Origi starts tonight. He scored against Everton in the 96th minute in December. He saved his best for when it matters. Pick your goalscorer.",
   "Last one — and the most important one. Tap Supersub.",
-  "Two ways to play this. Back the bench as a whole — any substitute who scores wins you 500 points. Or go specific — pick one player, and if they come on and score, you win 2,500. Seven players on this bench. Two worth watching: Wijnaldum and Sturridge. Sturridge has made 20 of his 27 appearances from the bench this season. He knows how to change a game late. But look at Wijnaldum. He's started 32 of Liverpool's last 35 league games. Their most-used midfielder. Klopp almost never drops him. So why is he sitting here tonight? When a manager saves his best midfielder for a 3-0 deficit, he's not leaving him out. He's loading a weapon. Make your call.",
+  "Two ways to play this. Back the bench as a whole — any substitute who scores wins you 500 points. Or go specific — pick one player, and if they come on and score, you win 2,500. Look at Wijnaldum. He's started 32 of Liverpool's last 35 league games. Their most-used midfielder. Klopp almost never drops him. When a manager saves his best midfielder for a 3-0 deficit, he's not leaving him out. He's loading a weapon. Make your call.",
   "Calls made. Let's see if the match agrees with you.",
   "Liverpool 4-0 Barcelona. One of the greatest nights in European football — and you read it. Wijnaldum came on at half-time. Two goals in two minutes. Origi opened and closed the scoring. The bench won this match. These were simulation cards. Your real cards are waiting.",
-];
-
-/* ─── Settlement goals ────────────────────────────────────────── */
-
-const GOALS = [
-  { minute: "7'",  scorer: 'Origi',     score: '1 — 0' },
-  { minute: "54'", scorer: 'Wijnaldum', score: '2 — 0' },
-  { minute: "56'", scorer: 'Wijnaldum', score: '3 — 0' },
-  { minute: "79'", scorer: 'Origi',     score: '4 — 0' },
 ];
 
 /* ─── Shared content panel style — mirrors real MatchDetail ──── */
@@ -123,61 +129,105 @@ const CONTENT_PANEL = {
   minHeight: '100%',
 };
 
+/* ─── Inline Joseba intel box — matches MatchDetail AssistantDialogue ── */
+const JosebaIntelBox = ({ message, isTappable, onTap }) => (
+  <div
+    onClick={isTappable ? onTap : undefined}
+    style={{
+      display: 'flex', alignItems: 'flex-start', gap: '10px',
+      margin: '0 12px 12px', padding: '10px 14px',
+      background: '#f5f0e8', borderRadius: '14px',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
+      cursor: isTappable ? 'pointer' : 'default',
+    }}
+  >
+    <img
+      src="/assets/assistant-head.png"
+      alt="Joseba"
+      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)' }}
+    />
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+        Joseba · Analyst
+      </span>
+      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
+        {message}
+      </p>
+      {isTappable && (
+        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '9px', color: '#888', marginTop: 6, textTransform: 'uppercase', letterSpacing: '1px' }}>
+          Tap to continue ›
+        </p>
+      )}
+    </div>
+  </div>
+);
+
 /* ─── Component ───────────────────────────────────────────────── */
 
 const SimulationMatchDetail = ({ onComplete, onBack }) => {
   const [step, setStep]             = useState(0);
-  const [activeCard, setActiveCard] = useState(null);
+  const [activeCard, setActiveCard] = useState('c_match_result');
   const [openSheet, setOpenSheet]   = useState(null);
   const [activeTab, setActiveTab]   = useState('LINEUP');
-  const [simSelections, setSimSelections] = useState({
-    matchResult: null, totalGoals: null, playerScore: null, supersub: null,
-  });
 
-  const [settling, setSettling]           = useState(false);
-  const [revealedGoals, setRevealedGoals] = useState([]);
-  const [settled, setSettled]             = useState(false);
+  // Staging + locked-in state (replaces pendingX vars)
+  const [simStaged, setSimStaged]     = useState(null); // { label, reward }
+  const [showLockedIn, setShowLockedIn] = useState(false);
 
-  const [pendingMatchResult, setPendingMatchResult] = useState(null);
-  const [pendingTotalGoals, setPendingTotalGoals]   = useState(null);
-  const [pendingPlayerScore, setPendingPlayerScore] = useState(null);
-  const [pendingSupersub, setPendingSupersub]       = useState(null);
+  // Settlement state
+  const [settling, setSettling]                 = useState(false);
+  const [settled, setSettled]                   = useState(false);
+  const [settlementMinute, setSettlementMinute] = useState("0'");
+  const [settlementScore, setSettlementScore]   = useState({ home: 0, away: 0 });
+  const [goalPopup, setGoalPopup]               = useState(null);
+  const [showWinnerPopup, setShowWinnerPopup]   = useState(false);
 
-  /* Settlement animation */
+  /* Settlement animation — PayoffView style */
   useEffect(() => {
     if (!settling) return;
+    const GOALS_TIMELINE = [
+      { delay: 600,  minute: "7'",  scorer: 'Origi',     score: { home: 1, away: 0 } },
+      { delay: 2800, minute: "54'", scorer: 'Wijnaldum', score: { home: 2, away: 0 } },
+      { delay: 5000, minute: "56'", scorer: 'Wijnaldum', score: { home: 3, away: 0 } },
+      { delay: 7200, minute: "79'", scorer: 'Origi',     score: { home: 4, away: 0 } },
+    ];
     const timeouts = [];
-    GOALS.forEach((goal, i) => {
+    GOALS_TIMELINE.forEach(({ delay, minute, scorer, score }) => {
       timeouts.push(setTimeout(() => {
-        setRevealedGoals(prev => [...prev, goal]);
-      }, 700 + i * 800));
+        setSettlementMinute(minute);
+        setSettlementScore(score);
+        setGoalPopup({ scorer, minute });
+        timeouts.push(setTimeout(() => setGoalPopup(null), 2000));
+      }, delay));
     });
     timeouts.push(setTimeout(() => {
+      setSettlementMinute('FT');
+      setShowWinnerPopup(true);
       setSettled(true);
       setSettling(false);
       setStep(9);
-    }, 700 + GOALS.length * 800 + 600));
+    }, 9800));
     return () => timeouts.forEach(clearTimeout);
   }, [settling]);
 
-  /* Bubble advance */
+  /* Bubble advance — only tappable steps (1, 3, 5, 7, 8) */
   const handleBubbleAdvance = () => {
     switch (step) {
-      case 0: setStep(1); setActiveCard('c_match_result'); break;
-      case 1: setOpenSheet('match_result'); break;
-      case 2: setStep(3); setActiveCard('c_total_goals'); break;
-      case 3: setOpenSheet('total_goals'); break;
-      case 4: setStep(5); setActiveCard('c_player_score'); break;
-      case 5: setOpenSheet('player_score'); break;
-      case 6: setStep(7); setActiveCard('c_supersub'); break;
-      case 7: setOpenSheet('supersub'); break;
-      case 8: setSettling(true); setRevealedGoals([]); break;
+      case 0: /* display only */ break;
+      case 1: setStep(2); setActiveCard('c_total_goals'); break;
+      case 2: /* display only */ break;
+      case 3: setStep(4); setActiveCard('c_player_score'); break;
+      case 4: /* display only */ break;
+      case 5: setStep(6); setActiveCard('c_supersub'); break;
+      case 6: /* display only */ break;
+      case 7: setStep(8); setActiveCard(null); break;
+      case 8: setSettling(true); break;
       case 9: onComplete(); break;
       default: break;
     }
   };
 
-  /* Card tile tap — only the active card responds */
+  /* Card tile tap — opens sheet directly */
   const handleCardTap = (cardId) => {
     if (cardId !== activeCard) return;
     switch (cardId) {
@@ -189,33 +239,23 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
     }
   };
 
-  /* Sheet confirm handlers */
-  const confirmMatchResult = () => {
-    if (!pendingMatchResult) return;
-    setSimSelections(prev => ({ ...prev, matchResult: pendingMatchResult }));
-    setOpenSheet(null); setActiveCard(null); setStep(2);
+  /* Confirm Play — shared handler reads openSheet to know which card */
+  const handleSimConfirm = () => {
+    const sheet = openSheet;
+    setSimStaged(null);
+    setOpenSheet(null);
+    setShowLockedIn(true);
+    if (sheet === 'match_result') { setStep(1); setActiveCard(null); }
+    else if (sheet === 'total_goals')  { setStep(3); setActiveCard(null); }
+    else if (sheet === 'player_score') { setStep(5); setActiveCard(null); }
+    else if (sheet === 'supersub')     { setStep(7); setActiveCard(null); }
   };
-  const confirmTotalGoals = () => {
-    if (!pendingTotalGoals) return;
-    setSimSelections(prev => ({ ...prev, totalGoals: pendingTotalGoals }));
-    setOpenSheet(null); setActiveCard(null); setStep(4);
-  };
-  const confirmPlayerScore = () => {
-    if (!pendingPlayerScore) return;
-    setSimSelections(prev => ({ ...prev, playerScore: pendingPlayerScore }));
-    setOpenSheet(null); setActiveCard(null); setStep(6);
-  };
-  const confirmSupersub = () => {
-    if (!pendingSupersub) return;
-    setSimSelections(prev => ({ ...prev, supersub: pendingSupersub }));
-    setOpenSheet(null); setActiveCard(null); setStep(8);
-  };
-
-  const showBubble = openSheet === null && !settling;
 
   /* Pre-compute formation positions */
   const lfcPositioned = mapFormation(LFC_XI, LFC_FORMATION, false);
   const barPositioned = mapFormation(BAR_XI, BAR_FORMATION, true);
+
+  const isTappable = [1, 3, 5, 7, 8].includes(step);
 
   return (
     <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
@@ -250,9 +290,11 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
         {/* Row 2: Teams + VS + date */}
         <div className="flex items-center justify-between px-4 pb-3 gap-3">
           <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-red-700 flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-black text-[9px] tracking-wide">LFC</span>
-            </div>
+            <img
+              src={SIM_MATCH.home_logo}
+              className="w-9 h-9 object-contain"
+              alt="Liverpool"
+            />
             <span className="text-[10px] font-bold text-white uppercase truncate w-full text-center">
               {SIM_MATCH.home_team}
             </span>
@@ -266,9 +308,11 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
           </div>
 
           <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-blue-900 flex items-center justify-center flex-shrink-0">
-              <span className="text-yellow-400 font-black text-[9px] tracking-wide">FCB</span>
-            </div>
+            <img
+              src={SIM_MATCH.away_logo}
+              className="w-9 h-9 object-contain"
+              alt="Barcelona"
+            />
             <span className="text-[10px] font-bold text-white uppercase truncate w-full text-center">
               {SIM_MATCH.away_team}
             </span>
@@ -325,24 +369,31 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
       </div>
 
       {/* ── TAB CONTENT ───────────────────────────────────────── */}
-      {/* bottom: 340px = 84px Joseba + 256px card shelf — nothing hidden */}
       <div
         className="absolute w-full z-30 overflow-y-auto scrollbar-hide"
         style={{ top: '196px', bottom: '256px', WebkitOverflowScrolling: 'touch' }}
       >
         <div style={CONTENT_PANEL}>
 
+          {/* ── JOSEBA INTEL BOX — first item in content panel ── */}
+          {!settling && !settled && (
+            <JosebaIntelBox
+              message={JOSEBA_MESSAGES[step]}
+              isTappable={isTappable}
+              onTap={handleBubbleAdvance}
+            />
+          )}
+
           {/* ── LINEUP — pitch formation diagram ─────────────── */}
           {activeTab === 'LINEUP' && (
             <div style={{ padding: '0 12px' }}>
-              {/* Formation labels */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              {/* Formation label row — Liverpool only (left); Barça label inside pitch */}
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <img
                     src={SIM_MATCH.home_logo}
                     style={{ width: 16, height: 16, objectFit: 'contain' }}
                     alt=""
-                    onError={e => { e.target.style.display = 'none'; }}
                   />
                   <span style={{
                     fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
@@ -351,24 +402,10 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                     {LFC_FORMATION}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{
-                    fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
-                    fontSize: '10px', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase',
-                  }}>
-                    {BAR_FORMATION}
-                  </span>
-                  <img
-                    src={SIM_MATCH.away_logo}
-                    style={{ width: 16, height: 16, objectFit: 'contain' }}
-                    alt=""
-                    onError={e => { e.target.style.display = 'none'; }}
-                  />
-                </div>
               </div>
 
               {/* Pitch */}
-              <div style={pitchContainerStyle}>
+              <div style={{ ...pitchContainerStyle, position: 'relative' }}>
                 <div style={grainOverlayStyle} />
                 <PitchMarkings />
                 <TeamHalf
@@ -383,6 +420,14 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                   teamName="Barcelona"
                   isAway={true}
                 />
+                {/* Barcelona formation label — bottom-right inside pitch */}
+                <div style={{
+                  position: 'absolute', bottom: '6px', right: '8px',
+                  fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
+                  fontSize: '10px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase',
+                }}>
+                  {BAR_FORMATION}
+                </div>
               </div>
             </div>
           )}
@@ -451,8 +496,6 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
       </div>
 
       {/* ── CARD SHELF ────────────────────────────────────────── */}
-      {/* bottom-[84px]: sits directly above the Joseba panel.
-          z-[500]: always renders above Joseba (z-[400]) — cards always visible. */}
       <div data-testid="sim-card-shelf" className="fixed bottom-0 w-full z-[300] h-64">
         <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10" />
         <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4">
@@ -477,110 +520,84 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
         </div>
       </div>
 
-      {/* ── JOSEBA BUBBLE ─────────────────────────────────────── */}
-      {/* fixed bottom-0 z-[400] — card shelf sits above at z-[500].
-          Cards always visible above Joseba; Joseba narrates from below. */}
-      {showBubble && (
-        <JosebaBubble
-          message={JOSEBA_MESSAGES[step]}
-          onAdvance={handleBubbleAdvance}
-          variant="compact"
-        />
-      )}
-
-      {/* ── MATCH RESULT SHEET ────────────────────────────────── */}
-      {openSheet === 'match_result' && (
-        <div className="fixed inset-0 z-[600] flex flex-col items-center justify-center px-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+      {/* ── MATCH RESULT SELECTION ────────────────────────────── */}
+      {openSheet === 'match_result' && !simStaged && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
           <button onClick={() => setOpenSheet(null)} className="absolute top-8 right-8 text-white/50 hover:text-white">
             <X className="w-8 h-8" />
           </button>
-          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-6">Pick the Result</p>
-          <div className="grid grid-cols-3 gap-4 w-full max-w-sm">
+          <div className="grid grid-cols-3 gap-4 w-full max-w-lg">
             {[
-              { value: 'HOME_WIN', label: 'Home Win', logo: SIM_MATCH.home_logo, name: 'Liverpool' },
-              { value: 'DRAW',     label: 'Draw',     logo: null,                name: 'Draw' },
-              { value: 'AWAY_WIN', label: 'Away Win', logo: SIM_MATCH.away_logo, name: 'Barcelona' },
+              { outcome: 'HOME_WIN', label: 'Home Win', logo: SIM_MATCH.home_logo, name: 'Liverpool Win' },
+              { outcome: 'DRAW',     label: 'Draw',     logo: null,                name: 'Draw' },
+              { outcome: 'AWAY_WIN', label: 'Away Win', logo: SIM_MATCH.away_logo, name: 'Barcelona Win' },
             ].map(opt => (
               <button
-                key={opt.value}
-                onClick={() => setPendingMatchResult(opt.value)}
-                className={`bg-zinc-900/80 border rounded-2xl p-5 flex flex-col items-center gap-3 transition-all active:scale-95 ${
-                  pendingMatchResult === opt.value ? 'border-yellow-400 bg-yellow-400/10' : 'border-white/10 hover:bg-zinc-800'
-                }`}
+                key={opt.outcome}
+                onClick={() => setSimStaged({ label: opt.name, reward: SIM_REWARDS[opt.outcome] })}
+                className="bg-zinc-900/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all active:scale-95"
               >
-                {opt.value === 'HOME_WIN' ? (
-                  <div className="w-12 h-12 rounded-full bg-red-700 flex items-center justify-center">
-                    <span className="text-white font-black text-[11px] tracking-wide">LFC</span>
-                  </div>
-                ) : opt.value === 'AWAY_WIN' ? (
-                  <div className="w-12 h-12 rounded-full bg-blue-900 flex items-center justify-center">
-                    <span className="text-yellow-400 font-black text-[11px] tracking-wide">FCB</span>
-                  </div>
-                ) : (
-                  <Trophy className="w-12 h-12 text-zinc-600" />
-                )}
+                {opt.logo
+                  ? <img src={opt.logo} className="w-16 h-16 object-contain" alt={opt.name} />
+                  : <Trophy className="w-16 h-16 text-zinc-600" />}
+                <span className="text-yellow-400 font-black text-2xl">+{SIM_REWARDS[opt.outcome]}</span>
                 <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">{opt.label}</span>
               </button>
             ))}
           </div>
-          <button onClick={confirmMatchResult} disabled={!pendingMatchResult} className="mt-8 w-full max-w-sm py-4 bg-emerald-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-black text-sm uppercase tracking-widest rounded-xl active:scale-95 transition-all">
-            Confirm
-          </button>
         </div>
       )}
 
-      {/* ── TOTAL GOALS SHEET ─────────────────────────────────── */}
-      {openSheet === 'total_goals' && (
-        <div className="fixed inset-0 z-[600] flex flex-col items-center justify-center px-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+      {/* ── TOTAL GOALS SELECTION ─────────────────────────────── */}
+      {openSheet === 'total_goals' && !simStaged && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
           <button onClick={() => setOpenSheet(null)} className="absolute top-8 right-8 text-white/50 hover:text-white">
             <X className="w-8 h-8" />
           </button>
-          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-6">Total Goals</p>
-          <div className="flex flex-col gap-4 w-full max-w-sm">
-            {[
-              { value: 'OVER_2_5',  label: 'Over 2.5 Goals' },
-              { value: 'UNDER_2_5', label: 'Under 2.5 Goals' },
-            ].map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => setPendingTotalGoals(opt.value)}
-                className={`border rounded-2xl p-5 flex items-center justify-center transition-all active:scale-95 ${
-                  pendingTotalGoals === opt.value ? 'border-yellow-400 bg-yellow-400/10' : 'bg-zinc-900/80 border-white/10 hover:bg-zinc-800'
-                }`}
-              >
-                <span className="text-white font-black text-base uppercase tracking-widest">{opt.label}</span>
-              </button>
-            ))}
+          <div className="flex gap-6 w-full max-w-lg">
+            <button
+              onClick={() => setSimStaged({ label: 'Over 2.5 Goals', reward: SIM_REWARDS.OVER_2_5 })}
+              className="flex-1 bg-zinc-900/80 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all active:scale-95"
+            >
+              <div className="text-center">
+                <p className="text-white font-black text-2xl">OVER 2.5</p>
+                <p className="text-yellow-400 font-bold mt-2">+{SIM_REWARDS.OVER_2_5} PTS</p>
+              </div>
+            </button>
+            <button
+              onClick={() => setSimStaged({ label: 'Under 2.5 Goals', reward: SIM_REWARDS.UNDER_2_5 })}
+              className="flex-1 bg-zinc-900/80 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-all active:scale-95"
+            >
+              <div className="text-center">
+                <p className="text-white font-black text-2xl">UNDER 2.5</p>
+                <p className="text-yellow-400 font-bold mt-2">+{SIM_REWARDS.UNDER_2_5} PTS</p>
+              </div>
+            </button>
           </div>
-          <button onClick={confirmTotalGoals} disabled={!pendingTotalGoals} className="mt-8 w-full max-w-sm py-4 bg-emerald-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-black text-sm uppercase tracking-widest rounded-xl active:scale-95 transition-all">
-            Confirm
-          </button>
         </div>
       )}
 
-      {/* ── PLAYER SCORE SHEET ────────────────────────────────── */}
-      {openSheet === 'player_score' && (
-        <div className="fixed inset-0 z-[600] flex flex-col bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+      {/* ── PLAYER SCORE SELECTION ────────────────────────────── */}
+      {openSheet === 'player_score' && !simStaged && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
           <button onClick={() => setOpenSheet(null)} className="absolute top-8 right-8 text-white/50 hover:text-white">
             <X className="w-8 h-8" />
           </button>
           <div className="w-full max-w-lg mx-auto bg-zinc-900 border border-white/10 rounded-t-3xl mt-auto overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
             <div className="bg-zinc-800/50 px-6 py-5 border-b border-white/5">
-              <h3 className="text-white font-black uppercase tracking-tighter text-xl">Pick a Goalscorer</h3>
+              <h3 className="text-white font-black uppercase tracking-tighter text-xl">Pick a Player to Score</h3>
             </div>
-            <div className="p-4 space-y-2 overflow-y-auto max-h-[55vh] scrollbar-hide">
-              {SCORERS.map(player => (
+            <div className="h-[55vh] overflow-y-auto p-4 space-y-2 scrollbar-hide">
+              {SCORERS.map((player) => (
                 <button
                   key={player.player_id}
-                  onClick={() => setPendingPlayerScore(player.player_name)}
-                  className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all active:scale-95 ${
-                    pendingPlayerScore === player.player_name
-                      ? 'bg-yellow-400/10 border-yellow-400'
-                      : 'bg-white/5 border-transparent hover:bg-emerald-500/20 hover:border-emerald-500/50'
-                  }`}
+                  onClick={() => setSimStaged({ label: player.player_name, reward: SIM_REWARDS[player.player_name] || SIM_REWARDS.DEFAULT_SCORER })}
+                  className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 transition-all active:scale-95"
                 >
                   <span className="text-white font-bold text-sm truncate">{player.player_name}</span>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 bg-white/[0.06] px-2 py-0.5 rounded ml-3 flex-shrink-0">FW</span>
+                  <span className="text-yellow-400 font-black text-sm whitespace-nowrap ml-3">
+                    +{SIM_REWARDS[player.player_name] || SIM_REWARDS.DEFAULT_SCORER} pts
+                  </span>
                 </button>
               ))}
               {INJURED.map((player, i) => (
@@ -590,18 +607,13 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                 </div>
               ))}
             </div>
-            <div className="p-4 border-t border-white/5">
-              <button onClick={confirmPlayerScore} disabled={!pendingPlayerScore} className="w-full py-4 bg-emerald-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-black text-sm uppercase tracking-widest rounded-xl active:scale-95 transition-all">
-                Confirm
-              </button>
-            </div>
           </div>
         </div>
       )}
 
-      {/* ── SUPERSUB SHEET ────────────────────────────────────── */}
-      {openSheet === 'supersub' && (
-        <div className="fixed inset-0 z-[600] flex flex-col bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+      {/* ── SUPERSUB SELECTION ────────────────────────────────── */}
+      {openSheet === 'supersub' && !simStaged && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
           <button onClick={() => setOpenSheet(null)} className="absolute top-8 right-8 text-white/50 hover:text-white">
             <X className="w-8 h-8" />
           </button>
@@ -611,129 +623,188 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
             </div>
             <div className="p-4 space-y-2 overflow-y-auto max-h-[55vh] scrollbar-hide">
               <button
-                onClick={() => setPendingSupersub('BENCH')}
-                style={{
-                  width: '100%', padding: '10px 16px', marginBottom: '4px',
-                  background: pendingSupersub === 'BENCH' ? 'rgba(234,179,8,0.1)' : 'rgba(0,0,0,0.80)',
-                  border: `1.5px solid ${pendingSupersub === 'BENCH' ? '#eab308' : '#00e5ff'}`,
-                  borderRadius: '12px',
-                  color: pendingSupersub === 'BENCH' ? '#eab308' : '#00e5ff',
-                  fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '12px',
-                  textTransform: 'uppercase', letterSpacing: '1.5px', cursor: 'pointer', textAlign: 'left',
-                  boxShadow: '0 0 10px rgba(0,229,255,0.15)',
-                }}
+                onClick={() => setSimStaged({ label: 'Any Sub to Score', reward: SIM_REWARDS.BENCH })}
+                className="w-full flex justify-between items-center p-3 rounded-xl border border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all active:scale-95"
               >
-                ⚡ Any Sub to Score — 500 pts
+                <span className="text-cyan-400 font-black text-sm">⚡ Any Sub to Score</span>
+                <span className="text-yellow-400 font-black text-sm ml-3">+{SIM_REWARDS.BENCH} pts</span>
               </button>
-
               {SIM_BENCH.map(player => {
                 const hi  = player.player_name === 'G. Wijnaldum' || player.player_name === 'D. Sturridge';
-                const sel = pendingSupersub === player.player_name;
+                const pts = SIM_REWARDS[player.player_name] || SIM_REWARDS.DEFAULT_SCORER;
                 return (
-                  <div
+                  <button
                     key={player.player_id}
-                    onClick={() => setPendingSupersub(player.player_name)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '8px 10px',
-                      background: sel ? 'rgba(234,179,8,0.08)' : hi ? 'rgba(0,229,255,0.04)' : 'rgba(255,255,255,0.03)',
-                      borderRadius: '10px',
-                      border: sel ? '1px solid #eab308' : hi ? '1px solid rgba(0,229,255,0.15)' : '1px solid rgba(255,255,255,0.05)',
-                      cursor: 'pointer',
-                    }}
+                    onClick={() => setSimStaged({ label: player.player_name, reward: pts })}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all active:scale-95 ${
+                      hi ? 'bg-cyan-500/5 border-cyan-500/20 hover:bg-cyan-500/15' : 'bg-white/5 border-transparent hover:bg-emerald-500/20 hover:border-emerald-500/50'
+                    }`}
                   >
-                    <div>
-                      <span style={{
-                        fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-                        fontSize: '11px', color: '#FFFFFF', display: 'block',
-                      }}>{player.player_name}</span>
+                    <div className="text-left">
+                      <span className="text-white font-bold text-sm block">{player.player_name}</span>
                       {player.context && (
-                        <span style={{
-                          fontFamily: "'Montserrat', sans-serif", fontWeight: 500,
-                          fontSize: '9px', color: 'rgba(255,255,255,0.4)',
-                        }}>{player.context}</span>
+                        <span className="text-zinc-500 text-[9px]">{player.context}</span>
                       )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
-                      <span style={{
-                        fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
-                        fontSize: '9px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase',
-                        background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '6px',
-                      }}>
-                        {player.position}
-                      </span>
-                      <span style={{
-                        fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
-                        fontSize: '10px', color: '#f59e0b',
-                      }}>
-                        2500 pts
-                      </span>
-                    </div>
-                  </div>
+                    <span className="text-yellow-400 font-black text-sm whitespace-nowrap ml-3">+{pts} pts</span>
+                  </button>
                 );
               })}
             </div>
-            <div className="p-4 border-t border-white/5">
-              <button onClick={confirmSupersub} disabled={!pendingSupersub} className="w-full py-4 bg-emerald-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-black text-sm uppercase tracking-widest rounded-xl active:scale-95 transition-all">
-                Confirm
+          </div>
+        </div>
+      )}
+
+      {/* ── STAGING MODAL — shared for all card types ─────────── */}
+      {simStaged && openSheet && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
+            <div className="flex justify-between items-start mb-8">
+              <div className="space-y-1">
+                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Outcome Selection</p>
+                <h3 className="text-white font-black text-3xl uppercase italic tracking-tighter leading-tight">{simStaged.label}</h3>
+              </div>
+              <div className="text-right space-y-1">
+                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Reward</p>
+                <p className="text-yellow-400 font-black text-4xl tracking-tighter">
+                  {simStaged.reward} <span className="text-xs uppercase">pts</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setSimStaged(null)}
+                className="flex-1 py-4 bg-zinc-800 rounded-2xl font-bold uppercase text-zinc-400 text-xs tracking-widest hover:bg-zinc-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSimConfirm}
+                className="flex-[2] py-4 bg-emerald-500 rounded-2xl font-black uppercase text-black text-xl shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:scale-105 transition-all"
+              >
+                Confirm Play
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── SETTLEMENT ANIMATION ──────────────────────────────── */}
-      {(settling || settled) && (
-        <div className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center p-6">
-          <div className="flex items-center gap-6 mb-10">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-14 h-14 rounded-full bg-red-700 flex items-center justify-center">
-                <span className="text-white font-black text-sm tracking-wide">LFC</span>
-              </div>
-              <span className="text-xs font-black uppercase text-zinc-400">Liverpool</span>
+      {/* ── LOCKED IN! CONFIRMATION — matches real MatchDetail ── */}
+      {showLockedIn && (
+        <div className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6">
+          <div className="text-center w-full max-w-sm border border-white/10 bg-zinc-900/50 p-10 rounded-[3rem] relative overflow-hidden shadow-2xl">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
+            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30">
+              <Trophy className="w-10 h-10 text-emerald-400" />
             </div>
-            <div className="text-4xl font-black font-mono tracking-tighter text-white">
-              {revealedGoals.length} — 0
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-14 h-14 rounded-full bg-blue-900 flex items-center justify-center">
-                <span className="text-yellow-400 font-black text-sm tracking-wide">FCB</span>
-              </div>
-              <span className="text-xs font-black uppercase text-zinc-400">Barcelona</span>
-            </div>
+            <h2 className="text-white font-black uppercase text-4xl tracking-tighter mb-4">Locked In!</h2>
+            <p className="text-zinc-500 text-sm mb-8 uppercase tracking-widest font-bold">Your prediction has been logged in the Locker Room</p>
+            <button
+              onClick={() => setShowLockedIn(false)}
+              className="w-full py-5 bg-white text-black font-black uppercase rounded-2xl shadow-2xl hover:bg-zinc-200 transition-colors tracking-tighter text-lg"
+            >
+              Continue Scouting
+            </button>
           </div>
-
-          <div className="w-full max-w-sm space-y-3">
-            {revealedGoals.map((goal, i) => (
-              <div key={i} className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3 animate-in slide-in-from-bottom-2 duration-300">
-                <span className="text-emerald-400 font-black font-mono text-sm w-8">{goal.minute}</span>
-                <span className="text-white font-bold flex-1">{goal.scorer}</span>
-                <span className="text-emerald-400 font-black font-mono text-lg">{goal.score}</span>
-              </div>
-            ))}
-            {settling && Array.from({ length: GOALS.length - revealedGoals.length }).map((_, i) => (
-              <div key={`pending-${i}`} className="flex items-center gap-3 bg-zinc-900/40 border border-white/5 rounded-xl px-4 py-3">
-                <div className="w-8 h-4 bg-zinc-800 rounded animate-pulse" />
-                <div className="flex-1 h-4 bg-zinc-800 rounded animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-          {settled && (
-            <p className="mt-8 text-emerald-400 font-black text-sm uppercase tracking-widest animate-in fade-in duration-500">
-              Full Time
-            </p>
-          )}
         </div>
       )}
 
-      {/* Step 9 bubble rendered above settlement screen */}
-      {settled && step === 9 && (
-        <JosebaBubble
-          message={JOSEBA_MESSAGES[9]}
-          onAdvance={onComplete}
-          variant="compact"
-        />
+      {/* ── SETTLEMENT ANIMATION — PayoffView style ───────────── */}
+      {(settling || settled) && (
+        <>
+          <style>{SETTLEMENT_KEYFRAMES}</style>
+          <div
+            className="fixed inset-0 z-[150] flex flex-col"
+            style={{ background: 'linear-gradient(180deg, #080808 0%, #0a160a 100%)' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pt-12 pb-2">
+              <div className="w-9 h-9" />
+              <span className="text-[10px] font-bold uppercase tracking-[2px] text-white/45">
+                {SIM_MATCH.league_name}
+              </span>
+              <div className="w-9" />
+            </div>
+
+            {/* Scoreboard */}
+            <div
+              className="mx-4 mt-3 mb-4 rounded-2xl p-5"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col items-center flex-1 gap-2">
+                  <img src={SIM_MATCH.home_logo} className="w-10 h-10 object-contain" alt="Liverpool" />
+                  <span className="text-white font-black text-xs uppercase tracking-wide">Liverpool</span>
+                </div>
+                <div className="flex flex-col items-center px-4">
+                  <span
+                    className="font-black text-5xl tracking-tighter transition-all duration-500"
+                    style={{
+                      color: settlementScore.home === 4 ? '#00e5ff' : 'white',
+                      textShadow: settlementScore.home === 4 ? '0 0 24px rgba(0,229,255,0.8)' : 'none',
+                    }}
+                  >
+                    {settlementScore.home} — {settlementScore.away}
+                  </span>
+                  <span
+                    className="text-sm font-black mt-2"
+                    style={{ color: '#00e5ff', animation: 'clockTick 0.5s ease-in-out infinite' }}
+                  >
+                    {settlementMinute}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center flex-1 gap-2">
+                  <img src={SIM_MATCH.away_logo} className="w-10 h-10 object-contain" alt="Barcelona" />
+                  <span className="text-white font-black text-xs uppercase tracking-wide">Barcelona</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Goal popup */}
+            {goalPopup && (
+              <div className="absolute inset-x-4 top-[28%] z-30 animate-in zoom-in duration-300">
+                <div className="w-full max-w-md mx-auto bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl text-center relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
+                  <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+                    <span className="text-3xl">⚽</span>
+                  </div>
+                  <h2 className="text-white font-black uppercase text-3xl tracking-tighter mb-2">Goal!</h2>
+                  <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest">Liverpool</p>
+                  <p className="text-zinc-500 text-xs mt-1">Scored by {goalPopup.scorer} · {goalPopup.minute}</p>
+                </div>
+              </div>
+            )}
+
+            {/* WINNER popup */}
+            {showWinnerPopup && (
+              <div className="absolute inset-0 z-40 flex items-center justify-center px-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-500">
+                <div
+                  className="w-full max-w-sm rounded-3xl p-8 text-center relative overflow-hidden shadow-[0_0_60px_rgba(234,179,8,0.3)]"
+                  style={{ background: 'linear-gradient(160deg, #ca8a04 0%, #ea580c 50%, #b91c1c 100%)' }}
+                >
+                  <div
+                    className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl"
+                    style={{ animation: 'winner-bounce 1s ease-in-out infinite' }}
+                  >
+                    <span className="text-4xl">🏆</span>
+                  </div>
+                  <p className="text-white font-black text-2xl tracking-widest mb-1">Liverpool 4–0 Barcelona</p>
+                  <p className="text-white/80 font-bold text-xs uppercase tracking-widest mb-4">One of the greatest European nights</p>
+                  <div className="bg-white/15 rounded-2xl p-4 mb-5 border border-white/20 text-left">
+                    <p className="text-white/90 text-xs leading-relaxed">{JOSEBA_MESSAGES[9]}</p>
+                  </div>
+                  <button
+                    onClick={onComplete}
+                    className="w-full py-4 rounded-2xl font-black uppercase text-black text-base tracking-widest shadow-2xl hover:scale-[1.02] transition-all active:scale-95"
+                    style={{ background: 'white' }}
+                  >
+                    Get Your Real Cards →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

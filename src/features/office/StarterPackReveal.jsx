@@ -4,17 +4,9 @@ import JosebaBubble from '../../shared/ui/JosebaBubble';
 
 const STARTER_CARDS = [
   { id: 'c_match_result', label: 'Match Result' },
-  { id: 'c_match_result', label: 'Match Result' },
-  { id: 'c_match_result', label: 'Match Result' },
-  { id: 'c_total_goals',  label: 'Total Goals' },
-  { id: 'c_total_goals',  label: 'Total Goals' },
   { id: 'c_total_goals',  label: 'Total Goals' },
   { id: 'c_player_score', label: 'Player Score' },
-  { id: 'c_player_score', label: 'Player Score' },
-  { id: 'c_player_score', label: 'Player Score' },
-  { id: 'c_supersub',     label: 'Supersub' },
-  { id: 'c_supersub',     label: 'Supersub' },
-  { id: 'c_supersub',     label: 'Supersub' },
+  { id: 'c_supersub',     label: 'Super Sub' },
 ];
 
 const JOSEBA_MESSAGE =
@@ -40,21 +32,29 @@ const StarterPackReveal = ({ onComplete }) => {
         <p className="text-xs text-zinc-500 mt-1">12 cards · 3 of each type</p>
       </div>
 
-      {/* Card grid — 4 columns × 3 rows */}
-      <div className="flex-1 overflow-y-auto px-4 pb-40 scrollbar-hide">
-        <div className="grid grid-cols-4 gap-3 justify-items-center">
+      {/* Card grid — 2×2, one per card type with x3 badge */}
+      <div className="flex-1 overflow-y-auto px-4 pb-40 scrollbar-hide flex items-center justify-center">
+        <div className="grid grid-cols-2 gap-5 w-full max-w-sm">
           {STARTER_CARDS.map((card, i) => (
             <div
-              key={i}
-              className="w-[5rem] h-[7.5rem] animate-in fade-in zoom-in-95 duration-300"
-              style={{ animationDelay: `${i * 60}ms`, animationFillMode: 'backwards' }}
+              key={card.id}
+              className="relative animate-in fade-in zoom-in-95 duration-300"
+              style={{ animationDelay: `${i * 100}ms`, animationFillMode: 'backwards' }}
             >
-              <CardBase
-                type={card.id}
-                label={card.label}
-                status="generic"
-                variant="transparent"
-              />
+              <div className="opacity-100 drop-shadow-2xl">
+                <CardBase
+                  type={card.id}
+                  label={card.label}
+                  status="generic"
+                  variant="transparent"
+                />
+              </div>
+              <div className="absolute top-3 right-3 z-30">
+                <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-1">
+                  <span>x</span>
+                  <span className="text-sm">3</span>
+                </div>
+              </div>
             </div>
           ))}
         </div>

@@ -61,9 +61,11 @@ const SimulationMatchHub = ({ onMatchSelect, onBack }) => {
 
           <div className="flex items-center justify-between gap-1">
             <div className="flex flex-col items-center flex-[1.2] min-w-0">
-              <div className="w-10 h-10 mb-1 rounded-full bg-red-700 flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-black text-[10px] tracking-wide">LFC</span>
-              </div>
+              <img
+                src="https://cdn.sportmonks.com/images/soccer/teams/8/8.png"
+                className="w-10 h-10 object-contain mb-1"
+                alt="Liverpool"
+              />
               <span className="text-[11px] font-bold text-center truncate w-full uppercase">
                 {SIMULATION_MATCH.home_team}
               </span>
@@ -74,9 +76,11 @@ const SimulationMatchHub = ({ onMatchSelect, onBack }) => {
             </div>
 
             <div className="flex flex-col items-center flex-[1.2] min-w-0">
-              <div className="w-10 h-10 mb-1 rounded-full bg-blue-900 flex items-center justify-center flex-shrink-0">
-                <span className="text-yellow-400 font-black text-[10px] tracking-wide">FCB</span>
-              </div>
+              <img
+                src="https://cdn.sportmonks.com/images/soccer/teams/19/83.png"
+                className="w-10 h-10 object-contain mb-1"
+                alt="Barcelona"
+              />
               <span className="text-[11px] font-bold text-center truncate w-full uppercase">
                 {SIMULATION_MATCH.away_team}
               </span>
