@@ -5,6 +5,9 @@ const GameContext = createContext();
 
 export const useGame = () => useContext(GameContext);
 
+// Captured once when the module loads — filters out wins settled before this session.
+const SESSION_START = new Date().toISOString();
+
 export const GameProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +61,7 @@ export const GameProvider = ({ children }) => {
         .eq('user_id', session.user.id)
         .eq('seen_by_user', false)
         .eq('status', 'SETTLED')
+        .gte('settled_at', SESSION_START)
         .order('created_at', { ascending: false })
         .limit(5);
 
