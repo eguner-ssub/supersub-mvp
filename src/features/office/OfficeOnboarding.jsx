@@ -7,7 +7,7 @@ import StarterPackReveal from './StarterPackReveal';
 
 const INTRO_MESSAGES = [
   // Message 0
-  "Welcome to your office, Boss. I'm Joseba — your analyst. I'll give you the intel. You make the calls. That simulation you just played? Solskjær averaged a goal every 93 minutes coming off the bench in the Premier League. Most managers never see that until it's too late.",
+  "Welcome to your office, Boss. I'm Joseba — your assistant. Did you know that Solskjær averaged a goal every 93 minutes coming off the bench in the Premier League? I'll be giving you this type of insights all the time.",
   // Message 1
   "1999 is history. Let me show you something more recent — a night where the bench changed everything. Tap the window.",
 ];

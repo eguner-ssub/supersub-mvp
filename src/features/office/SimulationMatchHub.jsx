@@ -23,8 +23,6 @@ const SimulationMatchHub = ({ onMatchSelect, onBack }) => {
 
   return (
     <div className="h-[100dvh] w-full flex flex-col text-white font-sans select-none overflow-hidden relative bg-[url('/assets/bg-stadium.webp')] bg-cover bg-center">
-      {/* Dark overlay keeps header, match card, and Joseba readable */}
-      <div className="absolute inset-0 bg-black/60 pointer-events-none z-0" />
 
       {/* HEADER */}
       <div className="flex-none bg-black/80 backdrop-blur-md border-b border-white/10 z-50">

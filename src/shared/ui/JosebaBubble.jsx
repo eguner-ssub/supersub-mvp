@@ -50,9 +50,11 @@ const JosebaBubble = ({
           <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400">
             {label}
           </span>
-          <p className="text-[14px] font-bold text-white/90 leading-relaxed text-center">
-            {message}
-          </p>
+          <div className="h-[105px] flex flex-col justify-center">
+            <p className="text-[12px] font-bold text-white/90 leading-relaxed text-center">
+              {message}
+            </p>
+          </div>
           <div className="flex items-center gap-1 mt-1 opacity-40">
             <span className="text-[9px] font-black uppercase tracking-widest text-white">tap to continue</span>
             <ChevronRight className="w-3.5 h-3.5 text-white" />

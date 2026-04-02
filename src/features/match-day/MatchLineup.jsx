@@ -145,7 +145,7 @@ const PlayerNode = ({ player }) => (
                 whiteSpace: 'nowrap',
             }}
         >
-            {player.name?.split(' ').pop()}
+            {player.name}
         </span>
     </div>
 );

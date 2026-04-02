@@ -33,16 +33,16 @@ const SIM_MATCH = {
 const LFC_FORMATION = '4-3-3';
 const LFC_XI = [
   { player: { id: 1,  name: 'Alisson',    number: '1',  grid: '1:1' } },
-  { player: { id: 2,  name: 'Trent',      number: '66', grid: '2:4' } },
+  { player: { id: 2,  name: 'Trent',      number: '66', grid: '2:1' } },
   { player: { id: 3,  name: 'Matip',      number: '32', grid: '2:2' } },
   { player: { id: 4,  name: 'Van Dijk',   number: '4',  grid: '2:3' } },
-  { player: { id: 5,  name: 'Robertson',  number: '26', grid: '2:1' } },
+  { player: { id: 5,  name: 'Robertson',  number: '26', grid: '2:4' } },
   { player: { id: 6,  name: 'Henderson',  number: '14', grid: '3:3' } },
   { player: { id: 7,  name: 'Fabinho',    number: '3',  grid: '3:2' } },
   { player: { id: 8,  name: 'Milner',     number: '7',  grid: '3:1' } },
-  { player: { id: 9,  name: 'Shaqiri',    number: '23', grid: '4:3' } },
+  { player: { id: 9,  name: 'Shaqiri',    number: '23', grid: '4:1' } },
   { player: { id: 10, name: 'Origi',      number: '27', grid: '4:2' } },
-  { player: { id: 11, name: 'Mané',       number: '10', grid: '4:1' } },
+  { player: { id: 11, name: 'Mané',       number: '10', grid: '4:3' } },
 ];
 
 const BAR_FORMATION = '4-3-3';
@@ -423,10 +423,12 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                 {/* Barcelona formation label — bottom-right inside pitch */}
                 <div style={{
                   position: 'absolute', bottom: '6px', right: '8px',
+                  display: 'flex', alignItems: 'center', gap: '4px',
                   fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
                   fontSize: '10px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase',
                 }}>
                   {BAR_FORMATION}
+                  <img src={SIM_MATCH.away_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain', opacity: 0.7 }} />
                 </div>
               </div>
             </div>
@@ -498,22 +500,27 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
       {/* ── CARD SHELF ────────────────────────────────────────── */}
       <div data-testid="sim-card-shelf" className="fixed bottom-0 w-full z-[300] h-64">
         <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10" />
-        <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4">
+        <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-8 z-20">
           {CARD_TYPES.map(card => {
             const isActive = activeCard === card.id;
             return (
               <button
                 key={card.id}
                 onClick={() => handleCardTap(card.id)}
-                className={`relative transition-all duration-300 ${
-                  isActive ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl' : 'opacity-40'
+                className={`relative flex flex-col items-center transition-all duration-300 ${
+                  isActive ? 'translate-y-[-20px]' : 'opacity-40'
                 }`}
               >
-                <div className={`w-[5.5rem] h-[8.25rem] relative ${isActive ? 'animate-pulse' : ''}`}>
+                <div className={`w-[5.5rem] h-[8.25rem] relative ${
+                  isActive ? 'drop-shadow-[0_8px_24px_rgba(234,179,8,0.55)]' : ''
+                }`}>
                   <div className="absolute inset-0 flex items-center justify-center z-10">
                     <CardBase type={card.id} label={card.label} status="generic" variant="transparent" />
                   </div>
                 </div>
+                {isActive && (
+                  <div className="mt-2 w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.9)]" />
+                )}
               </button>
             );
           })}

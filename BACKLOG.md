@@ -1,14 +1,14 @@
 # Supersub — Product Backlog
 
-> Cross-referenced against pitch deck (`supersub_pitch.pptx`), live codebase, and `SUPERSUB_PROJECT_SUMMARY.md`.
-> Priorities: **P0** = World Cup blocker (ship by April 2026) · **P1** = Required before affiliate conversations · **P2** = Retention & organic growth · **P3** = Future market expansion
-> Last updated: 2026-03-27 — reflects 5 commits shipped on 2026-03-26.
+> Cross-referenced against pitch deck (`supersub_pitch.pptx`), live codebase, `SUPERSUB_PROJECT_SUMMARY.md`, and game economy audit (April 2026).
+> Priorities: **P0** = Soft launch blocker (ship by mid-April 2026) · **P1** = Required before affiliate conversations / first 2 weeks post-launch · **P2** = Retention & organic growth · **P3** = Future market expansion
+> Last updated: 2026-04-02 — merged game economy backlog from Octalysis audit session. World Cup Readiness downgraded to P3. Real-time score updates marked shipped. Signup & Funnel epic marked shipped.
 
 ---
 
 ## LEGAL & COMPLIANCE
 
-Everything in this epic is a hard prerequisite for any affiliate revenue conversation. No operator will sign a deal without these in place. None of it exists today.
+Everything in this epic is a hard prerequisite for any affiliate revenue conversation. No operator will sign a deal without these in place.
 
 ### ~~Privacy Policy and Terms of Service documents~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
@@ -39,7 +39,7 @@ Everything in this epic is a hard prerequisite for any affiliate revenue convers
 
 ## AFFILIATE REVENUE ENGINE
 
-The pitch deck's core commercial model. Three revenue streams: post-prediction contextual ads, post-win affiliate offers, and bench analytics data licensing. None are live.
+The pitch deck's core commercial model. Three revenue streams: post-prediction contextual ads, post-win affiliate offers, and bench analytics data licensing.
 
 ### ~~`seen_by_user` flag on predictions (DB migration)~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
@@ -70,148 +70,238 @@ The pitch deck's core commercial model. Three revenue streams: post-prediction c
 - **Priority:** P1
 - **Effort:** S
 - **Shipped in:** commits `f36bf3a` + `b39408f` — migrations `034_add_affiliate_columns.sql` + `036_add_share_event_type.sql`
-- **What was built:** `affiliate_events` table with `(id, user_id, event_type CHECK IN ('impression','click','share'), operator, card_type, match_id, odds, created_at)`. RLS INSERT-only for authenticated users. Migration 036 added `'share'` to the event_type enum. Tracking is fire-and-forget (`void supabase.from('affiliate_events').insert(...)`) in `PostPredictionSheet` (impression on mount + click on CTA), `WinCelebrationModal` (click on CTA), and `ShareCardButton` (share events).
+- **What was built:** `affiliate_events` table with `(id, user_id, event_type CHECK IN ('impression','click','share'), operator, card_type, match_id, odds, created_at)`. RLS INSERT-only for authenticated users. Migration 036 added `'share'` to the event_type enum. Tracking is fire-and-forget in `PostPredictionSheet` (impression on mount + click on CTA), `WinCelebrationModal` (click on CTA), and `ShareCardButton` (share events).
 - **Open:** Create a Supabase view `affiliate_summary` grouping by `operator/date/card_type` — needed before operator conversations.
 
 ### Ad provider integration for energy refills
-- **Priority:** P2
+- **Priority:** P1
 - **Effort:** M
-- **Why (commercial link):** Slide 3 — "Daily card rewards from the Training Ground keep users returning. Card scarcity creates natural engagement pressure." Ads fund the energy loop.
-- **What exists today:** `AdOverlay.jsx` exists as a **mock** component — it shows a placeholder with a 5-second countdown timer. `Training.jsx` calls it when energy = 0. The `watch_ad_reward()` RPC exists in migration 010 but is never called from the frontend. `GameContext.jsx` has `gainEnergy()` which updates Supabase directly but bypasses the RPC.
-- **What needs building:** Replace `AdOverlay.jsx` mock with a real ad SDK (Google AdMob for web, or a rewarded video provider). Wire the completion callback to call `watch_ad_reward()` RPC (which atomically refills energy and increments `ads_watched`). Add ad frequency caps to prevent abuse.
-- **Dependencies:** Ad network account (Google AdMob, Unity Ads, or ironSource).
+- **Why (commercial link):** Ads fund the energy drink loop.
+- **What exists today:** `AdOverlay.jsx` exists as a **mock** component — 5-second countdown placeholder. `watch_ad_reward()` RPC exists but grants direct energy (to be updated in Game Economy epic).
+- **What needs building:** Replace `AdOverlay.jsx` mock with a real ad SDK (Google AdMob for web, or Unity Ads / ironSource). Wire the completion callback to call the updated `watch_ad_reward()` RPC (which now grants 1 energy drink — see Game Economy: ad system story).
+- **Dependencies:** Ad network account. Game Economy: ad system story (P0, must ship first).
 
 ---
 
 ## SHAREABLE PREDICTION CARDS
 
-The pitch deck's organic growth engine. Every share during the World Cup is free acquisition. Build the infrastructure once; both card variants (pre- and post-settlement) reuse it.
-
 ### ~~`share_token` column on predictions (DB migration)~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** XS
 - **Shipped in:** commit `f36bf3a` — migration `034_add_affiliate_columns.sql`
-- **What was built:** `predictions.share_token UUID NOT NULL DEFAULT gen_random_uuid()` with unique index `idx_predictions_share_token`. Share URL pattern: `supersub.mobi/share/<share_token>`.
 
 ### ~~`/api/share-card` image generation endpoint~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** M
-- **Shipped in:** commits `b39408f` + `87f0de0` (deployment fix)
-- **What was built:** `api/share-card.js` using `@vercel/og` (`@vercel/og` added to `package.json`). Accepts `?token=<share_token>`. Fetches prediction via Supabase service role key. Renders 1200×630 OG image: Supersub branding, match title, card type, selection, WON/LOST badge. Cache-Control headers set for performance. Runs on Node.js serverless runtime (Edge runtime skipped — incompatible with supabase-js). Deployment fix in `87f0de0` resolved a runtime conflict. Now 7/12 Vercel functions used.
+- **Shipped in:** commits `b39408f` + `87f0de0`
 
 ### ~~`ShareCardButton.jsx` — share trigger component~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** S
 - **Shipped in:** commit `b39408f`
-- **What was built:** `src/shared/ui/ShareCardButton.jsx`. Web Share API on mobile with `navigator.clipboard` + Sonner toast fallback. Fires `affiliate_events` share event (fire-and-forget). Placed in: `WinCelebrationModal.jsx` (post-win), `MatchDetail.jsx` confirmation screen (pre-settlement), `ViewLedger.jsx` settled rows, `ViewLive.jsx` active bet rows.
 
 ### ~~Pre-settlement shareable card ("I'm calling this")~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** S
 - **Shipped in:** commit `b39408f`
-- **What was built:** Share button added to `MatchDetail.jsx` prediction confirmation screen using `<ShareCardButton prediction={...} variant='pre' />`. Share URL: `supersub.mobi/share/<share_token>`. OG image rendered by `/api/share-card`. Destination: `PublicShareView.jsx` with signup CTA.
 
 ### ~~Post-win shareable card ("I called it")~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** XS
 - **Shipped in:** commit `b39408f`
-- **What was built:** `<ShareCardButton prediction={prediction} variant='won' />` added to `WinCelebrationModal.jsx` between points display and affiliate CTA. Share icon added to WON rows in `ViewLedger.jsx`. OG image generated by existing `/api/share-card` endpoint (WON badge already handled).
 
 ### ~~Public share view and OG meta tags (`PublicShareView.jsx`)~~ ✅ SHIPPED 2026-03-26
 - **Priority:** P0
 - **Effort:** S
 - **Shipped in:** commit `b39408f`
-- **What was built:** `src/pages/PublicShareView.jsx` — public route (no `ProtectedRoute`), reads `:token` param, fetches prediction, renders card with "Play free" CTA pointing to `/intro`. Default OG meta tags added to `index.html`. Per-page dynamic OG image tag updated client-side pointing to `/api/share-card?token=<token>`. `/share/:token` added to `App.jsx` (lazy-loaded) and `vercel.json` rewrites.
 
 ---
 
-## WORLD CUP READINESS
+## GAME ECONOMY
 
-The pitch deck's #1 deadline. "Any feature not in production by April is not in the World Cup."
+Card scarcity, energy system, training mode, and the daily engagement loop. Derived from Octalysis framework audit (April 2026). All P0 items have corresponding Claude Code prompts in `p0_prompts.md`.
 
-### International fixture support
-- **Priority:** P0
-- **Effort:** L
-- **Why (commercial link):** Slide 9 — "48 teams · 104 matches · June–July 2026." Supersub cannot participate in the World Cup without international fixture data.
-- **What exists today:** `coverage.js` hardcodes 5 domestic league IDs (EPL=8, Championship=9, Bundesliga=82, La Liga=564, Serie A=384). No international competition IDs. All data sync scripts, API endpoints, and frontend league selectors are built around these 5 IDs.
-- **What needs building:** Add FIFA World Cup 2026 season/competition ID to `coverage.js` (Sportmonks competition ID TBD — likely available early 2026). Update `backfill-sportmonks.js` to sync World Cup fixtures, teams, and squads. Update `api/matches.js` league filter to include the World Cup competition. Update `LeagueHub.jsx` dropdown to include "World Cup 2026" as a league option. Ensure `MatchHub.jsx` daily view shows World Cup matches alongside domestic leagues.
-- **Dependencies:** Sportmonks World Cup 2026 data availability. May require Sportmonks plan upgrade for international fixtures.
-
-### National team leaderboards
+### Schema migration batch — economy primitives
 - **Priority:** P0
 - **Effort:** M
-- **Why (commercial link):** Slide 9 — The World Cup is inherently national. Country leaderboards create tribal competition that drives engagement and sharing.
-- **What exists today:** `leaderboard_entries` and `leaderboards` tables support `type='country'` with `scope_key` for country codes. `api/leaderboard.js` handles `?type=country&scope_key=GB`. `Leaderboard.jsx` has country tab. `profiles.country_code` stores user's country. The schema is ready; the feature is partially wired.
-- **What needs building:** Ensure country_code is collected at signup (currently missing — `Signup.jsx` has no country picker). Add a dedicated "World Cup Leaderboard" view filtered to predictions on World Cup matches only. Auto-create country leaderboard entries in `refresh-leaderboards.js` for World Cup period. Add national flag icons to leaderboard rows.
-- **Dependencies:** International fixture support. Country picker at signup (see Signup story).
+- **Claude Code prompt:** Prompt 1
+- **What needs building:** Single migration adding to `profiles`: `current_streak`, `last_streak_date`, `best_streak`, `energy_last_updated_at`, `energy_drinks`, `training_sessions_today`, `last_training_date`, `ads_watched_today`, `last_ad_date`. Add `inventory.expires_at TIMESTAMPTZ nullable`. Index on `inventory(user_id, expires_at)`.
+- **Dependencies:** None — foundation for all economy features.
 
-### Impact Sub Tracker (public, no-login)
-- **Priority:** P0
-- **Effort:** L
-- **Why (commercial link):** Slide 9 — "Public-facing real-time leaderboard of substitute impact across all 32 nations. No login required. SEO magnet, PR hook, organic acquisition engine."
-- **What exists today:** `player_supersub_stats` table has goals_as_sub, assists_as_sub, apps_as_sub per player per season. `team_bench_stats` has team-level bench goal data. `Leaderboard.jsx` exists but is wrapped in `<ProtectedRoute>` — login required. `api/leaderboard.js` endpoint itself has no auth check (Supabase anon key works).
-- **What needs building:** A new public route `/tracker` (no `ProtectedRoute` wrapper) that shows a "World Cup Impact Sub Tracker" — ranked list of substitutes who've scored/assisted during the tournament. Pulls from `player_supersub_stats` filtered to World Cup season. Add SEO-friendly server-rendered meta tags. Should work without login and encourage signup. Add to `vercel.json` rewrites. Consider a standalone landing page design (different from in-app chrome) for SEO/PR purposes.
-- **Dependencies:** International fixture support. `sync-supersub-stats.js` running against World Cup data.
-
-### World Cup match card placements
+### Energy regeneration — time-based calculation
 - **Priority:** P0
 - **Effort:** S
-- **Why (commercial link):** Core product — users need to be able to place all 4 card types on World Cup matches, not just domestic league games.
-- **What exists today:** `MatchDetail.jsx` works for any match ID. `settlementEngine.js` is league-agnostic. The card placement flow doesn't filter by league.
-- **What needs building:** Verify that the end-to-end flow works for international fixtures (odds fetching, lineup data, bench stats for national teams). May need to handle cases where Sportmonks has limited data for smaller national teams. Ensure `settle.js` settlement cron picks up World Cup matches.
-- **Dependencies:** International fixture support.
+- **Claude Code prompt:** Prompt 2
+- **What needs building:** Calculate on read: `min(max_energy, stored_energy + floor((now - energy_last_updated_at) / 4h))`. Update `loadProfile`, `spendEnergy`, `gainEnergy` in GameContext. No cron.
+- **Dependencies:** Schema migration batch.
 
----
+### Energy drinks — six-pack resource
+- **Priority:** P0
+- **Effort:** S
+- **Claude Code prompt:** Prompt 3
+- **What needs building:** `useEnergyDrink()` (consume 1 drink → gain 1 energy, cap 6) and `grantEnergyDrink(amount)` in GameContext. Sources: streak milestones, 10/10 training, rewarded ads.
+- **Dependencies:** Schema migration batch. Energy regeneration.
 
-## GAMIFIED DAILY LOOP
+### Ad system — server-side daily cap and energy drink grant
+- **Priority:** P0
+- **Effort:** S
+- **Claude Code prompt:** Prompt 4
+- **What needs building:** Update `watch_ad_reward()` RPC: server-side 2/day cap, grant 1 energy drink (not direct energy), reset on date change. Update `claimAdReward()` in GameContext. Remove client localStorage cooldown.
+- **Dependencies:** Schema migration batch. Energy drinks.
 
-Card scarcity and daily engagement pressure drive return visits.
+### Streak system — decay model
+- **Priority:** P0
+- **Effort:** M
+- **Claude Code prompt:** Prompt 5
+- **What needs building:** Streak increments on daily open. Decay on missed day (drop one tier, not reset to zero). Tiers: 1-3, 4-6, 7+. Energy drink grants at day 3, 5, 7 milestones. `incrementStreak()` + tier helper exported from GameContext.
+- **Dependencies:** Schema migration batch.
 
-### Daily Training quest with streak rewards
+### Training bag — daily login reward
+- **Priority:** P0
+- **Effort:** S
+- **Claude Code prompt:** Prompt 6
+- **What needs building:** `claimTrainingBag()` in GameContext. 2-3 common cards by streak tier. Calls `incrementStreak()`. Dressing room modal on first daily open. `expires_at` set to next Monday 23:59 UTC.
+- **Dependencies:** Streak system. Card expiry (column available from schema migration).
+
+### Card expiry — Monday 23:59 reset
+- **Priority:** P0
+- **Effort:** M
+- **Claude Code prompt:** Prompt 7
+- **What needs building:** `nextMondayExpiry()` helper. Apply `expires_at` to all common card grants, `null` for Supersub. Tuesday 00:05 UTC cron deletes expired rows. `loadProfile` filters expired cards from local state.
+- **Dependencies:** Schema migration batch.
+
+### Training mode — 10 questions with tiered rewards
+- **Priority:** P0
+- **Effort:** M
+- **Claude Code prompt:** Prompt 8
+- **What needs building:** 10q trivia, 10s timer. Tiers: 0-4→1c, 5-6→2c, 7-8→3c, 9→4c, 10→5c+1 Supersub+1 drink. 2 sessions/day cap. `startTrainingSession()` + `completeTrainingSession(score)` in GameContext.
+- **Dependencies:** Schema migration. Energy regen. Card expiry.
+
+### Training mode — progress UI
+- **Priority:** P0
+- **Effort:** S
+- **Claude Code prompt:** Prompt 9
+- **What needs building:** Real-time score + cards earned + next threshold during quiz. Prominent threshold display at Q7+. Joseba toast reactions at 5, 7, 9, 10 correct.
+- **Dependencies:** Training mode — 10 questions.
+
+### Supersub card — rarity and points multiplier
+- **Priority:** P0
+- **Effort:** M
+- **Claude Code prompt:** Prompt 10
+- **What needs building:** Rarity gates: only from 10/10 training, day 7 streak, special Joseba events. Audit and remove from all other grant sources. Settlement multiplier: match_result 1×, over_under 1×, player_score 1.5×, supersub 2.5×. Applied to `points_awarded`.
+- **Dependencies:** Schema migration. Card expiry. Training mode.
+
+### High-roller prediction option (card sink)
 - **Priority:** P1
 - **Effort:** M
-- **Why (commercial link):** Slide 3 — "Daily card rewards from the Training Ground keep users returning. Card scarcity creates natural engagement pressure before each gameweek."
-- **What exists today:** `Training.jsx` is fully functional: 5-question quiz, 10s timer, costs 1 energy, awards 1 random card on 3/5 correct. But there's no daily mechanic — users can run Training infinitely if they have energy. No streak tracking, no daily reset, no compounding rewards.
-- **What needs building:** Add `last_training_date` and `training_streak` columns to `profiles`. Limit Training to 1 free session per day (additional sessions cost energy as today). Streak bonuses: Day 3 = bonus card, Day 7 = rare card, Day 14 = Supersub card. Show streak counter on Dashboard and Training page. Reset streak if a day is missed. Add a "Daily Training" card to `Dashboard.jsx` with countdown to next available session.
-- **Dependencies:** None.
+- **What needs building:** Spend 2-3 cards on a single prediction for multiplied points. Toggle on confirmation screen. Update `placeBet()`, `consumeCard()`, settlement engine.
+- **Dependencies:** Card expiry (economy must be balanced first).
 
-### Card scarcity & economy balancing
+### Card expiry countdown in UI
 - **Priority:** P1
-- **Effort:** M
-- **Why (commercial link):** Slide 3 — "Card scarcity creates natural engagement pressure." Without scarcity, users have no reason to return daily or engage with ads.
-- **What exists today:** `inventory` table tracks card counts. `consumeCard()` in `GameContext.jsx` decrements count. Cards are acquired via: onboarding bonus (hardcoded), Training rewards. No other acquisition source. No depletion analytics.
-- **What needs building:** Card economy model: define daily earn rate vs daily spend rate to ensure scarcity. Dashboard widget showing card counts with "Low stock" warning when count ≤ 1. "Get more cards" CTA linking to Training (free) or Card Store (future). Gameweek preview: "3 matches today, you have 2 Match Result cards" — creates urgency. Consider card expiry (cards expire if unused for 7 days) to prevent hoarding.
-- **Dependencies:** Daily Training quest.
+- **Effort:** S
+- **What needs building:** Time until expiry in inventory + prediction screens. Amber on Sunday, red on Monday. Tablet notification hook.
+- **Dependencies:** Card expiry.
+
+### Streak save mechanic
+- **Priority:** P1
+- **Effort:** S
+- **What needs building:** When streak would decay: offer "Spend 1 energy drink to save streak?" on training bag screen. Deduct drink on acceptance.
+- **Dependencies:** Streak system. Energy drinks.
 
 ### Card Store (points-to-cards exchange)
 - **Priority:** P2
 - **Effort:** L
-- **Why (commercial link):** Creates a sink for accumulated points, increases Training/ad engagement to earn points for card purchases.
-- **What exists today:** Nothing. `ViewDeck.jsx` shows inventory counts but no purchase CTA. No store page, no pricing model, no transaction flow.
-- **What needs building:** New `/store` route with a `CardStore.jsx` component. Price cards in points (e.g., Match Result = 200pts, Supersub = 1000pts). Transaction flow: select card → confirm → deduct points from `profiles.points` → increment `inventory.count`. RPC function for atomic purchase. Show store link from LockerRoom and Dashboard.
-- **Dependencies:** Card scarcity story (to validate economy).
+- **What needs building:** `/store` route. Atomic purchase RPC. Pricing: Match Result=200pts, Supersub=1000pts.
+- **Dependencies:** Economy must be balanced with live data first.
+
+### Training bag — variable rewards (surprise drops)
+- **Priority:** P2
+- **Effort:** S
+- **What needs building:** ~1 in 7 days: bonus Supersub card, extra energy drink, or Joseba scout report.
+- **Dependencies:** Training bag. Tablet notification hub.
+
+### Training mode — format rotation
+- **Priority:** P2
+- **Effort:** M
+- **What needs building:** True/false, visual, stat-based, image-based formats. Themed rounds.
+- **Dependencies:** Training mode. Economy data showing completion rate decline.
+
+### Midweek training challenge (card sink)
+- **Priority:** P2
+- **Effort:** M
+- **What needs building:** Spend 5 cards to enter. 10q at 7s timer. Win 8 cards + 1 drink if 8+. Only if card inflation observed.
+- **Dependencies:** Training mode. Card expiry. Economy data.
+
+### Energy drink expiry
+- **Priority:** P2
+- **Effort:** S
+- **What needs building:** 7-day expiry on drinks if hoarding data warrants it.
+- **Dependencies:** Energy drinks. Economy data showing hoarding.
+
+---
+
+## TABLET NOTIFICATION HUB
+
+### Tablet — core notification types
+- **Priority:** P1
+- **Effort:** M
+- **What needs building:** Badge on tablet. Types: energy recharged, matchday countdown (2h before), streak warning (20:00), leaderboard shift. Cap 2-3/day.
+- **Dependencies:** Energy regen. Streak system. Leaderboard.
+
+### Tablet — Joseba intel notifications
+- **Priority:** P1
+- **Effort:** S
+- **What needs building:** When new intel generated for upcoming match, push Joseba notification to tablet. Tapping navigates to match intel view.
+- **Dependencies:** Pre-Match Intel Engine. Tablet core notifications.
+
+---
+
+## SEASONAL NARRATIVE & USER STATS
+
+### Seasonal narrative arc — manager career mode
+- **Priority:** P1
+- **Effort:** M
+- **What needs building:** Track per-season: predictions, hit rate, best gameweek, biggest upset. Season summary card (Aug-May). Pure frontend reads on existing data.
+- **Dependencies:** None.
+
+### User hit rate stats — prediction performance breakdown
+- **Priority:** P1
+- **Effort:** M
+- **What needs building:** Performance breakdown by league, market type, home/away bias. Group by `league_id + card_type + result`. Manager's Office or stats tab. No new tables.
+- **Dependencies:** None.
+
+---
+
+## SIGNUP & FUNNEL
+
+### ~~Signup page redesign with value prop and compliance fields~~ ✅ SHIPPED
+- **Priority:** P1
+
+### ~~Country picker at signup~~ ✅ SHIPPED
+- **Priority:** P1
+
+### ~~Onboarding club name collection~~ ✅ SHIPPED
+- **Priority:** P1
+
+### ~~Funnel analytics events~~ ✅ SHIPPED
+- **Priority:** P1
+
+### ~~Post-signup welcome card gift confirmation~~ ✅ SHIPPED
+- **Priority:** P1
 
 ---
 
 ## LIVE MATCH EXPERIENCE
 
-Second-screen engagement is the pitch deck's positioning thesis.
-
-### Real-time score updates
+### ~~Real-time score updates~~ ✅ SHIPPED
 - **Priority:** P1
-- **Effort:** M
-- **Why (commercial link):** Slide 6 — "35% of second-screen usage is during live matches." 30-second polling feels laggy. Users will switch to a faster app if scores are delayed.
-- **What exists today:** `ViewLive.jsx` polls `matches` table every 30 seconds for `home_score`/`away_score`. `usePredictions.js` subscribes to Supabase Realtime for prediction status changes (INSERT/UPDATE/DELETE) — but NOT for match score changes. Sportmonks data itself may be 2–5 minutes delayed depending on sync frequency.
-- **What needs building:** Two options: (a) Add Supabase Realtime subscription on `matches` table for score changes — requires `settle.js` or a new cron to update match scores more frequently (currently runs post-FT only). (b) Direct Sportmonks live polling from client via a new `/api/live?fixtures=1,2,3` endpoint that batch-fetches live scores, called every 60s from `MatchDetail.jsx`. Either way, reduce perceived latency. Add goal flash animation in `MatchDetail.jsx` scoreboard when score changes.
-- **Dependencies:** Sportmonks live data access (may require plan upgrade for real-time feeds).
 
 ### Half-time card placement
 - **Priority:** P2
 - **Effort:** M
-- **Why (commercial link):** Slide 6 — "34% half-time re-engage, add a card." Currently users can only place pre-match predictions. Half-time is a natural re-engagement window.
-- **What exists today:** `MatchDetail.jsx` has view states (PRE_NO_LINEUPS, PRE_WITH_LINEUPS, LIVE, POST). Card placement is only available in PRE states. LIVE state shows a read-only tactical view.
-- **What needs building:** Allow Supersub card placement during HT (half-time status from Sportmonks). Add a "HT Special" badge on matches at half-time in `MatchHub.jsx`. Modify `MatchDetail.jsx` LIVE view to show Supersub CTA during HT. Settlement logic in `settlementEngine.js` already handles sub events regardless of when the bet was placed — no backend changes needed.
-- **Dependencies:** Real-time score updates (to detect HT reliably).
+- **What needs building:** Allow Supersub card placement during HT. HT Special badge in MatchHub. Settlement logic already handles sub events.
+- **Dependencies:** Real-time score updates (shipped).
 
 ---
 
@@ -220,56 +310,8 @@ Second-screen engagement is the pitch deck's positioning thesis.
 ### Web push notification infrastructure
 - **Priority:** P2
 - **Effort:** L
-- **Why (commercial link):** Slide 6 — Users need prompting to open their second screen. Without push, Supersub relies on the user remembering to check the app.
-- **What exists today:** Nothing. No service worker, no Firebase/FCM, no notification permission flow.
-- **What needs building:** Service worker registration in `main.jsx`. Push notification permission request (post-onboarding, not at first visit). FCM or web-push integration. Notification triggers: (1) Lineup announced for a match you follow — "Lineups are in! Place your cards." (2) Prediction settled — "Your Supersub card on Salah just won! +2,500 pts." (3) Daily Training available — "Your daily session is ready." Backend: a `push_tokens` table and a notification dispatch script.
-- **Dependencies:** Daily Training quest (for daily notification trigger). Service worker also enables offline support.
-
----
-
-## SIGNUP & FUNNEL
-
-The funnel is: `/intro` → `/` → `/signup` → email confirmation → `/onboarding` → `/dashboard`. Currently the signup step has no value proposition, no compliance fields, and no analytics. Each story below is a discrete, shippable improvement to one step of this funnel.
-
-### Signup page redesign with value prop and compliance fields
-- **Priority:** P1
-- **Effort:** M
-- **Why (commercial link):** The interactive onboarding creates genuine excitement (1999 CL Final). The signup page immediately deflates it — a bare dark form with "Initialize your performance profile" copy. This is the highest-leverage conversion improvement available: fix the transition from hook to registration.
-- **What exists today:** `Signup.jsx` (line 82): heading "Join the Club", subheading "Initialize your performance profile." Two fields: email and password. Carbon fibre texture. Stadium background. A stylised submit button. No value copy, no social proof, no country picker, no compliance checkboxes. Redirects to `/onboarding` on success.
-- **What needs building:** (1) Replace subheading with a short value proposition — 2 lines max: *"Call the sub before the manager does."* and *"Earn points. Beat your rivals. Play free."* (2) Add a visual hook above the form: 3 small icon+text rows (⚡ Play free · 🏆 Earn points · 🌍 Compete globally) to reinforce the pitch. (3) Add country picker (see dedicated story below). (4) Add the two compliance checkboxes (18+ and ToS — see LEGAL & COMPLIANCE epic, `ToS acceptance and 18+ confirmation` story — these must ship together). (5) Add a referral code field (optional, collapsed under "Have a code?" disclosure, stores to `profiles.referral_code` for future viral mechanic). (6) Style the email confirmation screen (`needsEmailConfirm` state, line 49): replace "Verify Access / Activation link sent" with warmer copy — "Check your inbox — we've sent you a link to get started." (7) Keep all existing logic (`supabase.auth.signUp`, error handling, `navigate('/onboarding')` on success) intact.
-- **Dependencies:** Privacy Policy and Terms of Service pages (must be live before linking). ToS/18+ acceptance migration (needs `terms_accepted_at` and `is_age_verified` columns — ships in LEGAL epic).
-
-### Country picker at signup
-- **Priority:** P1
-- **Effort:** S
-- **Why (commercial link):** `profiles.country_code` feeds national leaderboards. For the World Cup, users need a country to compete in national rankings. If country is not collected at signup, it must be collected at onboarding — and users frequently skip optional onboarding fields. Collect it at signup when intent is highest.
-- **What exists today:** `profiles` table has `country_code TEXT` column. `Signup.jsx` does not collect it. `Onboarding.jsx` does not collect it either. The leaderboard country tab exists in the schema but has no country data for most users.
-- **What needs building:** (1) Add a country `<select>` dropdown to `Signup.jsx`, placed after the email/password fields and before the compliance checkboxes. Initially show top 20 countries by football fanbase (England, Germany, Spain, Italy, Brazil, France, Argentina, Netherlands, Portugal, Turkey, Nigeria, Ghana, USA, Mexico, etc.) plus an "Other" fallback. (2) After `supabase.auth.signUp()` succeeds, upsert `country_code` to `profiles`. The `profiles` row is created by a Supabase trigger on `auth.users` insert — update it with: `supabase.from('profiles').update({ country_code }).eq('id', data.user.id)`. (3) Add a UK/EU locale flag icon beside the selected country in the dropdown for visual clarity (use emoji flags — simple, no external library).
-- **Dependencies:** Signup page redesign (same component, same sprint).
-
-### Onboarding club name collection
-- **Priority:** P1
-- **Effort:** S
-- **Why (commercial link):** `profiles.club_name` is the gating field for `ProtectedRoute` — without it, users are redirected to `/onboarding` on every authenticated page load. It's also displayed as the user's identity across the app. This field must be collected reliably and the UX must feel worthwhile, not like a form obstacle.
-- **What exists today:** `Onboarding.jsx` collects `club_name` and writes it to `profiles`. The `ProtectedRoute` wrapper in `App.jsx` checks `userProfile.club_name` — if missing, redirects to `/onboarding`. This logic works. The current onboarding is functional but plain.
-- **What needs building:** (1) Read `Onboarding.jsx` fully and evaluate: is the copy engaging? Does it explain why club name matters? Rewrite the intro copy to frame club name as identity: *"Name your club. This is how rivals will know you on the leaderboard."* (2) Add a brief "here's what you get" value reminder on the first onboarding step — show the 3 card types as mini icons with one-word labels (Result · Goals · Supersub) to prime users before they start. (3) Pre-populate a starter card gift: after `club_name` is set, ensure the profile receives 3 Match Result cards, 2 Total Goals cards, 1 Supersub card (this is likely already in a migration — verify in `supabase/migrations/` and confirm it fires correctly for new signups). (4) Confirm the redirect chain: `/onboarding` complete → `/dashboard` (not `/manager-office`) — this should already be correct.
-- **Dependencies:** Signup page redesign (must ship together for cohesive funnel feel).
-
-### Funnel analytics events
-- **Priority:** P1
-- **Effort:** S
-- **Why (commercial link):** Without visibility into the `/intro` → `/signup` → `/onboarding` → `/dashboard` funnel, there is no way to know where users drop off. Affiliate partners will ask for MAU and conversion data — this story produces it.
-- **What exists today:** `InteractiveOnboarding.jsx` has 5 phases (bench → match → subs → confirm → payoff) but fires no analytics events. No drop-off tracking anywhere in the funnel.
-- **What needs building:** (1) Migration: create `analytics_events` table `(id UUID DEFAULT gen_random_uuid(), session_id TEXT, event TEXT, properties JSONB, created_at TIMESTAMPTZ DEFAULT now())`. No `user_id` on early funnel events (user is not yet authenticated). Session ID generated client-side with `crypto.randomUUID()` and stored in `sessionStorage`. RLS: anon users can INSERT, no SELECT. (2) Fire events at: `onboarding_phase_started` (with phase name), `onboarding_phase_completed`, `signup_page_viewed`, `signup_attempted`, `signup_completed`, `onboarding_club_name_set`. (3) Place event calls in `InteractiveOnboarding.jsx` phase transitions (the `setPhase()` calls), `Signup.jsx` `handleSignup()` function, and `Onboarding.jsx` submit. (4) A simple Supabase query groups by event and date for a funnel report: no external analytics provider needed initially. Plausible or PostHog can be added later as a drop-in.
-- **Dependencies:** None — table migration is self-contained. Can ship independently of other funnel stories.
-
-### Post-signup welcome card gift confirmation
-- **Priority:** P1
-- **Effort:** XS
-- **Why (commercial link):** First-session retention depends on the user immediately understanding the card economy and having something to spend. If a new user arrives at Dashboard with 0 cards, the value proposition evaporates.
-- **What exists today:** There is likely a migration that seeds starter inventory for new users (check `supabase/migrations/` for INSERT into `inventory`). `GameContext.jsx` `loadProfile()` fetches `inventoryMap` — the counts should appear in the LockerRoom. It is unclear whether the seed fires reliably for Supabase Auth signups (trigger-based vs manual).
-- **What needs building:** (1) Verify in Supabase that new user signups receive starter cards (check the `handle_new_user()` trigger in migrations — it should INSERT into `inventory`). If it works: add a visual confirmation on the `Dashboard.jsx` first load — a one-time toast or banner: "Your starter cards are ready. Make your first call." with a link to `/match-hub`. If it's broken: fix the trigger. (2) Add `has_seen_welcome BOOLEAN DEFAULT false` to `profiles` and show a dismissible welcome banner on first Dashboard visit only.
-- **Dependencies:** Signup page redesign (same sprint). Onboarding club name collection.
+- **What needs building:** Service worker in `main.jsx`. Push permission flow post-onboarding. FCM/web-push. Triggers: lineup announced, prediction settled, daily training. `push_tokens` table.
+- **Dependencies:** Service worker also enables offline support.
 
 ---
 
@@ -278,26 +320,50 @@ The funnel is: `/intro` → `/` → `/signup` → email confirmation → `/onboa
 ### 3G performance optimisation
 - **Priority:** P2
 - **Effort:** M
-- **Why (commercial link):** Slide 8 — Tier 2 markets (Nigeria, Ghana): "Performance on 3G critical." The app must load and function on slow mobile connections.
-- **What exists today:** Images use `.webp` format (good). `useAssetPreloader.js` preloads critical images. `ManagerOffice` is the only lazily-loaded route (`React.lazy()` in `App.jsx`). No bundle analysis, no image lazy loading attributes, no responsive srcset, no service worker.
-- **What needs building:** Route-based code splitting — wrap all feature routes in `React.lazy()` + `Suspense` (MatchDetail, LeagueHub, Leaderboard, Training, LockerRoom are all eager-loaded). Add `loading="lazy"` to non-critical images. Add responsive `srcset` for background images. Run `vite-bundle-visualizer` to identify bloat. Consider a "lite mode" that skips background images on slow connections. Add Vercel Edge caching headers for API responses.
+- **What needs building:** Route-based code splitting. `loading="lazy"` on images. Responsive `srcset`. Bundle analysis. Vercel Edge caching.
 - **Dependencies:** None.
 
 ### Localisation framework
 - **Priority:** P3
 - **Effort:** L
-- **Why (commercial link):** Slide 8 — Tier 3 (Brazil): "Portuguese localisation essential." All UI text is currently hardcoded English.
-- **What exists today:** Nothing. No i18n library, no locale detection, no translation files. Every string in every component is inline English.
-- **What needs building:** Install `react-i18next`. Extract all user-facing strings into translation JSON files (`en.json`, `pt-BR.json`). Add language picker to Settings. Detect browser locale on first visit. This is a large refactor touching every component with user-facing text.
-- **Dependencies:** None technically, but should be done after feature set stabilises (post-World Cup) to avoid translating strings that change.
+- **What needs building:** `react-i18next`. Translation JSON files. Language picker. Browser locale detection.
+- **Dependencies:** Feature set must stabilise first.
 
 ### Liga Portugal / Brasileirão coverage
 - **Priority:** P3
 - **Effort:** M
-- **Why (commercial link):** Slide 8 — Tier 2/3 market entry requires local league coverage. Nigeria works with EPL. Brazil needs Brasileirão.
-- **What exists today:** `coverage.js` has Liga Portugal (94) commented out or was previously included (per project memory). Sportmonks has Brasileirão data.
-- **What needs building:** Add Brasileirão Sportmonks ID to `coverage.js`. Run `backfill-sportmonks.js` for the new league. Verify `sync-standings.js`, `sync-supersub-stats.js`, and `sync-news-intel.js` work for the new league. Add league to `LeagueHub.jsx` dropdown. Source Portuguese-language news RSS feeds for Brazil.
-- **Dependencies:** Localisation framework (for Brazilian users).
+- **What needs building:** Add Brasileirão to `coverage.js`. Backfill. Verify sync scripts. Frontend league selector. Portuguese-language news feeds.
+- **Dependencies:** Localisation framework.
+
+---
+
+## WORLD CUP READINESS
+
+Downgraded to P3. No World Cup work until core economy and retention loop are proven post-launch.
+
+### International fixture support
+- **Priority:** P3
+- **Effort:** L
+- **What needs building:** Add FIFA World Cup 2026 competition ID to `coverage.js`. Update backfill, `api/matches.js`, `LeagueHub.jsx`, `MatchHub.jsx`.
+- **Dependencies:** Sportmonks WC2026 data availability.
+
+### National team leaderboards
+- **Priority:** P3
+- **Effort:** M
+- **What needs building:** WC-only leaderboard view. Auto-create country leaderboard entries in `refresh-leaderboards.js`. Flag icons.
+- **Dependencies:** International fixture support.
+
+### Impact Sub Tracker (public, no-login)
+- **Priority:** P3
+- **Effort:** L
+- **What needs building:** Public `/tracker` route. World Cup Impact Sub Tracker ranked list. SEO meta tags. No login.
+- **Dependencies:** International fixture support. `sync-supersub-stats.js` on WC data.
+
+### World Cup match card placements
+- **Priority:** P3
+- **Effort:** S
+- **What needs building:** Verify end-to-end card placement flow for international fixtures.
+- **Dependencies:** International fixture support.
 
 ---
 
@@ -306,7 +372,36 @@ The funnel is: `/intro` → `/` → `/signup` → email confirmation → `/onboa
 ### Bench analytics API
 - **Priority:** P3
 - **Effort:** M
-- **Why (commercial link):** Slide 7 — "Bench analytics feed: coach substitution patterns, sub-on scoring efficiency, team bench rates. B2B revenue, no user scale required."
-- **What exists today:** All the data exists: `team_bench_stats`, `player_supersub_stats`, `coach_substitution_patterns` tables are populated by `sync-supersub-stats.js` and `sync-coaches.js`. The data is consumed internally by `api/intel.js` and `api/league.js` (bench watch tab). But there's no external-facing API or documentation.
-- **What needs building:** A dedicated `/api/bench-analytics` endpoint (or a separate API service) with API key authentication, rate limiting, and structured JSON responses. Documentation page. Usage metering for billing. Consider hosting separately from the Vercel Hobby plan to avoid the 12-function limit.
-- **Dependencies:** Sufficient data coverage across leagues. API key management system.
+- **What needs building:** `/api/bench-analytics` endpoint. API key auth. Rate limiting. Structured JSON. Documentation. Usage metering.
+- **Dependencies:** Sufficient data coverage. API key management.
+
+---
+
+## IMPLEMENTATION DEPENDENCIES (GAME ECONOMY)
+
+```
+Schema migration batch
+  ├── Energy regeneration
+  │     └── Energy drinks
+  │           ├── Ad system (server-side cap)
+  │           └── Streak save (P1)
+  ├── Streak system
+  │     └── Training bag (login reward)
+  ├── Card expiry
+  │     ├── Training mode (10 questions + rewards)
+  │     │     └── Training progress UI
+  │     └── Card expiry countdown UI (P1)
+  └── Supersub card rarity + multipliers
+```
+
+**P0 build order (Claude Code prompts 1–10):**
+1. Schema migration batch
+2. Energy regeneration
+3. Energy drinks
+4. Ad system
+5. Streak system
+6. Training bag
+7. Card expiry
+8. Training mode — 10 questions
+9. Training mode — progress UI
+10. Supersub card rarity + settlement multipliers

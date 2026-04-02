@@ -25,11 +25,12 @@ vi.mock('../../data/gameData.json', () => ({
   },
 }));
 
-// Replace AdOverlay with a stub that exposes onReward as a clickable button
+// Replace AdOverlay with a stub that exposes onReward as a clickable button.
+// The stub calls onClose after onReward resolves — mirroring the real SDK contract.
 vi.mock('../../components/AdOverlay', () => ({
   default: ({ onReward, onClose }) => (
     <div data-testid="ad-overlay">
-      <button data-testid="ad-reward-btn" onClick={onReward}>ClaimReward</button>
+      <button data-testid="ad-reward-btn" onClick={async () => { await onReward?.(); onClose?.(); }}>ClaimReward</button>
       <button data-testid="ad-close-btn" onClick={onClose}>CloseAd</button>
     </div>
   ),
@@ -49,6 +50,8 @@ const makeCtx = (overrides = {}) => ({
   loading: false,
   spendEnergy: vi.fn(),
   gainEnergy: vi.fn().mockResolvedValue(undefined),
+  claimAdReward: vi.fn().mockResolvedValue(undefined),
+  grantEnergyDrink: vi.fn().mockResolvedValue(undefined),
   updateInventory: vi.fn(),
   ...overrides,
 });
@@ -270,14 +273,13 @@ describe('Training Page', () => {
       expect(screen.getByTestId('ad-overlay')).toBeInTheDocument();
     });
 
-    it('clicking the mocked ad reward button calls gainEnergy(3)', async () => {
+    it('calls claimAdReward() when the ad reward button is clicked', async () => {
       const ctx = makeCtx({ userProfile: { id: 'u1', energy: 0, max_energy: 5 } });
       renderTraining(ctx);
       fireEvent.click(screen.getByText(/Watch Ad/i));
       fireEvent.click(screen.getByTestId('ad-reward-btn'));
-      // act(async) flushes promise microtasks without needing real setTimeout (fake timers are active)
       await act(async () => {});
-      expect(ctx.gainEnergy).toHaveBeenCalledWith(3);
+      expect(ctx.claimAdReward).toHaveBeenCalledTimes(1);
     });
 
     it('closes the AdOverlay after the reward is granted', async () => {
@@ -289,13 +291,13 @@ describe('Training Page', () => {
       expect(screen.queryByTestId('ad-overlay')).not.toBeInTheDocument();
     });
 
-    it('does not call gainEnergy when the ad is closed without claiming reward', async () => {
+    it('does not call claimAdReward when the ad is closed without claiming reward', async () => {
       const ctx = makeCtx({ userProfile: { id: 'u1', energy: 0, max_energy: 5 } });
       renderTraining(ctx);
       fireEvent.click(screen.getByText(/Watch Ad/i));
       fireEvent.click(screen.getByTestId('ad-close-btn'));
       await act(async () => {});
-      expect(ctx.gainEnergy).not.toHaveBeenCalled();
+      expect(ctx.claimAdReward).not.toHaveBeenCalled();
     });
   });
 

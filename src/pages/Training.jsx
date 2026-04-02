@@ -29,6 +29,7 @@ const Training = () => {
   const [score, setScore]                     = useState(0);
   const [showAd, setShowAd]                   = useState(false);
   const [showReward, setShowReward]           = useState(false);
+  const [capToast, setCapToast]               = useState(false);
   const [timeLeft, setTimeLeft]               = useState(TIMER_SECONDS);
   const [wonCard, setWonCard]                 = useState(null); // the card to award on pass
 
@@ -110,12 +111,15 @@ const Training = () => {
   const handleAdReward = async () => {
     try {
       await claimAdReward();
-      // showAd is closed by AdOverlay after onReward resolves (via onClose)
       setShowReward(true);
       setTimeout(() => setShowReward(false), 3000);
     } catch (err) {
-      console.error('Ad reward failed:', err.message);
-      alert(err.message || 'Failed to grant reward. Please try again.');
+      if (err.message === 'daily_cap_reached') {
+        setCapToast(true);
+        setTimeout(() => setCapToast(false), 4000);
+      } else {
+        console.error('Ad reward failed:', err.message);
+      }
     }
   };
 
@@ -190,7 +194,7 @@ const Training = () => {
                   className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 active:scale-95 text-white font-bold rounded-xl text-lg transition-all shadow-lg border-b-4 border-green-800 flex items-center justify-center gap-2"
                 >
                   <PlayCircle className="w-5 h-5" />
-                  Watch Ad (+3 Energy)
+                  Watch Ad (+1 Energy Drink)
                 </button>
               )}
             </div>
@@ -397,8 +401,16 @@ const Training = () => {
             <div className="mb-4 inline-block p-4 bg-white/20 rounded-full">
               <Zap className="w-14 h-14 text-yellow-300 animate-bounce" />
             </div>
-            <h2 className="text-2xl font-black text-white mb-1 uppercase tracking-wide">Energy Recharged!</h2>
-            <p className="text-yellow-200 text-xl font-bold">+3 Energy</p>
+            <h2 className="text-2xl font-black text-white mb-1 uppercase tracking-wide">Energy Drink Earned!</h2>
+            <p className="text-yellow-200 text-xl font-bold">+1 Energy Drink</p>
+          </div>
+        </div>
+      )}
+
+      {capToast && (
+        <div className="fixed bottom-24 inset-x-4 z-[9999] flex justify-center animate-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-zinc-900 border border-white/10 rounded-2xl px-5 py-4 shadow-2xl max-w-sm w-full text-center">
+            <p className="text-white font-bold text-sm">🧃 The club physio has run out of energy drinks for today.</p>
           </div>
         </div>
       )}

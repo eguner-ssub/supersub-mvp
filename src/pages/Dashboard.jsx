@@ -13,10 +13,12 @@ import WinCelebrationModal from '../shared/ui/WinCelebrationModal';
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userProfile, updateInventory, loading, gainEnergy, unseenSettlements, markPredictionsSeen } = useGame();
+  const { userProfile, updateInventory, loading, gainEnergy, unseenSettlements, markPredictionsSeen, claimTrainingBag, currentStreak } = useGame();
 
   // --- LOCAL STATE ---
   const [showBagOverlay, setShowBagOverlay] = useState(false);
+  const [trainingBagReward, setTrainingBagReward] = useState(null);
+  const bagChecked = React.useRef(false);
   const [bagStage, setBagStage] = useState('closed');
   const [newCards, setNewCards] = useState([]);
   const [showEnergyModal, setShowEnergyModal] = useState(false);
@@ -51,6 +53,21 @@ export default function Dashboard() {
       .map(p => p.id);
     if (lostIds.length > 0) markPredictionsSeen(lostIds);
   }, [unseenSettlements]);
+
+  // Daily Training Bag Check
+  useEffect(() => {
+    if (!userProfile || bagChecked.current || loading) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    if (userProfile.last_streak_date !== today) {
+      bagChecked.current = true;
+      claimTrainingBag().then(result => {
+        if (result) {
+          setTrainingBagReward(result);
+        }
+      });
+    }
+  }, [userProfile, loading, claimTrainingBag]);
 
 
 
@@ -318,6 +335,51 @@ export default function Dashboard() {
               setWinAmount(0);
             }}
           />
+        )}
+
+        {/* DAILY TRAINING BAG MODAL */}
+        {trainingBagReward && (
+          <div className="fixed inset-0 z-[70] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-500">
+            <div className="w-full max-w-sm bg-zinc-900 border border-white/10 rounded-2xl p-8 text-center shadow-2xl relative overflow-hidden">
+              {/* Animated glow effect */}
+              <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 blur-[80px] rounded-full" />
+              
+              <div className="relative z-10">
+                <div className="mb-6 flex justify-center">
+                  <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center border-2 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.3)] animate-bounce">
+                    <ShoppingBag className="w-12 h-12 text-emerald-400" />
+                  </div>
+                </div>
+
+                <h2 className="text-3xl font-black text-white mb-2 uppercase italic tracking-tight">Your Training Bag</h2>
+                <div className="inline-block px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full mb-8">
+                   <p className="text-emerald-400 text-xs font-black uppercase tracking-widest">Day {currentStreak} — Tier {trainingBagReward.tier}</p>
+                </div>
+
+                <div className="flex justify-center mb-8">
+                   <div className="relative group">
+                     <CardBase type={trainingBagReward.cardType} />
+                     <div className="absolute -top-3 -right-3 bg-yellow-400 text-black w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-xl border-2 border-zinc-900">
+                       x{trainingBagReward.cardCount}
+                     </div>
+                   </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setTrainingBagReward(null);
+                    toast.success('Training bag claimed! Your cards are in the kit bag.', {
+                      icon: '🎒',
+                      duration: 4000
+                    });
+                  }}
+                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black font-black uppercase rounded-xl transition-all shadow-lg shadow-emerald-500/20 tracking-widest text-lg"
+                >
+                  Claim Cards
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ── Win Celebration Modal — real settled predictions ─────────────────
