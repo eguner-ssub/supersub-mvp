@@ -211,7 +211,7 @@ describe('Player Score card', () => {
             events
         );
         expect(result.status).toBe('WON');
-        expect(result.points).toBe(300);
+        expect(result.points).toBe(450); // 300 base × 1.5 player_score multiplier
     });
 
     it('WON: player scores a Penalty (non-shootout)', () => {
@@ -490,7 +490,7 @@ describe('calculateResult routing', () => {
             events
         );
         expect(result.status).toBe('WON');
-        expect(result.points).toBe(500);
+        expect(result.points).toBe(1250); // 500 base × 2.5 supersub multiplier
     });
 
     it('routes c_player_score through player score logic', () => {
@@ -501,7 +501,7 @@ describe('calculateResult routing', () => {
             events
         );
         expect(result.status).toBe('WON');
-        expect(result.points).toBe(250);
+        expect(result.points).toBe(375); // 250 base × 1.5 player_score multiplier
     });
 });
 

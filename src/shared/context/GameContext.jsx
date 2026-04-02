@@ -89,6 +89,52 @@ function computeStreakDecay(profile) {
 // Streak milestones that grant 1 energy drink
 const STREAK_DRINK_MILESTONES = new Set([3, 5, 7]);
 
+/**
+ * Returns the card reward for a training session score (0–10).
+ * Pure helper — no side effects.
+ */
+function trainingRewardForScore(score) {
+  if (score === 10) return { common: 5, supersub: true,  drink: true  };
+  if (score === 9)  return { common: 4, supersub: false, drink: false };
+  if (score >= 7)   return { common: 3, supersub: false, drink: false };
+  if (score >= 5)   return { common: 2, supersub: false, drink: false };
+  return              { common: 1, supersub: false, drink: false };
+}
+
+// Common card types that expire on Monday 23:59 UTC.
+// c_supersub never expires (null).
+const COMMON_CARD_TYPES = new Set(['c_match_result', 'c_total_goals', 'c_player_score']);
+
+/**
+ * Returns the ISO timestamp of the next (or current) Monday at 23:59:00 UTC.
+ * Rules:
+ *   - If today IS Monday and the current UTC time is before 23:59 → return today at 23:59.
+ *   - Otherwise → return the coming Monday at 23:59.
+ *
+ * Exported so it can be tested in isolation.
+ */
+export function nextMondayExpiry() {
+  const now  = new Date();
+  const day  = now.getUTCDay(); // 0=Sun, 1=Mon … 6=Sat
+  const h    = now.getUTCHours();
+  const m    = now.getUTCMinutes();
+
+  let daysUntil;
+  if (day === 1 && (h < 23 || (h === 23 && m < 59))) {
+    daysUntil = 0; // It's Monday and still before the cutoff — use today
+  } else if (day === 0) {
+    daysUntil = 1; // Sunday → tomorrow (Monday)
+  } else {
+    // Mon after 23:59 → 7 days; Tue=6, Wed=5, Thu=4, Fri=3, Sat=2
+    daysUntil = 8 - day;
+  }
+
+  return new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysUntil,
+    23, 59, 0, 0,
+  )).toISOString();
+}
+
 export const GameProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -123,7 +169,9 @@ export const GameProvider = ({ children }) => {
       const { data: invData, error: invError } = await supabase
         .from('inventory')
         .select('card_id, count')
-        .eq('user_id', session.user.id);
+        .eq('user_id', session.user.id)
+        // Exclude rows that have already expired; null = never expires (Supersub).
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
       if (invError) throw invError;
 
@@ -143,12 +191,21 @@ export const GameProvider = ({ children }) => {
       const streakDecay   = computeStreakDecay(profile);
       const decayedFields = streakDecay ?? {};
 
+      // Daily-reset training sessions in local state: if last_training_date is not today,
+      // treat sessions_today as 0 so the cap check is accurate immediately on load.
+      // The DB write is deferred until startTrainingSession() is called.
+      const today = todayUTC();
+      const effectiveSessions = profile.last_training_date === today
+        ? (profile.training_sessions_today ?? 0)
+        : 0;
+
       setUserProfile({
         ...profile,
         inventoryMap,
         energy: computedEnergy,
         energy_last_updated_at: loadedAt,
         ...decayedFields, // overlays streak fields only when decay occurred
+        training_sessions_today: effectiveSessions,
       });
 
       // Fire-and-forget decay DB write — non-blocking, best-effort sync.
@@ -230,9 +287,10 @@ export const GameProvider = ({ children }) => {
       const { error } = await supabase
         .from('inventory')
         .upsert({
-          user_id: userProfile.id,
-          card_id: cardId,
-          count: currentCount + amount
+          user_id:    userProfile.id,
+          card_id:    cardId,
+          count:      currentCount + amount,
+          expires_at: COMMON_CARD_TYPES.has(cardId) ? nextMondayExpiry() : null,
         }, { onConflict: 'user_id,card_id' });
 
       if (!error) newMap[cardId] = currentCount + amount;
@@ -415,20 +473,6 @@ export const GameProvider = ({ children }) => {
   }
 
   /**
-   * Returns the ISO timestamp for next Monday at 23:59:00 UTC.
-   * Used as the expires_at value for daily training bag cards.
-   */
-  function nextMondayExpiry() {
-    const now = new Date();
-    const day = now.getUTCDay(); // 0=Sun, 1=Mon … 6=Sat
-    const daysUntilMonday = day === 0 ? 1 : (day === 1 ? 7 : 8 - day);
-    return new Date(Date.UTC(
-      now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysUntilMonday,
-      23, 59, 0, 0,
-    )).toISOString();
-  }
-
-  /**
    * INCREMENT STREAK
    * Advances the user's login streak by 1 (or resets to 1 if they missed a day).
    * Guards against double-incrementing the same day via last_streak_date.
@@ -444,8 +488,11 @@ export const GameProvider = ({ children }) => {
     const newStreak  = lastDate === yesterday ? (userProfile.current_streak ?? 0) + 1 : 1;
     const newBest    = Math.max(newStreak, userProfile.best_streak ?? 0);
 
-    // 7-day milestone: grant an energy drink
-    if (newStreak === 7) await grantEnergyDrink(1);
+    // 7-day milestone: grant an energy drink + 1 Supersub card (rarity gate)
+    if (newStreak === 7) {
+      await grantEnergyDrink(1);
+      await updateInventory(['c_supersub']);
+    }
 
     await supabase.from('profiles').update({
       current_streak:  newStreak,
@@ -510,7 +557,67 @@ export const GameProvider = ({ children }) => {
     return { cardCount, cardType, tier };
   };
 
+  /**
+   * START TRAINING SESSION
+   * Guards: training_sessions_today < 2 AND energy > 0.
+   * On success: increments training_sessions_today, sets last_training_date = today,
+   * and spends 1 energy. Returns { success: true } or { success: false, reason }.
+   *
+   * Reason values:
+   *   'cap'    — daily session limit reached (2/day)
+   *   'energy' — no energy remaining
+   */
+  const startTrainingSession = async () => {
+    if (!userProfile) return { success: false, reason: 'not_logged_in' };
+    const today = todayUTC();
+    // Apply daily reset in-memory (mirrors what loadProfile() does)
+    const sessions = userProfile.last_training_date === today
+      ? (userProfile.training_sessions_today ?? 0)
+      : 0;
+    if (sessions >= 2) return { success: false, reason: 'cap' };
+    const currentEnergy = computeCurrentEnergy(userProfile);
+    if (currentEnergy <= 0) return { success: false, reason: 'energy' };
 
+    const newSessions = sessions + 1;
+    // Optimistic state update for session count + date
+    setUserProfile(prev => prev ? {
+      ...prev,
+      training_sessions_today: newSessions,
+      last_training_date: today,
+    } : prev);
+    // Write session tracking fields (spendEnergy handles energy separately)
+    await supabase.from('profiles').update({
+      training_sessions_today: newSessions,
+      last_training_date: today,
+    }).eq('id', userProfile.id);
+    // Spend 1 energy (handles its own optimistic state + DB write)
+    await spendEnergy(1);
+    return { success: true };
+  };
+
+  /**
+   * COMPLETE TRAINING SESSION
+   * Determines reward tier for score (0–10), grants common cards and optionally
+   * a Supersub card + energy drink.
+   * Returns { commonCount, hasSupersub, hasDrink } for the completion screen.
+   *
+   * Reward tiers:
+   *   10/10 → 5 × c_match_result + 1 × c_supersub + 1 energy drink
+   *    9/10 → 4 × c_match_result
+   *   7–8   → 3 × c_match_result
+   *   5–6   → 2 × c_match_result
+   *   0–4   → 1 × c_match_result
+   */
+  const completeTrainingSession = async (score) => {
+    const { common, supersub, drink } = trainingRewardForScore(score);
+    const cardIds = [
+      ...Array(common).fill('c_match_result'),
+      ...(supersub ? ['c_supersub'] : []),
+    ];
+    if (cardIds.length) await updateInventory(cardIds);
+    if (drink) await grantEnergyDrink(1);
+    return { commonCount: common, hasSupersub: supersub, hasDrink: drink };
+  };
 
   /**
    * CLAIM AD REWARD
@@ -707,6 +814,10 @@ export const GameProvider = ({ children }) => {
     streakTier,
     incrementStreak,
     claimTrainingBag,
+    // Training sessions
+    trainingSessionsToday: userProfile?.training_sessions_today ?? 0,
+    startTrainingSession,
+    completeTrainingSession,
     // Cards / bets
     consumeCard,
     placeBet,

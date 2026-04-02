@@ -31,6 +31,16 @@ export const isVoid = (status) => VOID_STATUSES.includes(status);
 // ── Goal filter shared across card types ────────────────────────────────────
 const COUNTABLE_GOAL_DETAILS = ['Normal Goal', 'Penalty'];
 
+// ── Points multipliers — applied to points_awarded on WON bets ──────────────
+// Supersub is rare; its base points (500/2500) are amplified to reward the
+// difficulty of holding and playing the card correctly.
+const POINTS_MULTIPLIER = {
+    c_match_result: 1.0,
+    c_total_goals:  1.0,
+    c_player_score: 1.5,
+    c_supersub:     2.5,
+};
+
 /**
  * SUPERSUB settlement logic.
  *
@@ -120,6 +130,9 @@ export const settleSupersub = (bet, events) => {
  * Events are read from the matches.events JSONB column — no external API calls.
  *
  * Returns { status: 'PENDING' | 'WON' | 'LOST', points: number }
+ *
+ * Points multipliers (from POINTS_MULTIPLIER) are applied to the base points
+ * value before returning, so points_awarded already reflects the multiplier.
  */
 export const calculateResult = (bet, match, events = []) => {
     if (!isFinished(match.status)) return { status: 'PENDING', points: 0 };
@@ -131,25 +144,27 @@ export const calculateResult = (bet, match, events = []) => {
     const totalGoals = homeGoals + awayGoals;
     const oddsPoints = Math.round((bet.odds || 0) * 100);
 
+    let result;
+
     // 1. MATCH RESULT
     if (type.includes('match_result')) {
         let outcome = 'DRAW';
         if (homeGoals > awayGoals) outcome = 'HOME_WIN';
         else if (awayGoals > homeGoals) outcome = 'AWAY_WIN';
         const won = selection === outcome;
-        return { status: won ? 'WON' : 'LOST', points: won ? oddsPoints : 0 };
+        result = { status: won ? 'WON' : 'LOST', points: won ? oddsPoints : 0 };
     }
 
     // 2. TOTAL GOALS (2.5 Line)
-    if (type.includes('total_goals')) {
+    else if (type.includes('total_goals')) {
         const isOver = totalGoals > 2.5;
         const predictedOver = selection.includes('OVER');
         const won = isOver === predictedOver;
-        return { status: won ? 'WON' : 'LOST', points: won ? oddsPoints : 0 };
+        result = { status: won ? 'WON' : 'LOST', points: won ? oddsPoints : 0 };
     }
 
     // 3. PLAYER SCORE — player must score a normal goal or penalty within 90 minutes
-    if (type.includes('player_score')) {
+    else if (type.includes('player_score')) {
         // Read directly from the existing `selection` column (e.g., "SCORE_Erling Haaland")
         const betPlayerName = normalizeName(bet.selection);
 
@@ -167,15 +182,28 @@ export const calculateResult = (bet, match, events = []) => {
             return isGoal && scorerName === betPlayerName && time <= 90;
         });
 
-        return { status: didScore ? 'WON' : 'LOST', points: didScore ? oddsPoints : 0 };
+        result = { status: didScore ? 'WON' : 'LOST', points: didScore ? oddsPoints : 0 };
     }
 
     // 4. SUPERSUB
-    if (type.includes('supersub')) {
-        return settleSupersub(bet, events);
+    else if (type.includes('supersub')) {
+        result = settleSupersub(bet, events);
     }
 
-    return { status: 'LOST', points: 0 };
+    else {
+        result = { status: 'LOST', points: 0 };
+    }
+
+    // Apply points multiplier for winning bets.
+    // LOST bets always have points = 0 so the multiplier has no effect there.
+    if (result.status === 'WON' && result.points > 0) {
+        const multiplier = POINTS_MULTIPLIER[type] ?? 1.0;
+        if (multiplier !== 1.0) {
+            result = { ...result, points: Math.round(result.points * multiplier) };
+        }
+    }
+
+    return result;
 };
 
 // ── Orchestrator ────────────────────────────────────────────────────────────

@@ -120,26 +120,30 @@ export const CARD_CONFIG = {
     id: 'c_match_result',
     label: 'Match Result',
     rarity: 'rare',
-    role: 'match_result'
+    role: 'match_result',
+    points_multiplier: 1.0,
   },
   c_total_goals: {
     id: 'c_total_goals',
     label: 'Total Goals',
     rarity: 'common',
-    role: 'total_goals'
+    role: 'total_goals',
+    points_multiplier: 1.0,
   },
   c_player_score: {
     id: 'c_player_score',
     label: 'Player Score',
     rarity: 'legendary',
-    role: 'player_score'
+    role: 'player_score',
+    points_multiplier: 1.5,
   },
   c_supersub: {
     id: 'c_supersub',
     label: 'Super Sub',
     rarity: 'legendary',
-    role: 'supersub'
-  }
+    role: 'supersub',
+    points_multiplier: 2.5,
+  },
 };
 
 /**

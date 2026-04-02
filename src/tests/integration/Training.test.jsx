@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../shared/context/GameContext', () => ({ useGame: vi.fn() }));
@@ -10,23 +10,25 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-// Inject a deterministic question set inline inside the factory so vi.mock hoisting
-// doesn't cause a "cannot access before initialization" error. All questions have
-// correctIndex=0. The first entry is Hard to satisfy the balancing engine.
+// 10-question deterministic deck: 2 Hard + 8 Easy.
+// All correctIndex=0 so playQuestions() can click 'Correct' predictably.
 vi.mock('../../data/gameData.json', () => ({
   default: {
     trainingQuestions: [
-      { difficulty: 'Hard',   category: 'Tactics', text: 'Q1', options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
-      { difficulty: 'Easy',   category: 'History', text: 'Q2', options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
-      { difficulty: 'Easy',   category: 'History', text: 'Q3', options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
-      { difficulty: 'Easy',   category: 'History', text: 'Q4', options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
-      { difficulty: 'Medium', category: 'Rules',   text: 'Q5', options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Hard',   category: 'Tactics', text: 'Q1',  options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Hard',   category: 'Tactics', text: 'Q2',  options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Easy',   category: 'History', text: 'Q3',  options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Easy',   category: 'History', text: 'Q4',  options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Easy',   category: 'History', text: 'Q5',  options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Easy',   category: 'History', text: 'Q6',  options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Medium', category: 'Rules',   text: 'Q7',  options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Medium', category: 'Rules',   text: 'Q8',  options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Medium', category: 'Rules',   text: 'Q9',  options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
+      { difficulty: 'Medium', category: 'Rules',   text: 'Q10', options: ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'], correctIndex: 0 },
     ],
   },
 }));
 
-// Replace AdOverlay with a stub that exposes onReward as a clickable button.
-// The stub calls onClose after onReward resolves — mirroring the real SDK contract.
 vi.mock('../../components/AdOverlay', () => ({
   default: ({ onReward, onClose }) => (
     <div data-testid="ad-overlay">
@@ -36,7 +38,6 @@ vi.mock('../../components/AdOverlay', () => ({
   ),
 }));
 
-// Suppress background images / CSS the layout component uses
 vi.mock('../../shared/ui/MobileLayout', () => ({
   default: ({ children }) => <div data-testid="mobile-layout">{children}</div>,
 }));
@@ -44,15 +45,17 @@ vi.mock('../../shared/ui/MobileLayout', () => ({
 import { useGame } from '../../shared/context/GameContext';
 import Training from '../../pages/Training';
 
-// Default context — user has energy
+// Default reward shape returned by completeTrainingSession
+const defaultReward = { commonCount: 1, hasSupersub: false, hasDrink: false };
+
 const makeCtx = (overrides = {}) => ({
-  userProfile: { id: 'u1', energy: 3, max_energy: 5 },
-  loading: false,
-  spendEnergy: vi.fn(),
-  gainEnergy: vi.fn().mockResolvedValue(undefined),
-  claimAdReward: vi.fn().mockResolvedValue(undefined),
-  grantEnergyDrink: vi.fn().mockResolvedValue(undefined),
-  updateInventory: vi.fn(),
+  userProfile:             { id: 'u1', energy: 3, max_energy: 5 },
+  loading:                 false,
+  claimAdReward:           vi.fn().mockResolvedValue(undefined),
+  grantEnergyDrink:        vi.fn().mockResolvedValue(undefined),
+  trainingSessionsToday:   0,
+  startTrainingSession:    vi.fn().mockResolvedValue({ success: true }),
+  completeTrainingSession: vi.fn().mockResolvedValue(defaultReward),
   ...overrides,
 });
 
@@ -67,7 +70,7 @@ const renderTraining = (ctx = makeCtx()) => {
 const advanceQuestion = () => act(() => { vi.advanceTimersByTime(1500); });
 
 /** Click START SESSION to move from briefing → quiz. */
-const startSession = () => fireEvent.click(screen.getByText('START SESSION'));
+const startSession = () => fireEvent.click(screen.getByText('Start Session'));
 
 /**
  * Play through `count` questions, clicking 'Correct' for the first
@@ -75,7 +78,6 @@ const startSession = () => fireEvent.click(screen.getByText('START SESSION'));
  */
 const playQuestions = async (count, correctCount) => {
   for (let i = 0; i < count; i++) {
-    // Options re-render between questions so query fresh each time
     const optionText = i < correctCount ? 'Correct' : 'Wrong A';
     fireEvent.click(screen.getAllByText(optionText)[0]);
     await advanceQuestion();
@@ -102,14 +104,30 @@ describe('Training Page', () => {
       expect(screen.getByText('Training Camp')).toBeInTheDocument();
     });
 
-    it('shows "START SESSION" when user has energy > 0', () => {
+    it('shows "Start Session" when user has energy > 0 and cap not reached', () => {
       renderTraining();
-      expect(screen.getByText('START SESSION')).toBeInTheDocument();
+      expect(screen.getByText('Start Session')).toBeInTheDocument();
     });
 
-    it('shows "Watch Ad (+3 Energy)" when user has energy === 0', () => {
+    it('shows "Watch Ad" button when user has energy === 0', () => {
       renderTraining(makeCtx({ userProfile: { id: 'u1', energy: 0, max_energy: 5 } }));
       expect(screen.getByText(/Watch Ad/i)).toBeInTheDocument();
+    });
+
+    it('shows session cap message when trainingSessionsToday >= 2', () => {
+      renderTraining(makeCtx({ trainingSessionsToday: 2 }));
+      expect(screen.getByText(/maxed out training/i)).toBeInTheDocument();
+      expect(screen.queryByText('Start Session')).not.toBeInTheDocument();
+    });
+
+    it('shows "0/2" sessions in the stats row when no sessions used', () => {
+      renderTraining();
+      expect(screen.getByText('0/2')).toBeInTheDocument();
+    });
+
+    it('shows "1/2" sessions after one session has been used', () => {
+      renderTraining(makeCtx({ trainingSessionsToday: 1 }));
+      expect(screen.getByText('1/2')).toBeInTheDocument();
     });
 
     it('does not render quiz option buttons initially', () => {
@@ -118,41 +136,76 @@ describe('Training Page', () => {
     });
   });
 
+  // ─── Session start ─────────────────────────────────────────────────────────
+
+  describe('Session start via startTrainingSession()', () => {
+    it('calls startTrainingSession() when Start Session is clicked', async () => {
+      const ctx = makeCtx();
+      renderTraining(ctx);
+      await act(async () => { startSession(); });
+      expect(ctx.startTrainingSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT directly call spendEnergy (that is handled inside startTrainingSession)', async () => {
+      // Provide a spendEnergy mock in the context — if Training.jsx were calling it
+      // directly it would show up here.
+      const ctx = makeCtx({ spendEnergy: vi.fn() });
+      renderTraining(ctx);
+      await act(async () => { startSession(); });
+      expect(ctx.spendEnergy).not.toHaveBeenCalled();
+    });
+
+    it('shows cap message when startTrainingSession returns reason=cap', async () => {
+      const ctx = makeCtx({
+        startTrainingSession: vi.fn().mockResolvedValue({ success: false, reason: 'cap' }),
+      });
+      renderTraining(ctx);
+      await act(async () => { startSession(); });
+      expect(screen.getByText(/maxed out training/i)).toBeInTheDocument();
+    });
+
+    it('transitions to quiz phase when startTrainingSession succeeds', async () => {
+      renderTraining();
+      await act(async () => { startSession(); });
+      expect(screen.queryByText('Training Camp')).not.toBeInTheDocument();
+      // A question should be visible
+      expect(screen.queryByText(/^Q\d+$/)).toBeInTheDocument();
+    });
+  });
+
   // ─── Briefing → Quiz transition ───────────────────────────────────────────
 
   describe('Briefing → Quiz transition', () => {
-    it('renders a question text after clicking START SESSION', () => {
+    it('renders a question text after clicking Start Session', async () => {
       renderTraining();
-      startSession();
-      // Any of Q1–Q5 may appear first (shuffled), so check for one of the patterns
-      const questionEl = screen.queryByText(/^Q[1-5]$/);
-      expect(questionEl).toBeInTheDocument();
+      await act(async () => { startSession(); });
+      expect(screen.queryByText(/^Q\d+$/)).toBeInTheDocument();
     });
 
-    it('renders all 4 answer option buttons', () => {
+    it('renders all 4 answer option buttons', async () => {
       renderTraining();
-      startSession();
+      await act(async () => { startSession(); });
       expect(screen.getAllByText('Correct').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Wrong A').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Wrong B').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Wrong C').length).toBeGreaterThan(0);
     });
 
-    it('shows "Training Camp" heading is no longer visible in quiz phase', () => {
+    it('shows question counter as 1/10', async () => {
       renderTraining();
-      startSession();
-      expect(screen.queryByText('Training Camp')).not.toBeInTheDocument();
+      await act(async () => { startSession(); });
+      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(screen.getByText('/10')).toBeInTheDocument();
     });
   });
 
-  // ─── Answer selection — correct ───────────────────────────────────────────
+  // ─── Answer selection ─────────────────────────────────────────────────────
 
   describe('Correct answer selection', () => {
-    it('disables all option buttons after an answer is selected', () => {
+    it('disables all option buttons after an answer is selected', async () => {
       renderTraining();
-      startSession();
+      await act(async () => { startSession(); });
       fireEvent.click(screen.getAllByText('Correct')[0]);
-      // All buttons should now be disabled (isAnswered=true)
       const optionButtons = screen.getAllByRole('button').filter(
         btn => ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'].includes(btn.textContent?.trim())
       );
@@ -161,11 +214,9 @@ describe('Training Page', () => {
 
     it('advances to the next question after 1500ms', async () => {
       renderTraining();
-      startSession();
-      const firstQuestion = screen.getByText(/^Q[1-5]$/).textContent;
+      await act(async () => { startSession(); });
       fireEvent.click(screen.getAllByText('Correct')[0]);
       await advanceQuestion();
-      // After advancing, buttons are re-enabled (isAnswered reset)
       const optionButtons = screen.getAllByRole('button').filter(
         btn => ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'].includes(btn.textContent?.trim())
       );
@@ -173,12 +224,10 @@ describe('Training Page', () => {
     });
   });
 
-  // ─── Answer selection — wrong ─────────────────────────────────────────────
-
   describe('Wrong answer selection', () => {
-    it('disables all option buttons after a wrong answer', () => {
+    it('disables all option buttons after a wrong answer', async () => {
       renderTraining();
-      startSession();
+      await act(async () => { startSession(); });
       fireEvent.click(screen.getAllByText('Wrong A')[0]);
       const optionButtons = screen.getAllByRole('button').filter(
         btn => ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'].includes(btn.textContent?.trim())
@@ -188,10 +237,9 @@ describe('Training Page', () => {
 
     it('advances past a wrong answer after 1500ms', async () => {
       renderTraining();
-      startSession();
+      await act(async () => { startSession(); });
       fireEvent.click(screen.getAllByText('Wrong A')[0]);
       await advanceQuestion();
-      // Buttons re-enabled means we moved to the next question
       const optionButtons = screen.getAllByRole('button').filter(
         btn => ['Correct', 'Wrong A', 'Wrong B', 'Wrong C'].includes(btn.textContent?.trim())
       );
@@ -202,65 +250,79 @@ describe('Training Page', () => {
   // ─── Quiz → Complete transition ───────────────────────────────────────────
 
   describe('Quiz → Complete transition', () => {
-    it('shows "SESSION CLEAR!" after answering all 5 correctly (score = 5 ≥ 3)', async () => {
+    it('shows "Session Clear!" after answering all 10 questions', async () => {
       renderTraining();
-      startSession();
-      await playQuestions(5, 5);
-      expect(screen.getByText('SESSION CLEAR!')).toBeInTheDocument();
+      await act(async () => { startSession(); });
+      await playQuestions(10, 10);
+      expect(screen.getByText('Session Clear!')).toBeInTheDocument();
     });
 
-    it('shows "SESSION FAILED" when fewer than 3 correct (score = 2 < 3)', async () => {
+    it('shows the score "/10" on the complete screen', async () => {
       renderTraining();
-      startSession();
-      await playQuestions(5, 2);
-      expect(screen.getByText('SESSION FAILED')).toBeInTheDocument();
+      await act(async () => { startSession(); });
+      await playQuestions(10, 3);
+      expect(screen.getByText('/10')).toBeInTheDocument();
     });
 
-    it('shows the score on the complete screen', async () => {
-      renderTraining();
-      startSession();
-      await playQuestions(5, 3); // score = 3
-      // Score is shown as "3" with "/5" in a child span — check "3" appears
-      expect(screen.getByText('3/5')).toBeInTheDocument();
+    it('calls completeTrainingSession with the correct score', async () => {
+      const ctx = makeCtx();
+      renderTraining(ctx);
+      await act(async () => { startSession(); });
+      await playQuestions(10, 7); // 7 correct
+      expect(ctx.completeTrainingSession).toHaveBeenCalledWith(7);
+    });
+
+    it('shows reward badges returned by completeTrainingSession', async () => {
+      const ctx = makeCtx({
+        completeTrainingSession: vi.fn().mockResolvedValue({
+          commonCount: 3, hasSupersub: false, hasDrink: false,
+        }),
+      });
+      renderTraining(ctx);
+      await act(async () => { startSession(); });
+      await playQuestions(10, 7);
+      // Flush the async handleNext (awaits completeTrainingSession promise)
+      await act(async () => {});
+      expect(screen.getByText('Match Result ×3')).toBeInTheDocument();
+    });
+
+    it('shows Supersub and drink badges on perfect score (completeTrainingSession mock)', async () => {
+      const ctx = makeCtx({
+        completeTrainingSession: vi.fn().mockResolvedValue({
+          commonCount: 5, hasSupersub: true, hasDrink: true,
+        }),
+      });
+      renderTraining(ctx);
+      await act(async () => { startSession(); });
+      await playQuestions(10, 10);
+      // Flush the async handleNext (awaits completeTrainingSession promise)
+      await act(async () => {});
+      expect(screen.getByText('Match Result ×5')).toBeInTheDocument();
+      expect(screen.getByText('Super Sub ×1')).toBeInTheDocument();
+      expect(screen.getByText('Energy Drink ×1')).toBeInTheDocument();
     });
   });
 
   // ─── handleFinish (CONTINUE button) ──────────────────────────────────────
 
   describe('handleFinish — CONTINUE button', () => {
-    it('calls updateInventory(["c_match_result"]) when score >= 3', async () => {
-      const ctx = makeCtx();
-      renderTraining(ctx);
-      startSession();
-      await playQuestions(5, 3);
-      fireEvent.click(screen.getByText('CONTINUE'));
-      expect(ctx.updateInventory).toHaveBeenCalledWith(['c_match_result']);
-    });
-
-    it('does NOT call updateInventory when score < 3', async () => {
-      const ctx = makeCtx();
-      renderTraining(ctx);
-      startSession();
-      await playQuestions(5, 2);
-      fireEvent.click(screen.getByText('CONTINUE'));
-      expect(ctx.updateInventory).not.toHaveBeenCalled();
-    });
-
-    it('always calls spendEnergy(1) regardless of score', async () => {
-      const ctx = makeCtx();
-      renderTraining(ctx);
-      startSession();
-      await playQuestions(5, 0); // all wrong
-      fireEvent.click(screen.getByText('CONTINUE'));
-      expect(ctx.spendEnergy).toHaveBeenCalledWith(1);
-    });
-
     it('navigates to /dashboard after CONTINUE is clicked', async () => {
       renderTraining();
-      startSession();
-      await playQuestions(5, 5);
-      fireEvent.click(screen.getByText('CONTINUE'));
+      await act(async () => { startSession(); });
+      await playQuestions(10, 5);
+      fireEvent.click(screen.getByText('Continue'));
       expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+    });
+
+    it('does NOT call updateInventory directly (handled by completeTrainingSession)', async () => {
+      // Provide updateInventory in ctx — if Training.jsx called it directly it would show.
+      const ctx = makeCtx({ updateInventory: vi.fn() });
+      renderTraining(ctx);
+      await act(async () => { startSession(); });
+      await playQuestions(10, 5);
+      await act(async () => {});
+      fireEvent.click(screen.getByText('Continue'));
+      expect(ctx.updateInventory).not.toHaveBeenCalled();
     });
   });
 
@@ -291,7 +353,7 @@ describe('Training Page', () => {
       expect(screen.queryByTestId('ad-overlay')).not.toBeInTheDocument();
     });
 
-    it('does not call claimAdReward when the ad is closed without claiming reward', async () => {
+    it('does not call claimAdReward when the ad is closed without claiming', async () => {
       const ctx = makeCtx({ userProfile: { id: 'u1', energy: 0, max_energy: 5 } });
       renderTraining(ctx);
       fireEvent.click(screen.getByText(/Watch Ad/i));
@@ -305,7 +367,6 @@ describe('Training Page', () => {
 
   describe('Guard: missing profile', () => {
     it('navigates to /dashboard when userProfile is null and loading is false', () => {
-      // render() wraps in act() which flushes effects synchronously — no waitFor needed
       renderTraining(makeCtx({ userProfile: null, loading: false }));
       expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
     });

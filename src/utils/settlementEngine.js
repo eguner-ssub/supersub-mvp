@@ -26,6 +26,15 @@ const FINISHED_STATUSES = ['FT', 'AET', 'FT_PEN'];
 const VOID_STATUSES = ['POSTPONED', 'CANCELLED', 'ABANDONED', 'SUSPENDED', 'AWARDED', 'WO'];
 const COUNTABLE_GOAL_DETAILS = ['Normal Goal', 'Penalty'];
 
+// ── Points multipliers — mirrored from scripts/settle.js ────────────────────
+// Applied to points_awarded on WON bets so the UI preview matches settlement.
+const POINTS_MULTIPLIER = {
+    c_match_result: 1.0,
+    c_total_goals:  1.0,
+    c_player_score: 1.5,
+    c_supersub:     2.5,
+};
+
 /**
  * Calculate the result of a bet based on match data.
  *
@@ -33,6 +42,9 @@ const COUNTABLE_GOAL_DETAILS = ['Normal Goal', 'Penalty'];
  * @param {string|number} selection - The user's pick (e.g., 'HOME_WIN', playerID)
  * @param {object} matchData - Full match data including goals, events, lineups, odds
  * @returns {{ status: string, points: number, message?: string }}
+ *
+ * Points multipliers (from POINTS_MULTIPLIER) are applied to the base points value
+ * before returning so the UI preview matches what the backend settlement writes.
  */
 export const calculateBetResult = (cardType, selection, matchData) => {
 
@@ -46,16 +58,18 @@ export const calculateBetResult = (cardType, selection, matchData) => {
     const awayGoals = matchData.goals?.away || 0;
     const events = matchData.events || [];
 
-    // 2. LOGIC SWITCH
+    // 2. LOGIC SWITCH — compute base result, then apply multiplier below
+    let result;
+
     switch (cardType) {
 
         // --- A. MATCH RESULT (1x2) ---
         case 'c_match_winner':
         case 'c_match_result': {
-            let result;
-            if (homeGoals > awayGoals) result = 'HOME_WIN';
-            else if (awayGoals > homeGoals) result = 'AWAY_WIN';
-            else result = 'DRAW';
+            let outcome;
+            if (homeGoals > awayGoals) outcome = 'HOME_WIN';
+            else if (awayGoals > homeGoals) outcome = 'AWAY_WIN';
+            else outcome = 'DRAW';
 
             // Normalize selection — accept both 'HOME'/'HOME_WIN' formats
             let normalizedSelection = String(selection).toUpperCase();
@@ -63,13 +77,14 @@ export const calculateBetResult = (cardType, selection, matchData) => {
             else if (normalizedSelection === 'AWAY') normalizedSelection = 'AWAY_WIN';
 
             const closingOdds = matchData.odds?.match_winner?.[normalizedSelection] ?? 0;
-            const won = result === normalizedSelection;
+            const won = outcome === normalizedSelection;
 
-            return {
+            result = {
                 status: won ? 'WON' : 'LOST',
                 points: won ? Math.round(closingOdds * 100) : 0,
                 market_odds: closingOdds,
             };
+            break;
         }
 
         // --- B. TOTAL GOALS (Over/Under 2.5) ---
@@ -84,11 +99,12 @@ export const calculateBetResult = (cardType, selection, matchData) => {
 
             const odds = matchData.odds?.total_goals ?? 0;
 
-            return {
+            result = {
                 status: won ? 'WON' : 'LOST',
                 points: won ? Math.round(odds * 100) : 0,
                 market_odds: odds,
             };
+            break;
         }
 
         // --- C. PLAYER TO SCORE ---
@@ -112,18 +128,20 @@ export const calculateBetResult = (cardType, selection, matchData) => {
 
             const odds = matchData.odds?.player_score ?? 0;
 
-            return {
+            result = {
                 status: playerScored ? 'WON' : 'LOST',
                 points: playerScored ? Math.round(odds * 100) : 0,
                 market_odds: odds,
             };
+            break;
         }
 
         // --- D. SUPERSUB ---
-        // Team-level (player_id null): any sub from backed team scores → 500 pts
-        // Player-level (player_id set): that specific player subs on AND scores → 2500 pts
+        // Team-level (player_id null): any sub from backed team scores → 500 pts base
+        // Player-level (player_id set): that specific player subs on AND scores → 2500 pts base
+        // Both values are then multiplied by POINTS_MULTIPLIER['c_supersub'] (2.5×).
         case 'c_supersub': {
-            const backedTeamId  = matchData.team_id  ? Number(matchData.team_id)  : null;
+            const backedTeamId   = matchData.team_id   ? Number(matchData.team_id)   : null;
             const backedPlayerId = matchData.player_id ? Number(matchData.player_id) : null;
 
             if (backedTeamId == null) {
@@ -143,26 +161,30 @@ export const calculateBetResult = (cardType, selection, matchData) => {
                 }
             }
 
-            if (subsOnMap.size === 0) return { status: 'LOST', points: 0 };
+            if (subsOnMap.size === 0) { result = { status: 'LOST', points: 0 }; break; }
 
             // Player-level: backed player must have subbed on AND scored
             if (backedPlayerId != null) {
                 const subOnTime = subsOnMap.get(backedPlayerId);
-                if (subOnTime === undefined) return { status: 'LOST', points: 0 }; // never came on
+                if (subOnTime === undefined) { result = { status: 'LOST', points: 0 }; break; }
 
+                let won = false;
                 for (const event of events) {
                     const isGoal = event.type_id === 14 || event.type_id === 97 || event.type === 'Goal';
                     const time   = event.minute || event.time?.elapsed || 0;
                     const scorerId = Number(event.player_id || event.player?.id);
 
                     if (isGoal && scorerId === backedPlayerId && time >= subOnTime && time <= 120) {
-                        return { status: 'WON', points: 2500 };
+                        won = true;
+                        break;
                     }
                 }
-                return { status: 'LOST', points: 0 };
+                result = { status: won ? 'WON' : 'LOST', points: won ? 2500 : 0 };
+                break;
             }
 
             // Team-level: any sub from backed team scores
+            let won = false;
             for (const event of events) {
                 const isGoal = event.type_id === 14 || event.type_id === 97 || event.type === 'Goal';
                 const isBackedTeam = event.participant_id === backedTeamId || event.team?.id === backedTeamId;
@@ -172,21 +194,33 @@ export const calculateBetResult = (cardType, selection, matchData) => {
                     const scorerId = Number(event.player_id || event.player?.id);
                     const subOnTime = subsOnMap.get(scorerId);
                     if (subOnTime !== undefined && time >= subOnTime) {
-                        return { status: 'WON', points: 500 };
+                        won = true;
+                        break;
                     }
                 }
             }
-
-            return { status: 'LOST', points: 0 };
+            result = { status: won ? 'WON' : 'LOST', points: won ? 500 : 0 };
+            break;
         }
 
         default:
-            return {
+            result = {
                 status: 'VOID',
                 points: 0,
                 message: `Unknown card type: ${cardType}`,
             };
     }
+
+    // 3. Apply points multiplier for winning bets.
+    // LOST/VOID bets always have points = 0 so multiplier has no effect there.
+    if (result.status === 'WON' && result.points > 0) {
+        const multiplier = POINTS_MULTIPLIER[cardType] ?? 1.0;
+        if (multiplier !== 1.0) {
+            result = { ...result, points: Math.round(result.points * multiplier) };
+        }
+    }
+
+    return result;
 };
 
 /**
