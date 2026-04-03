@@ -98,7 +98,7 @@ const SIM_REWARDS = {
   HOME_WIN: 200, DRAW: 400, AWAY_WIN: 1000,
   OVER_2_5: 200, UNDER_2_5: 350,
   'D. Origi': 600, 'S. Mané': 450, 'X. Shaqiri': 800,
-  BENCH: 500, 'G. Wijnaldum': 2500, 'D. Sturridge': 1500,
+  BENCH: 500, SUPERSUB_SPECIFIC: 2500,
   DEFAULT_SCORER: 600,
 };
 
@@ -371,7 +371,7 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
       {/* ── TAB CONTENT ───────────────────────────────────────── */}
       <div
         className="absolute w-full z-30 overflow-y-auto scrollbar-hide"
-        style={{ top: '196px', bottom: '256px', WebkitOverflowScrolling: 'touch' }}
+        style={{ top: '196px', bottom: '192px', WebkitOverflowScrolling: 'touch' }}
       >
         <div style={CONTENT_PANEL}>
 
@@ -497,35 +497,41 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
         </div>
       </div>
 
-      {/* ── CARD SHELF ────────────────────────────────────────── */}
-      <div data-testid="sim-card-shelf" className="fixed bottom-0 w-full z-[300] h-64">
-        <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10" />
-        <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-8 z-20">
-          {CARD_TYPES.map(card => {
-            const isActive = activeCard === card.id;
-            return (
-              <button
-                key={card.id}
-                onClick={() => handleCardTap(card.id)}
-                className={`relative flex flex-col items-center transition-all duration-300 ${
-                  isActive ? 'translate-y-[-20px]' : 'opacity-40'
-                }`}
-              >
-                <div className={`w-[5.5rem] h-[8.25rem] relative ${
-                  isActive ? 'drop-shadow-[0_8px_24px_rgba(234,179,8,0.55)]' : ''
-                }`}>
-                  <div className="absolute inset-0 flex items-center justify-center z-10">
-                    <CardBase type={card.id} label={card.label} status="generic" variant="transparent" />
+      {/* ── CARD SHELF — hidden when any overlay is open ─────── */}
+      {!openSheet && !simStaged && !settling && !settled && (
+        <div data-testid="sim-card-shelf" className="fixed bottom-0 w-full z-[300] h-48">
+          <div className="absolute bottom-0 w-full h-24 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10" />
+          <div className="absolute inset-0 flex justify-center items-end gap-1 pb-10 px-3 z-20">
+            {CARD_TYPES.map(card => {
+              const isActive = activeCard === card.id;
+              return (
+                <button
+                  key={card.id}
+                  onClick={() => handleCardTap(card.id)}
+                  className={`relative flex flex-col items-center transition-all duration-300 ${
+                    isActive ? 'translate-y-[-20px]' : 'opacity-20'
+                  }`}
+                >
+                  <div className={`w-[4.5rem] h-[6.75rem] relative ${
+                    isActive
+                      ? 'drop-shadow-[0_8px_24px_rgba(234,179,8,0.55)] ring-2 ring-yellow-400/60 rounded-xl animate-pulse'
+                      : ''
+                  }`}>
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                      <CardBase type={card.id} label={card.label} status="generic" variant="transparent" />
+                    </div>
                   </div>
-                </div>
-                {isActive && (
-                  <div className="mt-2 w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.9)]" />
-                )}
-              </button>
-            );
-          })}
+                  {isActive && (
+                    <div className="mt-1.5 px-2 py-0.5 bg-yellow-400/20 border border-yellow-400/50 rounded-full">
+                      <span className="text-yellow-300 text-[8px] font-black uppercase tracking-widest">{card.label}</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── MATCH RESULT SELECTION ────────────────────────────── */}
       {openSheet === 'match_result' && !simStaged && (
@@ -637,12 +643,11 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                 <span className="text-yellow-400 font-black text-sm ml-3">+{SIM_REWARDS.BENCH} pts</span>
               </button>
               {SIM_BENCH.map(player => {
-                const hi  = player.player_name === 'G. Wijnaldum' || player.player_name === 'D. Sturridge';
-                const pts = SIM_REWARDS[player.player_name] || SIM_REWARDS.DEFAULT_SCORER;
+                const hi = player.player_name === 'G. Wijnaldum' || player.player_name === 'D. Sturridge';
                 return (
                   <button
                     key={player.player_id}
-                    onClick={() => setSimStaged({ label: player.player_name, reward: pts })}
+                    onClick={() => setSimStaged({ label: player.player_name, reward: SIM_REWARDS.SUPERSUB_SPECIFIC })}
                     className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all active:scale-95 ${
                       hi ? 'bg-cyan-500/5 border-cyan-500/20 hover:bg-cyan-500/15' : 'bg-white/5 border-transparent hover:bg-emerald-500/20 hover:border-emerald-500/50'
                     }`}
@@ -653,7 +658,7 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                         <span className="text-zinc-500 text-[9px]">{player.context}</span>
                       )}
                     </div>
-                    <span className="text-yellow-400 font-black text-sm whitespace-nowrap ml-3">+{pts} pts</span>
+                    <span className="text-yellow-400 font-black text-sm whitespace-nowrap ml-3">+{SIM_REWARDS.SUPERSUB_SPECIFIC} pts</span>
                   </button>
                 );
               })}
@@ -795,7 +800,11 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                   >
                     <span className="text-4xl">🏆</span>
                   </div>
-                  <p className="text-white font-black text-2xl tracking-widest mb-1">Liverpool 4–0 Barcelona</p>
+                  <div className="mb-1">
+                    <p className="text-white/80 font-bold text-xs uppercase tracking-widest">Liverpool</p>
+                    <p className="text-white font-black text-5xl tracking-tighter leading-none my-1">4 – 0</p>
+                    <p className="text-white/80 font-bold text-xs uppercase tracking-widest">Barcelona</p>
+                  </div>
                   <p className="text-white/80 font-bold text-xs uppercase tracking-widest mb-4">One of the greatest European nights</p>
                   <div className="bg-white/15 rounded-2xl p-4 mb-5 border border-white/20 text-left">
                     <p className="text-white/90 text-xs leading-relaxed">{JOSEBA_MESSAGES[9]}</p>

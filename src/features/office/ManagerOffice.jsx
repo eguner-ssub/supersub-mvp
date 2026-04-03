@@ -9,6 +9,7 @@ const ManagerOffice = () => {
     const navigate = useNavigate();
     const { userProfile } = useGame();
     const [showOnboarding, setShowOnboarding] = useState(false);
+    const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
     const [anyLiveMatches, setAnyLiveMatches] = useState(false);
     // Separate loaded state for each image to enable crossfade
@@ -16,10 +17,13 @@ const ManagerOffice = () => {
     const [emptyLoaded, setEmptyLoaded] = useState(false);
 
     useEffect(() => {
-        if (userProfile && userProfile.onboarding_complete === false) {
+        if (userProfile && userProfile.onboarding_complete === false && !onboardingDismissed) {
             setShowOnboarding(true);
         }
-    }, [userProfile]);
+        if (userProfile && userProfile.onboarding_complete === true) {
+            setShowOnboarding(false);
+        }
+    }, [userProfile, onboardingDismissed]);
 
     /**
      * EFFECT: Global Live Match Check
@@ -165,7 +169,10 @@ const ManagerOffice = () => {
                 {/* HUD provided by NavigationShell > GameHeader */}
 
                 {showOnboarding && (
-                    <OfficeOnboarding onComplete={() => setShowOnboarding(false)} />
+                    <OfficeOnboarding onComplete={() => {
+                        setShowOnboarding(false);
+                        setOnboardingDismissed(true);
+                    }} />
                 )}
             </div>
         </div>
