@@ -809,6 +809,7 @@ const MatchDetail = () => {
   // Affiliate sheet — set after successful card placement, cleared on dismiss
   const [affiliateSheetData, setAffiliateSheetData] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
+  const [liveInsights, setLiveInsights] = useState(null);
   const [activeTab, setActiveTab] = useState('LINEUP');
   const [selectedScorerTeam, setSelectedScorerTeam] = useState('home');
 
@@ -852,6 +853,15 @@ const MatchDetail = () => {
               .then(r => r.ok ? r.json() : null)
               .then(d => { if (d?.available && d?.analysis) setAnalysisData(d.analysis); })
               .catch(e => console.warn('[MatchDetail] Intel fetch error:', e))
+          );
+        }
+
+        if (phase === 'LIVE') {
+          secondaryFetches.push(
+            fetch(`/api/intel?match_id=${fixtureId}&phase=live`)
+              .then(r => r.ok ? r.json() : null)
+              .then(d => { if (d?.available) setLiveInsights(d); })
+              .catch(e => console.warn('[MatchDetail] Live insights fetch error:', e))
           );
         }
 
@@ -1002,7 +1012,7 @@ const MatchDetail = () => {
 
   const shelfVisible = viewState === 'PRE_NO_LINEUPS' || viewState === 'PRE_LINEUPS';
   const hasAnyCard = cardTypes.some(c => getCardCount(c.id) > 0);
-  const contentBottom = viewState === 'LIVE' ? '140px' : shelfVisible ? (hasAnyCard ? '256px' : '120px') : '0px';
+  const contentBottom = viewState === 'LIVE' ? '140px' : shelfVisible ? (hasAnyCard ? '192px' : '120px') : '0px';
 
   if (gameLoading || !userProfile) return <div className="bg-black h-[100dvh] flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500 w-8 h-8" /></div>;
 
@@ -1320,9 +1330,9 @@ const MatchDetail = () => {
       )}
 
       {shelfVisible && cardTypes.some(c => getCardCount(c.id) > 0) && (
-        <div data-testid="card-shelf" className="fixed bottom-0 w-full z-50 h-64 pointer-events-none">
-          <div className="absolute bottom-0 w-full h-32 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
-          <div className="absolute inset-0 flex justify-center items-end gap-3 pb-14 px-4 pointer-events-auto">
+        <div data-testid="card-shelf" className="fixed bottom-0 w-full z-50 h-48 pointer-events-none">
+          <div className="absolute bottom-0 w-full h-24 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
+          <div className="absolute inset-0 flex justify-center items-end gap-2 pb-10 px-3 pointer-events-auto z-20">
             {cardTypes.map(card => {
               const count = getCardCount(card.id);
               const needsOdds = card.id !== 'c_supersub';
@@ -1352,12 +1362,12 @@ const MatchDetail = () => {
                         : 'hover:translate-y-[-8px]'
                     }`}
                 >
-                  <div className="w-[5.5rem] h-[8.25rem] relative">
+                  <div className="w-[4.5rem] h-[6.75rem] relative">
                     <div className="absolute inset-0 flex items-center justify-center z-10"><CardBase type={card.id} label={card.label} status="generic" variant="transparent" /></div>
                     {oddsDisabled && (
                       <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1">
-                        <Lock className="w-5 h-5 text-red-400/80" />
-                        <span className="text-[8px] font-black uppercase tracking-wider text-red-400/80">No Odds</span>
+                        <Lock className="w-4 h-4 text-red-400/80" />
+                        <span className="text-[7px] font-black uppercase tracking-wider text-red-400/80">No Odds</span>
                       </div>
                     )}
                     {count > 0 && !oddsDisabled && <div className="absolute -top-2 -right-2 bg-zinc-900 text-yellow-500 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border border-yellow-500 shadow-lg z-50">x{count}</div>}
@@ -1371,7 +1381,7 @@ const MatchDetail = () => {
 
       {viewState === 'LIVE' && (
         <LiveSupersubPanel
-          insights={null}
+          insights={liveInsights}
           onUseSupersubCard={() => setActiveTab('SUBS')}
           supersubCount={getCardCount('c_supersub')}
         />

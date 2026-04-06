@@ -209,7 +209,7 @@ export default async function handler(req, res) {
     // ── PRE phase (default) ───────────────────────────────────────────────────
     const { data: match, error: matchError } = await supabase
       .from('matches')
-      .select('id, home_team, away_team, home_team_id, away_team_id, kickoff_time, league_id')
+      .select('id, home_team, away_team, home_team_id, away_team_id, kickoff_time, league_id, season')
       .eq('id', matchId)
       .single();
 
@@ -267,8 +267,37 @@ export default async function handler(req, res) {
 
     // Re-generate prose at request time so template fixes apply instantly
     // without needing to re-run the sync script on stored records.
-    const freshProse = intel.report_sections
-      ? generateProse(intel.report_sections, match.home_team, match.away_team)
+    // If formGuide was stored as unavailable (standings not synced at intel-sync time),
+    // try fetching fresh standings now so the section can be populated.
+    let sectionsToUse = intel.report_sections;
+    if (sectionsToUse && !sectionsToUse.formGuide?.available && match.season) {
+      const { data: standings } = await supabase
+        .from('standings')
+        .select('team_id, position, played, points, form')
+        .in('team_id', [match.home_team_id, match.away_team_id])
+        .eq('season_id', match.season);
+      if (standings?.length) {
+        const homeS = standings.find(s => s.team_id === match.home_team_id);
+        const awayS = standings.find(s => s.team_id === match.away_team_id);
+        if (homeS || awayS) {
+          sectionsToUse = {
+            ...sectionsToUse,
+            formGuide: {
+              source: 'internal',
+              available: true,
+              data: {
+                home: homeS ? { position: homeS.position, played: homeS.played, points: homeS.points, form: homeS.form } : null,
+                away: awayS ? { position: awayS.position, played: awayS.played, points: awayS.points, form: awayS.form } : null,
+              },
+              insight: null,
+            },
+          };
+        }
+      }
+    }
+
+    const freshProse = sectionsToUse
+      ? generateProse(sectionsToUse, match.home_team, match.away_team)
       : intel.prose;
 
     return res.json({
