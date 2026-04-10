@@ -31,6 +31,18 @@ function deriveCustomStatus(status) {
   return 'UPCOMING';
 }
 
+/**
+ * Coerce a Sportmonks starting_at string to a valid UTC ISO-8601 string.
+ * Sportmonks returns bare "YYYY-MM-DD HH:mm:ss" strings even when timezone=UTC
+ * is requested. Without an explicit 'Z' marker, Postgres may interpret them
+ * using the session timezone, causing the 1-hour offset bug.
+ */
+function toUtcIso(str) {
+  if (!str) return null;
+  if (/[Zz]$/.test(str) || /[+-]\d{2}:\d{2}$/.test(str)) return str;
+  return str.replace(' ', 'T') + 'Z';
+}
+
 function extractParticipants(fixture) {
   let homeTeam = null;
   let awayTeam = null;
@@ -84,8 +96,8 @@ async function main() {
       const row = {
         id:             f.id,
         league_id:      f.league_id ?? null,
-        date:           f.starting_at ? f.starting_at.split('T')[0] : null,
-        kickoff_time:   f.starting_at ?? null,
+        date:           toUtcIso(f.starting_at)?.split('T')[0] ?? null,
+        kickoff_time:   toUtcIso(f.starting_at),
         home_team:      homeTeam.name,
         away_team:      awayTeam.name,
         home_logo:      homeTeam.image_path ?? null,
