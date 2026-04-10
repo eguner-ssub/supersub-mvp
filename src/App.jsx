@@ -32,7 +32,7 @@ import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import FPLMarket from './pages/FPLMarket';
 import LeagueHub from './features/league-hub/LeagueHub';
-import ViewLedger from './features/locker-room/ViewLedger';
+
 import APIDebugger from './features/debug/APIDebugger';
 
 // Pages - Eager Loading (Dashboard must not be lazy — chunk 404 on production)
@@ -115,7 +115,6 @@ export const AppRoutes = () => {
 
       <Route path="/match/:id" element={<ProtectedRoute><MatchDetail /></ProtectedRoute>} />
       <Route path="/inventory" element={<ProtectedRoute><LockerRoom /></ProtectedRoute>} />
-      <Route path="/inventory/active" element={<ProtectedRoute><CardsInPlay /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
       <Route
@@ -132,7 +131,7 @@ export const AppRoutes = () => {
       <Route path="/stats" element={<ProtectedRoute><FPLMarket /></ProtectedRoute>} />
       <Route path="/scouting" element={<ProtectedRoute><FPLMarket /></ProtectedRoute>} />
       <Route path="/league-hub" element={<ProtectedRoute><LeagueHub /></ProtectedRoute>} />
-      <Route path="/history" element={<ProtectedRoute><ViewLedger /></ProtectedRoute>} />
+      <Route path="/history" element={<Navigate to="/inventory?tab=cabinet" replace />} />
       <Route path="/inbox" element={<ProtectedRoute><ComingSoon title="Manager Inbox" message="Social features are currently locked." /></ProtectedRoute>} />
       <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
 

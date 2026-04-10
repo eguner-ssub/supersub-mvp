@@ -7,9 +7,10 @@ import CardBase from '../shared/ui/CardBase';
 
 const Inventory = () => {
   const navigate = useNavigate();
-  const { userProfile } = useGame();
+  const { userProfile, useEnergyDrink } = useGame();
   const [showDrinkPopup, setShowDrinkPopup] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [isDrinking, setIsDrinking] = useState(false);
 
   const cardTypes = [
     { id: 'c_match_result', label: 'Match Result' },
@@ -23,10 +24,19 @@ const Inventory = () => {
     return userProfile?.inventoryMap?.[cardId] || 0;
   };
 
-  const handleDrink = () => {
-    setShowDrinkPopup(false);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+  const handleDrink = async () => {
+    if (isDrinking) return;
+    setIsDrinking(true);
+    try {
+      const result = await useEnergyDrink();
+      if (result.success) {
+        setShowDrinkPopup(false);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }
+    } finally {
+      setIsDrinking(false);
+    }
   };
 
   return (
@@ -52,7 +62,7 @@ const Inventory = () => {
                   </div>
                   <div className="text-center">
                     <p className="text-gray-300 font-bold text-xs uppercase tracking-wide group-hover:text-white">Energy Drink</p>
-                    <p className="text-blue-400 text-[10px] font-mono mt-1">x{userProfile?.consumables?.energy_drinks || 0}</p>
+                    <p className="text-blue-400 text-[10px] font-mono mt-1">x{userProfile?.energy_drinks || 0}</p>
                   </div>
                 </div>
               </button>

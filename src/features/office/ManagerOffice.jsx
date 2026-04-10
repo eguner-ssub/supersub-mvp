@@ -184,7 +184,7 @@ const ManagerOffice = () => {
                     {/* B. BOOKCASE (History) — Left wall */}
                     <div
                         data-testid="hotspot-bookcase"
-                        onClick={() => navigate('/history')}
+                        onClick={() => navigate('/inventory?tab=cabinet')}
                         className="absolute top-[12%] left-0 w-[32%] h-[50%] z-10 cursor-pointer active:scale-[0.98] transition-all duration-100"
                     >
                         {!showOnboarding && (

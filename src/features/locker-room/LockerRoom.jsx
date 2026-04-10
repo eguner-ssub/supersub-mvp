@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Tablet, Backpack, BookOpen, Refrigerator } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ClipboardList, Tablet, Trophy } from 'lucide-react';
 import MobileLayout from '../../shared/ui/MobileLayout';
 import ViewPendingGrid from './ViewPendingGrid';
 import ViewLive from './ViewLive';
-import ViewDeck from './ViewDeck';
-import ViewLedger from './ViewLedger';
-import ViewFridge from './ViewFridge';
+import ViewTrophyCabinet from './ViewTrophyCabinet';
 
 
 const LockerRoom = () => {
@@ -17,17 +15,15 @@ const LockerRoom = () => {
     // Read tab from query params on mount
     useEffect(() => {
         const tabParam = searchParams.get('tab');
-        if (tabParam && ['pending', 'live', 'deck', 'ledger', 'fridge'].includes(tabParam)) {
+        if (tabParam && ['pending', 'live', 'cabinet'].includes(tabParam)) {
             setActiveTab(tabParam);
         }
     }, [searchParams]);
 
     const tabs = [
-        { id: 'pending', label: 'Whiteboard', icon: ClipboardList, component: ViewPendingGrid, bgColor: 'bg-[#121212]' },
-        { id: 'live', label: 'Tablet', icon: Tablet, component: ViewLive, bgColor: 'bg-gray-950' },
-        { id: 'deck', label: 'Kit Bag', icon: Backpack, component: ViewDeck, bgColor: 'bg-gray-900' },
-        { id: 'ledger', label: 'Ledger', icon: BookOpen, component: ViewLedger, bgColor: 'bg-amber-100' },
-        { id: 'fridge', label: 'Fridge', icon: Refrigerator, component: ViewFridge, bgColor: 'bg-gray-900' }
+        { id: 'pending', label: 'Whiteboard', icon: ClipboardList, component: ViewPendingGrid },
+        { id: 'live',    label: 'Tablet',     icon: Tablet,        component: ViewLive },
+        { id: 'cabinet', label: 'Cabinet',    icon: Trophy,        component: ViewTrophyCabinet },
     ];
 
     const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
@@ -35,13 +31,12 @@ const LockerRoom = () => {
 
     const handleTabChange = (tabId) => {
         setActiveTab(tabId);
-        // Update URL without navigation
         navigate(`/inventory?tab=${tabId}`, { replace: true });
     };
 
     return (
         <MobileLayout bgImage="/bg-locker-room.webp">
-            <div className="h-screen w-full flex flex-col bg-gray-900 overflow-hidden">
+            <div className="h-screen w-full flex flex-col bg-[#0D0D0D] overflow-hidden">
                 {/* Header - Fixed */}
                 <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-black/60 backdrop-blur-md border-b border-white/10">
                     <button
@@ -56,7 +51,7 @@ const LockerRoom = () => {
                 </div>
 
                 {/* Active View - Scrollable Content */}
-                <div className={`flex-1 overflow-y-auto scrollbar-hide pb-32 pt-20 ${activeTabData.bgColor} transition-colors duration-300 ${activeTab === 'deck' ? 'relative before:content-[\'\'] before:absolute before:inset-0 before:bg-white/10 before:backdrop-blur-sm before:z-0' : ''}`}>
+                <div className="flex-1 overflow-y-auto scrollbar-hide pb-32 pt-20 bg-[#0D0D0D]">
                     <div className="relative z-10">
                         <ActiveComponent />
                     </div>

@@ -34,7 +34,6 @@ describe('Dashboard (The Living Room)', () => {
   const mockSpendEnergy = vi.fn();
   const mockGainEnergy = vi.fn();
   const mockUpdateInventory = vi.fn();
-  const mockCheckActiveBets = vi.fn();
   const mockLoadProfile = vi.fn();
 
   // Mock Supabase
@@ -61,7 +60,6 @@ describe('Dashboard (The Living Room)', () => {
       spendEnergy: mockSpendEnergy,
       gainEnergy: mockGainEnergy,
       updateInventory: mockUpdateInventory,
-      checkActiveBets: mockCheckActiveBets,
       loadProfile: mockLoadProfile,
       supabase: mockSupabase,
     });
@@ -210,7 +208,6 @@ describe('Dashboard (The Living Room)', () => {
       spendEnergy: mockSpendEnergy,
       gainEnergy: mockGainEnergy,
       updateInventory: mockUpdateInventory,
-      checkActiveBets: mockCheckActiveBets,
       loadProfile: mockLoadProfile,
       supabase: mockSupabase,
     });
@@ -264,7 +261,6 @@ describe('Dashboard (The Living Room)', () => {
       spendEnergy: mockSpendEnergy,
       gainEnergy: mockGainEnergy,
       updateInventory: mockUpdateInventory,
-      checkActiveBets: mockCheckActiveBets,
       loadProfile: mockLoadProfile,
       supabase: mockSupabaseWithBets,
     });

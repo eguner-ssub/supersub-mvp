@@ -66,7 +66,6 @@ describe('E2E Full Flow - Zero to Hero Journey (Integration Tests)', () => {
             gainEnergy: mockGainEnergy,
             updateInventory: vi.fn(),
             spendEnergy: vi.fn(),
-            checkActiveBets: vi.fn(),
             loadProfile: vi.fn()
         });
     });

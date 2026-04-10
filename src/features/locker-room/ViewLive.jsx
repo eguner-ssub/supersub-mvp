@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePredictions } from '../../shared/hooks/usePredictions';
 import { useGame } from '../../shared/context/GameContext';
 import { Coins, Activity } from 'lucide-react';
 import ShareCardButton from '../../shared/ui/ShareCardButton';
 
 const ViewLive = () => {
+    const navigate = useNavigate();
     const { predictions: liveBets, loading } = usePredictions('LIVE');
+    const { predictions: pendingBets } = usePredictions('PENDING');
     const { supabase } = useGame(); // Inject Supabase to run the poll
 
     // NEW: Local state to cache the scoreboard
@@ -75,6 +78,19 @@ const ViewLive = () => {
 
     return (
         <div className="h-full overflow-y-auto scrollbar-hide p-6 pb-32">
+            {/* Status pills — supplementary navigation */}
+            {pendingBets.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                    <button
+                        onClick={() => navigate('/inventory?tab=pending')}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 border border-white/10 text-[10px] font-black uppercase tracking-wider text-zinc-400 hover:text-white transition-colors"
+                    >
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                        {pendingBets.length} PENDING
+                    </button>
+                </div>
+            )}
+
             <div className="mb-6 text-center">
                 <h2 className="text-3xl font-black text-white uppercase tracking-tighter flex items-center justify-center gap-3">
                     <span className="w-3 h-3 bg-red-600 rounded-full animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.8)]"></span>
