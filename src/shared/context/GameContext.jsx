@@ -168,7 +168,7 @@ export const GameProvider = ({ children }) => {
 
       const { data: invData, error: invError } = await supabase
         .from('inventory')
-        .select('card_id, count')
+        .select('card_id, count, expires_at')
         .eq('user_id', session.user.id)
         // Exclude rows that have already expired; null = never expires (Supersub).
         .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
@@ -176,8 +176,10 @@ export const GameProvider = ({ children }) => {
       if (invError) throw invError;
 
       const inventoryMap = {};
+      const expiryMap = {};
       invData?.forEach(row => {
         inventoryMap[row.card_id] = row.count;
+        if (row.expires_at) expiryMap[row.card_id] = row.expires_at;
       });
 
       // Apply regen formula on read — no DB write.
@@ -187,9 +189,14 @@ export const GameProvider = ({ children }) => {
       const loadedAt = new Date().toISOString();
 
       // Compute streak decay (pure, no DB side-effect here).
-      // decayedFields is either {} (no decay) or { current_streak, last_streak_date }.
-      const streakDecay   = computeStreakDecay(profile);
-      const decayedFields = streakDecay ?? {};
+      // If the user has energy drinks, intercept the decay and hold it as pendingDecay
+      // so Dashboard can offer a "spend 1 drink to save your streak" prompt first.
+      const streakDecay = computeStreakDecay(profile);
+      const hasDrinks   = (profile.energy_drinks ?? 0) > 0;
+      const pendingDecay = streakDecay && hasDrinks
+        ? { fromStreak: profile.current_streak ?? 0, toStreak: streakDecay.current_streak, decayFields: streakDecay }
+        : null;
+      const decayedFields = (!pendingDecay && streakDecay) ? streakDecay : {};
 
       // Daily-reset training sessions in local state: if last_training_date is not today,
       // treat sessions_today as 0 so the cap check is accurate immediately on load.
@@ -202,14 +209,16 @@ export const GameProvider = ({ children }) => {
       setUserProfile({
         ...profile,
         inventoryMap,
+        expiryMap,
         energy: computedEnergy,
         energy_last_updated_at: loadedAt,
-        ...decayedFields, // overlays streak fields only when decay occurred
+        ...decayedFields, // overlays streak fields only when decay occurred (not intercepted)
         training_sessions_today: effectiveSessions,
+        pendingDecay, // non-null when decay was intercepted; cleared by save/decline
       });
 
-      // Fire-and-forget decay DB write — non-blocking, best-effort sync.
-      if (streakDecay) {
+      // Fire-and-forget decay DB write only if we're applying decay immediately.
+      if (streakDecay && !pendingDecay) {
         supabase.from('profiles').update(streakDecay).eq('id', session.user.id);
       }
 
@@ -558,6 +567,38 @@ export const GameProvider = ({ children }) => {
   };
 
   /**
+   * SAVE STREAK WITH DRINK
+   * Spends 1 energy drink to bypass the pending streak decay, then claims the bag.
+   * Only callable when userProfile.pendingDecay is non-null.
+   */
+  const saveStreakWithDrink = async () => {
+    if (!userProfile?.pendingDecay) return null;
+    const drinks = userProfile.energy_drinks ?? 0;
+    if (drinks <= 0) return null;
+
+    const newDrinks = drinks - 1;
+    // Optimistic: spend drink, clear pendingDecay (streak unchanged)
+    setUserProfile(prev => prev ? { ...prev, energy_drinks: newDrinks, pendingDecay: null } : prev);
+    await supabase.from('profiles').update({ energy_drinks: newDrinks }).eq('id', userProfile.id);
+
+    return claimTrainingBag();
+  };
+
+  /**
+   * DECLINE STREAK SAVE
+   * Applies the intercepted decay to DB + state, then claims the bag normally.
+   */
+  const declineStreakSave = async () => {
+    if (!userProfile?.pendingDecay) return null;
+    const { decayFields } = userProfile.pendingDecay;
+    // Apply decay and clear pendingDecay
+    setUserProfile(prev => prev ? { ...prev, ...decayFields, pendingDecay: null } : prev);
+    await supabase.from('profiles').update(decayFields).eq('id', userProfile.id);
+
+    return claimTrainingBag();
+  };
+
+  /**
    * START TRAINING SESSION
    * Guards: training_sessions_today < 2 AND energy > 0.
    * On success: increments training_sessions_today, sets last_training_date = today,
@@ -814,11 +855,15 @@ export const GameProvider = ({ children }) => {
     streakTier,
     incrementStreak,
     claimTrainingBag,
+    pendingDecay: userProfile?.pendingDecay ?? null,
+    saveStreakWithDrink,
+    declineStreakSave,
     // Training sessions
     trainingSessionsToday: userProfile?.training_sessions_today ?? 0,
     startTrainingSession,
     completeTrainingSession,
     // Cards / bets
+    expiryMap: userProfile?.expiryMap ?? {},
     consumeCard,
     placeBet,
     updateInventory,

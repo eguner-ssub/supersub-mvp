@@ -13,7 +13,7 @@ import WinCelebrationModal from '../shared/ui/WinCelebrationModal';
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userProfile, updateInventory, loading, gainEnergy, unseenSettlements, markPredictionsSeen, claimTrainingBag, currentStreak } = useGame();
+  const { userProfile, updateInventory, loading, gainEnergy, unseenSettlements, markPredictionsSeen, claimTrainingBag, currentStreak, pendingDecay, saveStreakWithDrink, declineStreakSave, energyDrinks } = useGame();
 
   // --- LOCAL STATE ---
   const [showBagOverlay, setShowBagOverlay] = useState(false);
@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [bagStage, setBagStage] = useState('closed');
   const [newCards, setNewCards] = useState([]);
   const [showEnergyModal, setShowEnergyModal] = useState(false);
+  const [showStreakSaveModal, setShowStreakSaveModal] = useState(false);
 
   // REAL-TIME DATA
   const [winAmount, setWinAmount] = useState(0);
@@ -57,17 +58,20 @@ export default function Dashboard() {
   // Daily Training Bag Check
   useEffect(() => {
     if (!userProfile || bagChecked.current || loading) return;
-    
+
     const today = new Date().toISOString().split('T')[0];
     if (userProfile.last_streak_date !== today) {
       bagChecked.current = true;
-      claimTrainingBag().then(result => {
-        if (result) {
-          setTrainingBagReward(result);
-        }
-      });
+      // If streak decay was intercepted (user has drinks), offer them a chance to save it first
+      if (pendingDecay) {
+        setShowStreakSaveModal(true);
+      } else {
+        claimTrainingBag().then(result => {
+          if (result) setTrainingBagReward(result);
+        });
+      }
     }
-  }, [userProfile, loading, claimTrainingBag]);
+  }, [userProfile, loading, claimTrainingBag, pendingDecay]);
 
 
 
@@ -335,6 +339,55 @@ export default function Dashboard() {
               setWinAmount(0);
             }}
           />
+        )}
+
+        {/* STREAK SAVE MODAL */}
+        {showStreakSaveModal && pendingDecay && (
+          <div className="fixed inset-0 z-[75] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="w-full max-w-sm bg-zinc-900 border border-white/10 rounded-2xl p-8 text-center shadow-2xl relative overflow-hidden">
+              <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 blur-[80px] rounded-full" />
+              <div className="relative z-10">
+                <div className="mb-6 flex justify-center">
+                  <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center border-2 border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)]">
+                    <Zap className="w-10 h-10 text-amber-400" />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">Streak at Risk</h2>
+                <p className="text-gray-400 text-sm mb-6">
+                  Your streak would drop from{' '}
+                  <span className="text-white font-bold">{pendingDecay.fromStreak}</span> to{' '}
+                  <span className="text-red-400 font-bold">{pendingDecay.toStreak}</span>.
+                  Spend 1 energy drink to save it?
+                </p>
+                <div className="flex items-center justify-center gap-2 mb-6">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  <span className="text-amber-400 font-bold text-sm">{energyDrinks} drink{energyDrinks !== 1 ? 's' : ''} available</span>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={async () => {
+                      setShowStreakSaveModal(false);
+                      const result = await declineStreakSave();
+                      if (result) setTrainingBagReward(result);
+                    }}
+                    className="flex-1 py-3 border border-white/20 text-white/70 font-bold uppercase tracking-wider rounded-xl text-sm hover:bg-white/5 transition-colors"
+                  >
+                    Decline
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setShowStreakSaveModal(false);
+                      const result = await saveStreakWithDrink();
+                      if (result) setTrainingBagReward(result);
+                    }}
+                    className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider rounded-xl text-sm transition-colors"
+                  >
+                    Save Streak
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* DAILY TRAINING BAG MODAL */}

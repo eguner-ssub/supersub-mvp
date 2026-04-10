@@ -2,7 +2,7 @@
 
 > Cross-referenced against pitch deck (`supersub_pitch.pptx`), live codebase, `SUPERSUB_PROJECT_SUMMARY.md`, and game economy audit (April 2026).
 > Priorities: **P0** = Soft launch blocker (ship by mid-April 2026) · **P1** = Required before affiliate conversations / first 2 weeks post-launch · **P2** = Retention & organic growth · **P3** = Future market expansion
-> Last updated: 2026-04-02 — merged game economy backlog from Octalysis audit session. World Cup Readiness downgraded to P3. Real-time score updates marked shipped. Signup & Funnel epic marked shipped.
+> Last updated: 2026-04-10 — all P0 Game Economy items marked shipped (Prompts 1–10). High-roller prediction, Seasonal narrative arc, and User hit rate stats downgraded to P2. P1 build order updated.
 
 ---
 
@@ -121,93 +121,81 @@ The pitch deck's core commercial model. Three revenue streams: post-prediction c
 
 Card scarcity, energy system, training mode, and the daily engagement loop. Derived from Octalysis framework audit (April 2026). All P0 items have corresponding Claude Code prompts in `p0_prompts.md`.
 
-### Schema migration batch — economy primitives
+### ~~Schema migration batch — economy primitives~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** M
 - **Claude Code prompt:** Prompt 1
-- **What needs building:** Single migration adding to `profiles`: `current_streak`, `last_streak_date`, `best_streak`, `energy_last_updated_at`, `energy_drinks`, `training_sessions_today`, `last_training_date`, `ads_watched_today`, `last_ad_date`. Add `inventory.expires_at TIMESTAMPTZ nullable`. Index on `inventory(user_id, expires_at)`.
-- **Dependencies:** None — foundation for all economy features.
+- **What was built:** Migration `040_economy_primitives.sql`: added `current_streak`, `last_streak_date`, `best_streak`, `energy_last_updated_at`, `energy_drinks`, `training_sessions_today`, `last_training_date`, `ads_watched_today`, `last_ad_date` to `profiles`; `inventory.expires_at TIMESTAMPTZ nullable`; index on `inventory(user_id, expires_at)`.
 
-### Energy regeneration — time-based calculation
+### ~~Energy regeneration — time-based calculation~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** S
 - **Claude Code prompt:** Prompt 2
-- **What needs building:** Calculate on read: `min(max_energy, stored_energy + floor((now - energy_last_updated_at) / 4h))`. Update `loadProfile`, `spendEnergy`, `gainEnergy` in GameContext. No cron.
-- **Dependencies:** Schema migration batch.
+- **What was built:** `computeEnergyRegen()` in `GameContext.jsx`; `loadProfile` calculates current energy on read — `min(max_energy, stored + floor((now - energy_last_updated_at) / 4h))`; no cron required.
 
-### Energy drinks — six-pack resource
+### ~~Energy drinks — six-pack resource~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** S
 - **Claude Code prompt:** Prompt 3
-- **What needs building:** `useEnergyDrink()` (consume 1 drink → gain 1 energy, cap 6) and `grantEnergyDrink(amount)` in GameContext. Sources: streak milestones, 10/10 training, rewarded ads.
-- **Dependencies:** Schema migration batch. Energy regeneration.
+- **What was built:** `useEnergyDrink()` (consume 1 drink → gain 1 energy, cap 6) and `grantEnergyDrink(amount)` in `GameContext.jsx`. Granted at streak milestones, 10/10 training, rewarded ads.
 
-### Ad system — server-side daily cap and energy drink grant
+### ~~Ad system — server-side daily cap and energy drink grant~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** S
 - **Claude Code prompt:** Prompt 4
-- **What needs building:** Update `watch_ad_reward()` RPC: server-side 2/day cap, grant 1 energy drink (not direct energy), reset on date change. Update `claimAdReward()` in GameContext. Remove client localStorage cooldown.
-- **Dependencies:** Schema migration batch. Energy drinks.
+- **What was built:** `watch_ad_reward()` RPC (migration `041`): server-side 2/day cap, grants 1 energy drink, resets on date change. `claimAdReward()` in `GameContext.jsx` updated. Client localStorage cooldown removed.
 
-### Streak system — decay model
+### ~~Streak system — decay model~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** M
 - **Claude Code prompt:** Prompt 5
-- **What needs building:** Streak increments on daily open. Decay on missed day (drop one tier, not reset to zero). Tiers: 1-3, 4-6, 7+. Energy drink grants at day 3, 5, 7 milestones. `incrementStreak()` + tier helper exported from GameContext.
-- **Dependencies:** Schema migration batch.
+- **What was built:** `incrementStreak()` + `computeStreakDecay()` in `GameContext.jsx`. Tier model: 1-3, 4-6, 7+. Decay drops one tier on missed day. Energy drink grants at day 3, 5, 7 milestones.
 
-### Training bag — daily login reward
+### ~~Training bag — daily login reward~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** S
 - **Claude Code prompt:** Prompt 6
-- **What needs building:** `claimTrainingBag()` in GameContext. 2-3 common cards by streak tier. Calls `incrementStreak()`. Dressing room modal on first daily open. `expires_at` set to next Monday 23:59 UTC.
-- **Dependencies:** Streak system. Card expiry (column available from schema migration).
+- **What was built:** `claimTrainingBag()` in `GameContext.jsx`; 2-3 common cards by streak tier; dressing room modal on first daily open; `expires_at` set to next Monday 23:59 UTC.
 
-### Card expiry — Monday 23:59 reset
+### ~~Card expiry — Monday 23:59 reset~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** M
 - **Claude Code prompt:** Prompt 7
-- **What needs building:** `nextMondayExpiry()` helper. Apply `expires_at` to all common card grants, `null` for Supersub. Tuesday 00:05 UTC cron deletes expired rows. `loadProfile` filters expired cards from local state.
-- **Dependencies:** Schema migration batch.
+- **What was built:** `nextMondayExpiry()` helper; `expires_at` applied to all common card grants (`null` for Supersub); `loadProfile` filters expired cards from local state; Tuesday 00:05 UTC cron Edge Function.
 
-### Training mode — 10 questions with tiered rewards
+### ~~Training mode — 10 questions with tiered rewards~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** M
 - **Claude Code prompt:** Prompt 8
-- **What needs building:** 10q trivia, 10s timer. Tiers: 0-4→1c, 5-6→2c, 7-8→3c, 9→4c, 10→5c+1 Supersub+1 drink. 2 sessions/day cap. `startTrainingSession()` + `completeTrainingSession(score)` in GameContext.
-- **Dependencies:** Schema migration. Energy regen. Card expiry.
+- **What was built:** `src/pages/Training.jsx` — 10q trivia, 10s timer per question. Tiers: 0-4→1c, 5-6→2c, 7-8→3c, 9→4c, 10→5c+1 Supersub+1 drink. 2 sessions/day cap. `startTrainingSession()` + `completeTrainingSession(score)` in `GameContext.jsx`.
 
-### Training mode — progress UI
+### ~~Training mode — progress UI~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** S
 - **Claude Code prompt:** Prompt 9
-- **What needs building:** Real-time score + cards earned + next threshold during quiz. Prominent threshold display at Q7+. Joseba toast reactions at 5, 7, 9, 10 correct.
-- **Dependencies:** Training mode — 10 questions.
+- **What was built:** `ScoreHUD` sub-component in `Training.jsx` — real-time score, cards earned, next threshold. Prominent tension styling at Q7+. Joseba milestone toast reactions at 5, 7, 9, 10 correct (2.5s auto-dismiss).
 
-### Supersub card — rarity and points multiplier
+### ~~Supersub card — rarity and points multiplier~~ ✅ SHIPPED
 - **Priority:** P0
 - **Effort:** M
 - **Claude Code prompt:** Prompt 10
-- **What needs building:** Rarity gates: only from 10/10 training, day 7 streak, special Joseba events. Audit and remove from all other grant sources. Settlement multiplier: match_result 1×, over_under 1×, player_score 1.5×, supersub 2.5×. Applied to `points_awarded`.
-- **Dependencies:** Schema migration. Card expiry. Training mode.
+- **What was built:** `POINTS_MULTIPLIER` constant in `src/utils/settlementEngine.js` + `scripts/settle.js` (match_result 1×, total_goals 1×, player_score 1.5×, supersub 2.5×). Rarity gated to 10/10 training + day-7 streak only. All other grant sources audited and removed.
 
 ### High-roller prediction option (card sink)
-- **Priority:** P1
+- **Priority:** P2
 - **Effort:** M
-- **What needs building:** Spend 2-3 cards on a single prediction for multiplied points. Toggle on confirmation screen. Update `placeBet()`, `consumeCard()`, settlement engine.
-- **Dependencies:** Card expiry (economy must be balanced first).
+- **What needs building:** Spend 2 cards on a single prediction for 2× points. "Double Down" toggle on confirmation screen. `placeBet()` accepts optional `cardCount = 1` param; `consumeCard()` called twice when `cardCount === 2`. Reward multiplied at placement time (stored in `potential_reward`), not in settlement engine.
+- **Dependencies:** Card expiry (economy must be balanced with live data first).
 
-### Card expiry countdown in UI
+### ~~Card expiry countdown in UI~~ ✅ SHIPPED
 - **Priority:** P1
 - **Effort:** S
-- **What needs building:** Time until expiry in inventory + prediction screens. Amber on Sunday, red on Monday. Tablet notification hook.
-- **Dependencies:** Card expiry.
+- **What was built:** `expiryMap` built in `loadProfile()` (`GameContext.jsx`); expiry chip rendered in `ViewDeck.jsx` — amber Saturday/Sunday, red Monday, "exp. Mon / exp. tmrw / exp. today" labels.
 
-### Streak save mechanic
+### ~~Streak save mechanic~~ ✅ SHIPPED
 - **Priority:** P1
 - **Effort:** S
-- **What needs building:** When streak would decay: offer "Spend 1 energy drink to save streak?" on training bag screen. Deduct drink on acceptance.
-- **Dependencies:** Streak system. Energy drinks.
+- **What was built:** `loadProfile()` intercepts decay when `energy_drinks > 0`, setting `pendingDecay` in state; `Dashboard.jsx` shows a "Save streak?" modal before the training bag reward; `saveStreakWithDrink()` / `declineStreakSave()` in `GameContext.jsx`.
 
 ### Card Store (points-to-cards exchange)
 - **Priority:** P2
@@ -243,33 +231,31 @@ Card scarcity, energy system, training mode, and the daily engagement loop. Deri
 
 ## TABLET NOTIFICATION HUB
 
-### Tablet — core notification types
+### ~~Tablet — core notification types~~ ✅ SHIPPED
 - **Priority:** P1
 - **Effort:** M
-- **What needs building:** Badge on tablet. Types: energy recharged, matchday countdown (2h before), streak warning (20:00), leaderboard shift. Cap 2-3/day.
-- **Dependencies:** Energy regen. Streak system. Leaderboard.
+- **What was built:** `ManagerOffice.jsx` builds up to 3 notifications on mount: `energy_ready` (4h+ regen), `matchday_soon` (6h window), `streak_warning` (after 20:00). Red badge on tablet hotspot; notifications passed as location state to `/leaderboard` and rendered in a panel at the top.
 
-### Tablet — Joseba intel notifications
+### ~~Tablet — Joseba intel notifications~~ ✅ SHIPPED
 - **Priority:** P1
 - **Effort:** S
-- **What needs building:** When new intel generated for upcoming match, push Joseba notification to tablet. Tapping navigates to match intel view.
-- **Dependencies:** Pre-Match Intel Engine. Tablet core notifications.
+- **What was built:** Intel fetch piggybacked onto the matches request in `ManagerOffice.jsx`; first available match within 24h checked against `/api/intel`; rendered as a Joseba-styled inline card in the Leaderboard notification panel; tapping navigates to `/match/:id`.
 
 ---
 
 ## SEASONAL NARRATIVE & USER STATS
 
 ### Seasonal narrative arc — manager career mode
-- **Priority:** P1
+- **Priority:** P2
 - **Effort:** M
-- **What needs building:** Track per-season: predictions, hit rate, best gameweek, biggest upset. Season summary card (Aug-May). Pure frontend reads on existing data.
+- **What needs building:** New CAREER tab in LockerRoom (`ViewCareer.jsx`). Per-season rollup: total predictions, win %, total points, best gameweek, most-used card type. Season label derived from `created_at`. Pure frontend computation on existing `predictions` table data.
 - **Dependencies:** None.
 
 ### User hit rate stats — prediction performance breakdown
-- **Priority:** P1
+- **Priority:** P2
 - **Effort:** M
-- **What needs building:** Performance breakdown by league, market type, home/away bias. Group by `league_id + card_type + result`. Manager's Office or stats tab. No new tables.
-- **Dependencies:** None.
+- **What needs building:** Section within CAREER tab. Win % by card type, by league, and home/away bias (from `selection` field). Horizontal CSS bar charts reusing `barStyle` pattern from `MatchDetail.jsx`. No new tables.
+- **Dependencies:** Seasonal narrative arc (ships in same file).
 
 ---
 
@@ -379,29 +365,25 @@ Downgraded to P3. No World Cup work until core economy and retention loop are pr
 
 ## IMPLEMENTATION DEPENDENCIES (GAME ECONOMY)
 
+All P0 items shipped. Remaining P1 build order:
+
 ```
-Schema migration batch
-  ├── Energy regeneration
-  │     └── Energy drinks
-  │           ├── Ad system (server-side cap)
-  │           └── Streak save (P1)
-  ├── Streak system
-  │     └── Training bag (login reward)
-  ├── Card expiry
-  │     ├── Training mode (10 questions + rewards)
-  │     │     └── Training progress UI
-  │     └── Card expiry countdown UI (P1)
-  └── Supersub card rarity + multipliers
+✅ Schema migration batch
+  ✅ Energy regeneration → Energy drinks → Ad system
+  ✅ Streak system → Training bag
+  ✅ Card expiry → Training mode → Training progress UI
+  ✅ Supersub card rarity + multipliers
+  │
+  ├── Card expiry countdown UI (P1) ← data available, UI only
+  ├── Streak save mechanic (P1) ← logic available, UI + GameContext hook
+  ├── Tablet core notifications (P1) ← new feature
+  │     └── Tablet Joseba intel (P1) ← depends on tablet core
+  └── Ad provider integration (P1) ← blocked on ad network account
 ```
 
-**P0 build order (Claude Code prompts 1–10):**
-1. Schema migration batch
-2. Energy regeneration
-3. Energy drinks
-4. Ad system
-5. Streak system
-6. Training bag
-7. Card expiry
-8. Training mode — 10 questions
-9. Training mode — progress UI
-10. Supersub card rarity + settlement multipliers
+**P1 build order:**
+1. ~~Card expiry countdown UI~~ ✅ SHIPPED
+2. ~~Streak save mechanic~~ ✅ SHIPPED
+3. ~~Tablet core notifications~~ ✅ SHIPPED
+4. ~~Tablet Joseba intel notifications~~ ✅ SHIPPED
+5. Ad provider integration (when ad network account is ready)

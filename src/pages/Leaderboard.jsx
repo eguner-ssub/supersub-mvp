@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Globe, Flag, Trophy, Loader2, Crown, Medal, Award } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, Globe, Flag, Trophy, Loader2, Crown, Medal, Award, Zap, Clock, Flame } from 'lucide-react';
 import { useGame } from '../shared/context/GameContext';
 
 const LEAGUE_OPTIONS = [
@@ -31,9 +31,14 @@ function RankBadge({ rank }) {
   return <span className="text-sm font-mono text-gray-400 w-5 text-center">{rank}</span>;
 }
 
+const NOTIFICATION_ICONS = { energy_ready: Zap, matchday_soon: Clock, streak_warning: Flame };
+const NOTIFICATION_COLORS = { energy_ready: 'text-blue-400', matchday_soon: 'text-yellow-400', streak_warning: 'text-orange-400' };
+
 export default function Leaderboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { userProfile, supabase } = useGame();
+  const [notifications] = useState(location.state?.notifications ?? []);
 
   const [type, setType] = useState('global');
   const [period, setPeriod] = useState('all_time');
@@ -107,6 +112,38 @@ export default function Leaderboard() {
         </h1>
         <div className="w-7" />
       </div>
+
+      {/* Notification Panel */}
+      {notifications.length > 0 && (
+        <div className="px-3 pt-3 flex flex-col gap-2">
+          {notifications.map((n, i) => {
+            if (n.type === 'intel') {
+              return (
+                <button
+                  key={i}
+                  onClick={() => navigate(`/match/${n.matchId}`)}
+                  className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-left w-full active:scale-[0.98] transition-transform"
+                >
+                  <img src="/assets/joseba-avatar.webp" alt="Joseba" className="w-8 h-8 rounded-full object-cover border border-emerald-500/30 shrink-0 mt-0.5" onError={e => { e.target.src = '/assets/assistant-head.png'; }} />
+                  <div className="flex-1 min-w-0">
+                    <span className="block text-[8px] font-black uppercase tracking-widest text-emerald-400 mb-0.5">JOSEBA — {n.matchName}</span>
+                    <p className="text-white/80 text-xs leading-relaxed">{n.message}</p>
+                  </div>
+                  <ArrowLeft className="w-3.5 h-3.5 text-emerald-400 rotate-180 shrink-0 mt-1" />
+                </button>
+              );
+            }
+            const Icon = NOTIFICATION_ICONS[n.type] || Zap;
+            const color = NOTIFICATION_COLORS[n.type] || 'text-gray-400';
+            return (
+              <div key={i} className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5">
+                <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${color}`} />
+                <p className="text-white/80 text-xs leading-relaxed">{n.message}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Type Selector */}
       <div className="flex gap-1 p-3 pb-0">
