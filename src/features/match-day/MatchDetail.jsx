@@ -809,6 +809,7 @@ const MatchDetail = () => {
   // Affiliate sheet — set after successful card placement, cleared on dismiss
   const [affiliateSheetData, setAffiliateSheetData] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(true);
   const [liveInsights, setLiveInsights] = useState(null);
   const [activeTab, setActiveTab] = useState('LINEUP');
   const [selectedScorerTeam, setSelectedScorerTeam] = useState('home');
@@ -847,12 +848,23 @@ const MatchDetail = () => {
         // Step 2: fire all secondary requests in parallel
         const secondaryFetches = [];
 
+        // analysisLoading only applies to PRE phase; clear it immediately for other phases
+        if (phase !== 'PRE') setAnalysisLoading(false);
+
         if (phase === 'PRE') {
           secondaryFetches.push(
             fetch(`/api/intel?match_id=${fixtureId}`)
               .then(r => r.ok ? r.json() : null)
-              .then(d => { if (d?.available && d?.analysis) setAnalysisData(d.analysis); })
+              .then(d => {
+                // Only use intel analysis when SportMonks predictions were actually synced.
+                // If sportmonksAvailable=false, all 4 sections would show "unavailable" —
+                // the odds fallback view is more useful in that case.
+                if (d?.available && d?.analysis && d?.sportmonksAvailable) {
+                  setAnalysisData(d.analysis);
+                }
+              })
               .catch(e => console.warn('[MatchDetail] Intel fetch error:', e))
+              .finally(() => setAnalysisLoading(false))
           );
         }
 
@@ -1156,7 +1168,7 @@ const MatchDetail = () => {
       )}
 
       {/* PRE_NO_LINEUPS: Full-page analyst report, no tabs */}
-      {match && viewState === 'PRE_NO_LINEUPS' && (
+      {match && viewState === 'PRE_NO_LINEUPS' && (analysisLoading || analysisData) && (
         <div
           className="absolute z-30 w-full overflow-y-auto scrollbar-hide"
           style={{
@@ -1177,7 +1189,13 @@ const MatchDetail = () => {
               minHeight: '100%',
             }}
           >
-            <PrematchAnalysisPanel match={match} odds={odds} analysisData={analysisData} />
+            {analysisLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="animate-spin text-white/30 w-6 h-6" />
+              </div>
+            ) : (
+              <PrematchAnalysisPanel match={match} odds={odds} analysisData={analysisData} />
+            )}
           </div>
         </div>
       )}

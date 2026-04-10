@@ -1,7 +1,7 @@
 export const INTEL_CONFIG = {
   // Sync window
   SYNC_DAYS_AHEAD: 14,
-  MIN_DAYS_BEFORE_KICKOFF: 1,
+  MIN_DAYS_BEFORE_KICKOFF: 0,
 
   // Display cutoff (switch from intel to lineups)
   LINEUPS_PHASE_MINUTES: 60,
