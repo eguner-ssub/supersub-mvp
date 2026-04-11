@@ -369,16 +369,74 @@ const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersu
   // Coerce to string to defeat JSON serialization type mismatches
   const benchPlayers = allLineups.filter((p) => String(p.type_id) === String(SM_BENCH_TYPE_ID));
 
-  if (benchPlayers.length === 0)
-    return <p className="text-center text-white/30 text-xs uppercase tracking-widest py-12">No substitute data available</p>;
+  const hasCards = supersubCount > 0;
+
+  if (benchPlayers.length === 0) {
+    const homeName = match?.teams?.home?.name || 'Home';
+    const awayName = match?.teams?.away?.name || 'Away';
+    const homeLogo = match?.teams?.home?.logo;
+    const awayLogo = match?.teams?.away?.logo;
+
+    return (
+      <div style={{ padding: '24px 16px' }}>
+        <p style={{
+          textAlign: 'center',
+          color: 'rgba(255,255,255,0.4)',
+          fontSize: '11px',
+          fontFamily: "'Montserrat', sans-serif",
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '1.5px',
+          marginBottom: '20px',
+        }}>
+          Pick a team to back their sub to score
+        </p>
+
+        {[
+          { side: 'HOME', name: homeName, logo: homeLogo },
+          { side: 'AWAY', name: awayName, logo: awayLogo },
+        ].map(({ side, name, logo }) => (
+          <button
+            key={side}
+            onClick={() => onStageSupersub && onStageSupersub(side, null, name)}
+            disabled={!hasCards}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              marginBottom: '12px',
+              background: hasCards ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.04)',
+              border: `1.5px solid ${hasCards ? '#00e5ff' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: '12px',
+              color: hasCards ? '#00e5ff' : 'rgba(255,255,255,0.2)',
+              fontFamily: "'Montserrat', sans-serif",
+              fontWeight: 800,
+              fontSize: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '1.5px',
+              cursor: hasCards ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s',
+              boxShadow: hasCards ? '0 0 10px rgba(0,229,255,0.15)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {logo && <img src={logo} alt={name} style={{ width: '24px', height: '24px', objectFit: 'contain' }} />}
+              <span>{name}</span>
+            </div>
+            <span style={{ opacity: 0.7 }}>⚡ 500 pts</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   const homeId = String(match?.teams?.home?.id);
   const awayId = String(match?.teams?.away?.id);
 
   const homeBench = benchPlayers.filter(p => String(p.team_id) === homeId);
   const awayBench = benchPlayers.filter(p => String(p.team_id) === awayId);
-
-  const hasCards = supersubCount > 0;
 
   const renderBench = (side, teamId, teamName, teamLogo, players) => {
     if (!players || players.length === 0) return null;
@@ -1200,6 +1258,47 @@ const MatchDetail = () => {
         </div>
       )}
 
+      {/* PRE_NO_LINEUPS: Supersub team-picker sheet (shown when card tapped before lineups) */}
+      {match && viewState === 'PRE_NO_LINEUPS' && activeTab === 'SUBS' && (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col justify-end"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setActiveTab('LINEUP')}
+        >
+          <div
+            className="w-full rounded-t-2xl overflow-hidden"
+            style={{ background: 'rgba(14,14,14,0.98)', borderTop: '1px solid rgba(255,255,255,0.1)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Sheet handle + close */}
+            <div className="flex items-center justify-between px-5 pt-4 pb-2">
+              <div className="w-10 h-1 rounded-full bg-white/20 mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
+              <span style={{
+                fontFamily: "'Montserrat', sans-serif",
+                fontWeight: 800,
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                letterSpacing: '2px',
+                color: 'rgba(255,255,255,0.5)',
+              }}>Supersub</span>
+              <button
+                onClick={() => setActiveTab('LINEUP')}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '20px', cursor: 'pointer', lineHeight: 1, padding: '0 0 0 8px' }}
+              >×</button>
+            </div>
+            <SubstitutesTab
+              match={match}
+              onStageSupersub={(side, teamId, name) => {
+                setActiveTab('LINEUP');
+                handleStageSupersub(side, teamId, name);
+              }}
+              onStagePlayerSupersub={handleStagePlayerSupersub}
+              supersubCount={getCardCount('c_supersub')}
+            />
+          </div>
+        </div>
+      )}
+
       {/* PRE_LINEUPS / LIVE: Tabbed content */}
       {match && (viewState === 'PRE_LINEUPS' || viewState === 'LIVE') && (
         <div
@@ -1380,7 +1479,7 @@ const MatchDetail = () => {
                         : 'hover:translate-y-[-8px]'
                     }`}
                 >
-                  <div className="w-[4.5rem] h-[6.75rem] relative">
+                  <div className="w-[5rem] h-[7.5rem] relative">
                     <div className="absolute inset-0 flex items-center justify-center z-10"><CardBase type={card.id} label={card.label} status="generic" variant="transparent" /></div>
                     {oddsDisabled && (
                       <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1">

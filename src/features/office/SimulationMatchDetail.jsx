@@ -530,7 +530,7 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                     }`}
                 >
                   {/* Consistent size for all tiles — only ring differs */}
-                  <div className={`w-[4.5rem] h-[6.75rem] relative rounded-xl ${isActive ? 'ring-2 ring-white/40 animate-pulse' : ''
+                  <div className={`w-[5rem] h-[7.5rem] relative rounded-xl ${isActive ? 'ring-2 ring-white/40 animate-pulse' : ''
                     }`}>
                     <div className="absolute inset-0 flex items-center justify-center z-10">
                       <CardBase type={card.id} status="generic" variant="transparent" />
