@@ -5,8 +5,16 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    overflow: hidden;
+    height: 100%;
+    overscroll-behavior: none;
+  }
   body {
-    @apply bg-black text-white min-h-screen;
+    @apply bg-black text-white;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 }
 
