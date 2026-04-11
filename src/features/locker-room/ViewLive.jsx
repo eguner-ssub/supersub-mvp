@@ -1,55 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { usePredictions } from '../../shared/hooks/usePredictions';
 import { useGame } from '../../shared/context/GameContext';
-import { Coins, Activity } from 'lucide-react';
-import ShareCardButton from '../../shared/ui/ShareCardButton';
+import { Activity } from 'lucide-react';
+import CardBase from '../../shared/ui/CardBase';
+
+// Copied exactly from ViewPendingGrid.jsx
+const FAN_SLOTS = [
+    { rotate: '-4deg',  translateY: '0px',   translateX: '-6px'  },
+    { rotate: '1deg',   translateY: '-8px',  translateX: '0px'   },
+    { rotate: '5deg',   translateY: '0px',   translateX: '6px'   },
+    { rotate: '-2deg',  translateY: '-4px',  translateX: '10px'  },
+];
+
+const getCardLabel = (type) => ({
+    c_match_result: 'MATCH RESULT',
+    c_total_goals:  'TOTAL GOALS',
+    c_player_score: 'GOALSCORER',
+    c_supersub:     'SUPERSUB',
+}[type] ?? type);
 
 const ViewLive = () => {
-    const navigate = useNavigate();
     const { predictions: liveBets, loading } = usePredictions('LIVE');
-    const { predictions: pendingBets } = usePredictions('PENDING');
-    const { supabase } = useGame(); // Inject Supabase to run the poll
+    const { supabase } = useGame();
 
-    // NEW: Local state to cache the scoreboard
-    const [matchScores, setMatchScores] = useState({});
+    const [matchData, setMatchData] = useState({});
 
-    // NEW: The 30-Second Polling Loop
+    // 30-second polling loop — extended to also fetch team names + logos
     useEffect(() => {
-        // If the user has no live bets, don't waste network requests
         if (!liveBets || liveBets.length === 0) return;
 
-        // Grab exactly which matches we need scores for
         const matchIds = [...new Set(liveBets.map(b => b.match_id))];
 
         const fetchScores = async () => {
             const { data, error } = await supabase
                 .from('matches')
-                .select('id, home_score, away_score')
+                .select('id, home_score, away_score, home_team, away_team, home_logo, away_logo')
                 .in('id', matchIds);
 
             if (!error && data) {
-                const scoreMap = {};
-                data.forEach(match => {
-                    scoreMap[match.id] = match;
-                });
-                setMatchScores(scoreMap);
+                const map = {};
+                data.forEach(match => { map[match.id] = match; });
+                setMatchData(map);
             } else if (error) {
                 console.error("Scoreboard Poll Error:", error.message);
             }
         };
 
-        // 1. Fetch instantly when the tab opens
         fetchScores();
-
-        // 2. Poll Supabase every 30 seconds (30000ms)
-        const pollInterval = setInterval(() => {
-            fetchScores();
-        }, 30000);
-
-        // 3. Clean up the loop if the user clicks away to another tab
+        const pollInterval = setInterval(fetchScores, 30000);
         return () => clearInterval(pollInterval);
-
     }, [liveBets, supabase]);
 
     const formatBetSelection = (bet) => {
@@ -76,83 +75,119 @@ const ViewLive = () => {
         </div>
     );
 
+    // Group predictions by match_id
+    const matchGroups = liveBets.reduce((acc, bet) => {
+        if (!acc[bet.match_id]) acc[bet.match_id] = [];
+        acc[bet.match_id].push(bet);
+        return acc;
+    }, {});
+
     return (
-        <div className="h-full overflow-y-auto scrollbar-hide p-6 pb-32">
-            {/* Status pills — supplementary navigation */}
-            {pendingBets.length > 0 && (
-                <div className="flex px-6 pt-2 pb-0">
-                    <button
-                        onClick={() => navigate('/inventory?tab=pending')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-800 border border-white/10 text-[10px] font-black uppercase tracking-wider text-zinc-400"
-                    >
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
-                        {pendingBets.length} PENDING
-                    </button>
-                </div>
-            )}
+        <div className="h-full overflow-y-auto scrollbar-hide p-4 pb-32">
 
-            <div className="mb-6 text-center">
-                <h2 className="text-3xl font-black text-white uppercase tracking-tighter flex items-center justify-center gap-3">
-                    <span className="w-3 h-3 bg-red-600 rounded-full animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.8)]"></span>
-                    LIVE TABLET
-                </h2>
-            </div>
+            {/* Match containers */}
+            <div className="space-y-4 max-w-lg mx-auto">
+                {Object.entries(matchGroups).map(([matchId, bets]) => {
+                    const md = matchData[matchId];
+                    const firstBet = bets[0];
 
-            <div className="space-y-4 max-w-2xl mx-auto">
-                {liveBets.map((bet) => {
-                    // DICTIONARY LOOKUP: Safely read the score from our local cache
-                    const scoreData = matchScores[bet.match_id] || { home_score: 0, away_score: 0 };
+                    // Score — null-safe placeholder until poll resolves
+                    const hasScore = md?.home_score != null && md?.away_score != null;
+                    const scoreDisplay = hasScore ? `${md.home_score} — ${md.away_score}` : '— — —';
+
+                    // Team identifiers — prefer polled data, fall back to match_title parse
+                    const titleParts = firstBet.match_title?.split(' vs ') ?? ['', ''];
+                    const homeName = md?.home_team ?? titleParts[0] ?? '?';
+                    const awayName = md?.away_team ?? titleParts[1] ?? '?';
+                    const homeLogo = md?.home_logo;
+                    const awayLogo = md?.away_logo;
+
+                    // Sum potential rewards
+                    const totalReward = bets.reduce((sum, b) => sum + (b.potential_reward ?? 0), 0);
 
                     return (
-                        <div key={bet.id} className="bg-zinc-900 border-2 border-emerald-500 rounded-xl p-6 shadow-xl transition-all border border-white/5">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="min-w-0 flex-1">
-                                    <h3 className="text-xl font-black text-white uppercase leading-none mb-1 truncate">{bet.match_title}</h3>
-                                    <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest">{formatBetSelection(bet)}</p>
+                        <div
+                            key={matchId}
+                            className="bg-zinc-900 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-xl"
+                        >
+                            {/* ── HEADER: Broadcaster Scoreboard ── */}
+                            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/5 flex-shrink-0">
+                                {/* Home */}
+                                <div className="flex flex-col items-center gap-1 w-16">
+                                    {homeLogo
+                                        ? <img src={homeLogo} alt={homeName} className="w-8 h-8 object-contain" />
+                                        : <span className="text-white font-black text-xs uppercase">{homeName.slice(0, 3)}</span>
+                                    }
+                                    <span className="text-zinc-400 text-[8px] font-bold uppercase tracking-wide leading-tight text-center line-clamp-2">{homeName}</span>
                                 </div>
-                                <div className="bg-red-600/20 border border-red-500/50 px-3 py-1 rounded-full flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></div>
-                                    <span className="text-red-500 text-[10px] font-black uppercase tracking-tighter">Live</span>
+
+                                {/* Score + LIVE capsule */}
+                                <div className="flex flex-col items-center gap-1.5">
+                                    <span className="text-white font-black text-2xl tracking-tighter font-mono">{scoreDisplay}</span>
+                                    <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        <span className="text-emerald-400 text-[9px] font-black uppercase tracking-widest">Live</span>
+                                    </span>
+                                </div>
+
+                                {/* Away */}
+                                <div className="flex flex-col items-center gap-1 w-16">
+                                    {awayLogo
+                                        ? <img src={awayLogo} alt={awayName} className="w-8 h-8 object-contain" />
+                                        : <span className="text-white font-black text-xs uppercase">{awayName.slice(0, 3)}</span>
+                                    }
+                                    <span className="text-zinc-400 text-[9px] font-bold uppercase tracking-wide leading-none text-center line-clamp-1">{awayName}</span>
                                 </div>
                             </div>
 
-                            <div className="bg-black/40 rounded-lg p-4 mb-4 border border-emerald-500/20">
-                                <div className="flex items-center justify-center gap-6">
-                                    <div className="text-3xl font-black text-white font-mono tracking-tighter">
-                                        {/* INJECTED HOME SCORE */}
-                                        {scoreData.home_score}
-                                    </div>
-                                    <div className="h-8 w-[1px] bg-white/10"></div>
-                                    <div className="text-3xl font-black text-white font-mono tracking-tighter">
-                                        {/* INJECTED AWAY SCORE */}
-                                        {scoreData.away_score}
-                                    </div>
+                            {/* ── BODY: Fan layout (mirrored from ViewPendingGrid, 62% scale) ── */}
+                            <div
+                                className="relative bg-white/5 px-4 py-4 flex items-end flex-shrink-0"
+                                style={{ minHeight: '100px' }}
+                            >
+                                <div className="flex items-end" style={{ marginLeft: '0.5rem' }}>
+                                    {bets.slice(0, 4).map((bet, idx) => {
+                                        const slot = FAN_SLOTS[idx] || FAN_SLOTS[FAN_SLOTS.length - 1];
+                                        return (
+                                            <div
+                                                key={bet.id}
+                                                className="drop-shadow-xl"
+                                                style={{
+                                                    transform: `rotate(${slot.rotate}) translateY(${slot.translateY}) translateX(${slot.translateX})`,
+                                                    marginLeft: idx === 0 ? '0' : '-1.5rem',
+                                                    zIndex: idx + 1,
+                                                    position: 'relative',
+                                                    // Collapse layout footprint to scaled dimensions
+                                                    width: '4rem',
+                                                    height: '6.2rem',
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                <div style={{
+                                                    transform: 'scale(0.62)',
+                                                    transformOrigin: 'top left',
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    left: 0,
+                                                }}>
+                                                    <CardBase
+                                                        type={bet.card_type}
+                                                        label={getCardLabel(bet.card_type)}
+                                                        selection={formatBetSelection(bet)}
+                                                        status="active"
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
-                            <div className="flex justify-between items-center bg-black/40 rounded-lg p-4">
-                                <div>
-                                    <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Entry Stake</p>
-                                    <div className="flex items-center gap-1.5 text-yellow-500">
-                                        <Coins className="w-4 h-4" />
-                                        <p className="text-xl font-black">{bet.stake || 100}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Target Win</p>
-                                    <div className="flex items-center gap-1.5 justify-end text-emerald-500">
-                                        <Coins className="w-4 h-4" />
-                                        <p className="text-2xl font-black">+{bet.potential_reward}</p>
-                                    </div>
-                                </div>
+                            {/* ── FOOTER: Potential Reward ── */}
+                            <div className="flex-shrink-0 px-5 py-3 border-t border-white/5 flex items-center justify-between">
+                                <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Potential Reward</span>
+                                <span className="font-black text-xl" style={{ color: '#00e5ff' }}>+{totalReward}</span>
                             </div>
-
-                            {/* Share */}
-                            {bet.share_token && (
-                                <div className="mt-3 flex justify-end">
-                                    <ShareCardButton prediction={bet} variant="pre" />
-                                </div>
-                            )}
                         </div>
                     );
                 })}

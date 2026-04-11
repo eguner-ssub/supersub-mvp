@@ -104,16 +104,16 @@ const MatchHub = () => {
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide border transition-all active:scale-95 ${
                   isActive
                     ? isLivePill
-                      ? 'bg-red-600 border-red-500 text-white shadow-[0_0_10px_rgba(220,38,38,0.3)]'
+                      ? 'bg-emerald-500 border-emerald-400 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]'
                       : 'bg-white text-black border-white'
                     : 'bg-zinc-900 border-white/10 text-zinc-400'
                 }`}
               >
                 {isLivePill && isActive && <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />}
-                {isLivePill && !isActive && liveCount > 0 && <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
+                {isLivePill && !isActive && liveCount > 0 && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />}
                 {f}
                 {isLivePill && liveCount > 0 && (
-                  <span className={`text-[9px] font-black px-1 py-0.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-red-500/20 text-red-400'}`}>
+                  <span className={`text-[9px] font-black px-1 py-0.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-emerald-500/20 text-emerald-400'}`}>
                     {liveCount}
                   </span>
                 )}
@@ -156,8 +156,8 @@ const MatchHub = () => {
                   <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
                     {leagueName}
                   </span>
-                  <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border ${isMatchLive ? 'text-red-500 border-red-500/20 bg-red-500/10' : 'text-zinc-500 border-zinc-700 bg-zinc-800'}`}>
-                    {isMatchLive && <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
+                  <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border ${isMatchLive ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10' : 'text-zinc-500 border-zinc-700 bg-zinc-800'}`}>
+                    {isMatchLive && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />}
                     <span className="text-[9px] font-black">
                       {status === 'NS' && kickoff
                         ? new Date(kickoff).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

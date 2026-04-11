@@ -182,10 +182,10 @@ export default function Dashboard() {
         {/* A. WHITEBOARD (Bets) — center back wall */}
         <div
           onClick={handleWhiteboardClick}
-          className="absolute top-[30%] left-[18%] w-[64%] h-[22%] z-10 cursor-pointer active:scale-95 transition-transform"
+          className="absolute top-[28%] left-[23%] w-[57%] h-[20%] z-10 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-whiteboard"
         >
-          <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
             <TrendingUp className="w-3.5 h-3.5 text-white" />
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function Dashboard() {
         {/* B. TABLET — left side of bench */}
         <div
           onClick={handleTabletClick}
-          className="absolute top-[55%] left-[12%] w-[20%] h-[7%] z-10 cursor-pointer active:scale-95 transition-transform"
+          className="absolute top-[52%] left-[7%] w-[24%] h-[10%] z-10 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-tablet"
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
@@ -204,7 +204,7 @@ export default function Dashboard() {
         {/* C. ENERGY DRINKS — right side of bench */}
         <div
           onClick={handleDrinkClick}
-          className="absolute top-[55%] left-[62%] w-[23%] h-[7%] z-10 cursor-pointer active:scale-95 transition-transform"
+          className="absolute top-[54%] left-[68%] w-[28%] h-[10%] z-10 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-drinks"
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
@@ -220,7 +220,7 @@ export default function Dashboard() {
         <div
           onClick={handleBagClick}
           className={`
-            absolute top-[74%] left-[28%] w-[54%] h-[14%] z-20 cursor-pointer rounded-2xl
+            absolute top-[78%] left-[28%] w-[54%] h-[16%] z-20 cursor-pointer rounded-2xl
             active:scale-95 transition-transform duration-100
             ${(highlightBag || dailyRewardAvailable) ? 'animate-pulse ring-4 ring-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.3)]' : ''}
           `}
@@ -234,10 +234,10 @@ export default function Dashboard() {
         {/* E. CONES (Training) — floor left, ends at 87% */}
         <div
           onClick={() => navigate('/training')}
-          className="absolute top-[68%] left-[5%] w-[23%] h-[14%] z-30 cursor-pointer active:scale-95 transition-transform"
+          className="absolute top-[67%] left-[0%] w-[28%] h-[18%] z-30 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-training"
         >
-          <div className="absolute -top-4 right-2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+          <div className="absolute -top-4 left-3 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
             <Cone className="w-3.5 h-3.5 text-orange-400" />
           </div>
         </div>

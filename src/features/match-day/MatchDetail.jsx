@@ -1350,7 +1350,7 @@ const MatchDetail = () => {
       {shelfVisible && cardTypes.some(c => getCardCount(c.id) > 0) && (
         <div data-testid="card-shelf" className="fixed bottom-0 w-full z-50 h-48 pointer-events-none">
           <div className="absolute bottom-0 w-full h-24 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
-          <div className="absolute inset-0 flex justify-center items-end gap-2 pb-10 px-3 pointer-events-auto z-20">
+          <div className="absolute inset-0 flex justify-center items-end gap-2 pb-10 px-1 pointer-events-auto z-20">
             {cardTypes.map(card => {
               const count = getCardCount(card.id);
               const needsOdds = card.id !== 'c_supersub';

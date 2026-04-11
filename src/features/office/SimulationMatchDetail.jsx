@@ -32,47 +32,47 @@ const SIM_MATCH = {
 
 const LFC_FORMATION = '4-3-3';
 const LFC_XI = [
-  { player: { id: 1,  name: 'Alisson',    number: '1',  grid: '1:1' } },
+  { player: { id: 1, name: 'Alisson', number: '1', grid: '1:1' } },
   // Defensive line L→R: Robertson (LB), Matip (CB), Van Dijk (CB), Trent (RB)
-  { player: { id: 5,  name: 'Robertson',  number: '26', grid: '2:1' } },
-  { player: { id: 3,  name: 'Matip',      number: '32', grid: '2:2' } },
-  { player: { id: 4,  name: 'Van Dijk',   number: '4',  grid: '2:3' } },
-  { player: { id: 2,  name: 'Trent',      number: '66', grid: '2:4' } },
+  { player: { id: 5, name: 'Robertson', number: '26', grid: '2:1' } },
+  { player: { id: 3, name: 'Matip', number: '32', grid: '2:2' } },
+  { player: { id: 4, name: 'Van Dijk', number: '4', grid: '2:3' } },
+  { player: { id: 2, name: 'Trent', number: '66', grid: '2:4' } },
   // Midfield L→R: Henderson, Fabinho, Milner
-  { player: { id: 6,  name: 'Henderson',  number: '14', grid: '3:1' } },
-  { player: { id: 7,  name: 'Fabinho',    number: '3',  grid: '3:2' } },
-  { player: { id: 8,  name: 'Milner',     number: '7',  grid: '3:3' } },
+  { player: { id: 6, name: 'Henderson', number: '14', grid: '3:1' } },
+  { player: { id: 7, name: 'Fabinho', number: '3', grid: '3:2' } },
+  { player: { id: 8, name: 'Milner', number: '7', grid: '3:3' } },
   // Attack L→R: Mané, Origi, Shaqiri
-  { player: { id: 11, name: 'Mané',       number: '10', grid: '4:1' } },
-  { player: { id: 10, name: 'Origi',      number: '27', grid: '4:2' } },
-  { player: { id: 9,  name: 'Shaqiri',    number: '23', grid: '4:3' } },
+  { player: { id: 11, name: 'Mané', number: '10', grid: '4:1' } },
+  { player: { id: 10, name: 'Origi', number: '27', grid: '4:2' } },
+  { player: { id: 9, name: 'Shaqiri', number: '23', grid: '4:3' } },
 ];
 
 const BAR_FORMATION = '4-3-3';
 const BAR_XI = [
-  { player: { id: 20, name: 'Ter Stegen',    number: '1',  grid: '1:1' } },
+  { player: { id: 20, name: 'Ter Stegen', number: '1', grid: '1:1' } },
   { player: { id: 21, name: 'Sergi Roberto', number: '20', grid: '2:4' } },
-  { player: { id: 22, name: 'Piqué',         number: '3',  grid: '2:3' } },
-  { player: { id: 23, name: 'Lenglet',       number: '15', grid: '2:2' } },
-  { player: { id: 24, name: 'Jordi Alba',    number: '18', grid: '2:1' } },
-  { player: { id: 25, name: 'Vidal',         number: '22', grid: '3:3' } },
-  { player: { id: 26, name: 'Busquets',      number: '5',  grid: '3:2' } },
-  { player: { id: 27, name: 'Rakitić',       number: '4',  grid: '3:1' } },
-  { player: { id: 28, name: 'Messi',         number: '10', grid: '4:3' } },
-  { player: { id: 29, name: 'Suárez',        number: '9',  grid: '4:2' } },
-  { player: { id: 30, name: 'Coutinho',      number: '7',  grid: '4:1' } },
+  { player: { id: 22, name: 'Piqué', number: '3', grid: '2:3' } },
+  { player: { id: 23, name: 'Lenglet', number: '15', grid: '2:2' } },
+  { player: { id: 24, name: 'Jordi Alba', number: '18', grid: '2:1' } },
+  { player: { id: 25, name: 'Vidal', number: '22', grid: '3:3' } },
+  { player: { id: 26, name: 'Busquets', number: '5', grid: '3:2' } },
+  { player: { id: 27, name: 'Rakitić', number: '4', grid: '3:1' } },
+  { player: { id: 28, name: 'Messi', number: '10', grid: '4:3' } },
+  { player: { id: 29, name: 'Suárez', number: '9', grid: '4:2' } },
+  { player: { id: 30, name: 'Coutinho', number: '7', grid: '4:1' } },
 ];
 
 /* ─── Bench data ──────────────────────────────────────────────── */
 
 const SIM_BENCH = [
-  { player_id: 1001, player_name: 'S. Mignolet',  position: 'GK',    context: null },
-  { player_id: 1002, player_name: 'D. Lovren',    position: 'CB',    context: null },
-  { player_id: 1003, player_name: 'J. Gomez',     position: 'CB/RB', context: null },
-  { player_id: 1004, player_name: 'G. Wijnaldum', position: 'MF',    context: '32 starts in last 35 league games' },
-  { player_id: 1005, player_name: 'B. Woodburn',  position: 'MF',    context: null },
-  { player_id: 1006, player_name: 'R. Brewster',  position: 'FW',    context: null },
-  { player_id: 1007, player_name: 'D. Sturridge', position: 'FW',    context: '20 of 27 appearances from bench this season' },
+  { player_id: 1001, player_name: 'S. Mignolet', position: 'GK', context: null },
+  { player_id: 1002, player_name: 'D. Lovren', position: 'CB', context: null },
+  { player_id: 1003, player_name: 'J. Gomez', position: 'CB/RB', context: null },
+  { player_id: 1004, player_name: 'G. Wijnaldum', position: 'MF', context: '32 starts in last 35 league games' },
+  { player_id: 1005, player_name: 'B. Woodburn', position: 'MF', context: null },
+  { player_id: 1006, player_name: 'R. Brewster', position: 'FW', context: null },
+  { player_id: 1007, player_name: 'D. Sturridge', position: 'FW', context: '20 of 27 appearances from bench this season' },
 ];
 
 const SCORERS = [
@@ -88,9 +88,9 @@ const INJURED = [
 
 const CARD_TYPES = [
   { id: 'c_match_result', label: 'Match Result' },
-  { id: 'c_total_goals',  label: 'Total Goals' },
+  { id: 'c_total_goals', label: 'Total Goals' },
   { id: 'c_player_score', label: 'Player Score' },
-  { id: 'c_supersub',     label: 'Supersub' },
+  { id: 'c_supersub', label: 'Supersub' },
 ];
 
 const TABS = ['LINEUP', 'SUBS', 'EVENTS', 'STATS'];
@@ -183,31 +183,31 @@ const JosebaIntelBox = ({ message, isTappable, onTap }) => {
 /* ─── Component ───────────────────────────────────────────────── */
 
 const SimulationMatchDetail = ({ onComplete, onBack }) => {
-  const [step, setStep]             = useState(0);
+  const [step, setStep] = useState(0);
   const [activeCard, setActiveCard] = useState('c_match_result');
-  const [openSheet, setOpenSheet]   = useState(null);
-  const [activeTab, setActiveTab]   = useState('LINEUP');
+  const [openSheet, setOpenSheet] = useState(null);
+  const [activeTab, setActiveTab] = useState('LINEUP');
 
   // Staging + locked-in state (replaces pendingX vars)
-  const [simStaged, setSimStaged]     = useState(null); // { label, reward }
+  const [simStaged, setSimStaged] = useState(null); // { label, reward }
   const [showLockedIn, setShowLockedIn] = useState(false);
 
   // Settlement state
-  const [settling, setSettling]                 = useState(false);
-  const [settled, setSettled]                   = useState(false);
+  const [settling, setSettling] = useState(false);
+  const [settled, setSettled] = useState(false);
   const [settlementMinute, setSettlementMinute] = useState("0'");
-  const [settlementScore, setSettlementScore]   = useState({ home: 0, away: 0 });
-  const [goalPopup, setGoalPopup]               = useState(null);
-  const [showWinnerPopup, setShowWinnerPopup]   = useState(false);
+  const [settlementScore, setSettlementScore] = useState({ home: 0, away: 0 });
+  const [goalPopup, setGoalPopup] = useState(null);
+  const [showWinnerPopup, setShowWinnerPopup] = useState(false);
 
   /* Settlement animation — PayoffView style */
   useEffect(() => {
     if (!settling) return;
     const GOALS_TIMELINE = [
-      { delay: 600,  minute: "7'",  scorer: 'Origi',     score: { home: 1, away: 0 } },
+      { delay: 600, minute: "7'", scorer: 'Origi', score: { home: 1, away: 0 } },
       { delay: 2800, minute: "54'", scorer: 'Wijnaldum', score: { home: 2, away: 0 } },
       { delay: 5000, minute: "56'", scorer: 'Wijnaldum', score: { home: 3, away: 0 } },
-      { delay: 7200, minute: "79'", scorer: 'Origi',     score: { home: 4, away: 0 } },
+      { delay: 7200, minute: "79'", scorer: 'Origi', score: { home: 4, away: 0 } },
     ];
     const timeouts = [];
     GOALS_TIMELINE.forEach(({ delay, minute, scorer, score }) => {
@@ -250,9 +250,9 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
     if (cardId !== activeCard) return;
     switch (cardId) {
       case 'c_match_result': setOpenSheet('match_result'); break;
-      case 'c_total_goals':  setOpenSheet('total_goals');  break;
+      case 'c_total_goals': setOpenSheet('total_goals'); break;
       case 'c_player_score': setOpenSheet('player_score'); break;
-      case 'c_supersub':     setOpenSheet('supersub');     break;
+      case 'c_supersub': setOpenSheet('supersub'); break;
       default: break;
     }
   };
@@ -264,9 +264,9 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
     setOpenSheet(null);
     setShowLockedIn(true);
     if (sheet === 'match_result') { setStep(1); setActiveCard(null); }
-    else if (sheet === 'total_goals')  { setStep(3); setActiveCard(null); }
+    else if (sheet === 'total_goals') { setStep(3); setActiveCard(null); }
     else if (sheet === 'player_score') { setStep(5); setActiveCard(null); }
-    else if (sheet === 'supersub')     { setStep(7); setActiveCard(null); }
+    else if (sheet === 'supersub') { setStep(7); setActiveCard(null); }
   };
 
   /* Pre-compute formation positions */
@@ -281,7 +281,7 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
       {/* ── BACKGROUND — tunnel pre/post ──────────────────────── */}
       <div className="absolute inset-0 z-0">
         <img
-          src="/assets/bg-tunnel-prepost.webp"
+          src="/assets/bg-tunnel-live.webp"
           className="absolute inset-0 w-full h-full object-cover"
           alt=""
           aria-hidden="true"
@@ -519,21 +519,19 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
       {!openSheet && !simStaged && !settling && !settled && (
         <div data-testid="sim-card-shelf" className="fixed bottom-0 w-full z-[300] h-48">
           <div className="absolute bottom-0 w-full h-24 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10" />
-          <div className="absolute inset-0 flex justify-center items-end gap-1 pb-10 px-3 z-20">
+          <div className="absolute inset-0 flex justify-center items-end gap-1 pb-10 px-1 z-20">
             {CARD_TYPES.map(card => {
               const isActive = activeCard === card.id;
               return (
                 <button
                   key={card.id}
                   onClick={() => handleCardTap(card.id)}
-                  className={`relative flex flex-col items-center transition-opacity duration-300 ${
-                    isActive ? 'opacity-100' : 'opacity-40'
-                  }`}
+                  className={`relative flex flex-col items-center transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-40'
+                    }`}
                 >
                   {/* Consistent size for all tiles — only ring differs */}
-                  <div className={`w-[4.5rem] h-[6.75rem] relative rounded-xl ${
-                    isActive ? 'ring-2 ring-white/40 animate-pulse' : ''
-                  }`}>
+                  <div className={`w-[4.5rem] h-[6.75rem] relative rounded-xl ${isActive ? 'ring-2 ring-white/40 animate-pulse' : ''
+                    }`}>
                     <div className="absolute inset-0 flex items-center justify-center z-10">
                       <CardBase type={card.id} status="generic" variant="transparent" />
                     </div>
@@ -557,7 +555,7 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
           <div className="grid grid-cols-3 gap-4 w-full max-w-lg">
             {[
               { outcome: 'HOME_WIN', label: 'Home Win', logo: SIM_MATCH.home_logo, name: 'Liverpool Win' },
-              { outcome: 'DRAW',     label: 'Draw',     logo: null,                name: 'Draw' },
+              { outcome: 'DRAW', label: 'Draw', logo: null, name: 'Draw' },
               { outcome: 'AWAY_WIN', label: 'Away Win', logo: SIM_MATCH.away_logo, name: 'Barcelona Win' },
             ].map(opt => (
               <button
@@ -663,9 +661,8 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                   <button
                     key={player.player_id}
                     onClick={() => setSimStaged({ label: player.player_name, reward: SIM_REWARDS.SUPERSUB_SPECIFIC })}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all active:scale-95 ${
-                      hi ? 'bg-cyan-500/5 border-cyan-500/20 hover:bg-cyan-500/15' : 'bg-white/5 border-transparent hover:bg-emerald-500/20 hover:border-emerald-500/50'
-                    }`}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all active:scale-95 ${hi ? 'bg-cyan-500/5 border-cyan-500/20 hover:bg-cyan-500/15' : 'bg-white/5 border-transparent hover:bg-emerald-500/20 hover:border-emerald-500/50'
+                      }`}
                   >
                     <div className="text-left">
                       <span className="text-white font-bold text-sm block">{player.player_name}</span>
