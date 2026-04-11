@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, X, Trophy } from 'lucide-react';
+import { ArrowLeft, X, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
 import CardBase from '../../shared/ui/CardBase';
 import {
   PlayerNode,
@@ -33,16 +33,19 @@ const SIM_MATCH = {
 const LFC_FORMATION = '4-3-3';
 const LFC_XI = [
   { player: { id: 1,  name: 'Alisson',    number: '1',  grid: '1:1' } },
-  { player: { id: 2,  name: 'Trent',      number: '66', grid: '2:1' } },
+  // Defensive line L→R: Robertson (LB), Matip (CB), Van Dijk (CB), Trent (RB)
+  { player: { id: 5,  name: 'Robertson',  number: '26', grid: '2:1' } },
   { player: { id: 3,  name: 'Matip',      number: '32', grid: '2:2' } },
   { player: { id: 4,  name: 'Van Dijk',   number: '4',  grid: '2:3' } },
-  { player: { id: 5,  name: 'Robertson',  number: '26', grid: '2:4' } },
-  { player: { id: 6,  name: 'Henderson',  number: '14', grid: '3:3' } },
+  { player: { id: 2,  name: 'Trent',      number: '66', grid: '2:4' } },
+  // Midfield L→R: Henderson, Fabinho, Milner
+  { player: { id: 6,  name: 'Henderson',  number: '14', grid: '3:1' } },
   { player: { id: 7,  name: 'Fabinho',    number: '3',  grid: '3:2' } },
-  { player: { id: 8,  name: 'Milner',     number: '7',  grid: '3:1' } },
-  { player: { id: 9,  name: 'Shaqiri',    number: '23', grid: '4:1' } },
+  { player: { id: 8,  name: 'Milner',     number: '7',  grid: '3:3' } },
+  // Attack L→R: Mané, Origi, Shaqiri
+  { player: { id: 11, name: 'Mané',       number: '10', grid: '4:1' } },
   { player: { id: 10, name: 'Origi',      number: '27', grid: '4:2' } },
-  { player: { id: 11, name: 'Mané',       number: '10', grid: '4:3' } },
+  { player: { id: 9,  name: 'Shaqiri',    number: '23', grid: '4:3' } },
 ];
 
 const BAR_FORMATION = '4-3-3';
@@ -129,38 +132,53 @@ const CONTENT_PANEL = {
   minHeight: '100%',
 };
 
-/* ─── Inline Joseba intel box — matches MatchDetail AssistantDialogue ── */
-const JosebaIntelBox = ({ message, isTappable, onTap }) => (
-  <div
-    onClick={isTappable ? onTap : undefined}
-    style={{
-      display: 'flex', alignItems: 'flex-start', gap: '10px',
-      margin: '0 12px 12px', padding: '10px 14px',
-      background: '#f5f0e8', borderRadius: '14px',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
-      cursor: isTappable ? 'pointer' : 'default',
-    }}
-  >
-    <img
-      src="/assets/assistant-head.png"
-      alt="Joseba"
-      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)' }}
-    />
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
-        Joseba · Analyst
-      </span>
-      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
-        {message}
-      </p>
-      {isTappable && (
-        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '9px', color: '#888', marginTop: 6, textTransform: 'uppercase', letterSpacing: '1px' }}>
-          Tap to continue ›
-        </p>
+/* ─── Inline Joseba intel box — compact collapsible ── */
+const JosebaIntelBox = ({ message, isTappable, onTap }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: '8px',
+        margin: '0 12px 10px', padding: '10px 12px',
+        background: '#f5f0e8', borderRadius: '14px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
+        cursor: isTappable ? 'pointer' : 'default',
+        maxHeight: '20vh',
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+      onClick={isTappable ? onTap : () => setExpanded(e => !e)}
+    >
+      <img
+        src="/assets/assistant-head.png"
+        alt="Joseba"
+        style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)' }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          Joseba · Analyst
+        </span>
+        <div style={{ maxHeight: expanded ? 'none' : '60px', overflow: 'hidden' }}>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '2px 0 0', lineHeight: 1.35 }}>
+            {message}
+          </p>
+          {isTappable && (
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '9px', color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Tap to continue ›
+            </p>
+          )}
+        </div>
+      </div>
+      {!isTappable && (
+        <div style={{ position: 'absolute', bottom: 6, right: 8, color: '#888' }}>
+          {expanded
+            ? <ChevronUp style={{ width: 14, height: 14 }} />
+            : <ChevronDown style={{ width: 14, height: 14 }} />}
+        </div>
       )}
     </div>
-  </div>
-);
+  );
+};
 
 /* ─── Component ───────────────────────────────────────────────── */
 
@@ -370,7 +388,7 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
 
       {/* ── TAB CONTENT ───────────────────────────────────────── */}
       <div
-        className="absolute w-full z-30 overflow-y-auto scrollbar-hide"
+        className="absolute w-full z-30 overflow-y-auto scrollbar-hide pb-36"
         style={{ top: '196px', bottom: '192px', WebkitOverflowScrolling: 'touch' }}
       >
         <div style={CONTENT_PANEL}>
@@ -508,24 +526,21 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                 <button
                   key={card.id}
                   onClick={() => handleCardTap(card.id)}
-                  className={`relative flex flex-col items-center transition-all duration-300 ${
-                    isActive ? 'translate-y-[-20px]' : 'opacity-20'
+                  className={`relative flex flex-col items-center transition-opacity duration-300 ${
+                    isActive ? 'opacity-100' : 'opacity-40'
                   }`}
                 >
-                  <div className={`w-[4.5rem] h-[6.75rem] relative ${
-                    isActive
-                      ? 'drop-shadow-[0_8px_24px_rgba(234,179,8,0.55)] ring-2 ring-yellow-400/60 rounded-xl animate-pulse'
-                      : ''
+                  {/* Consistent size for all tiles — only ring differs */}
+                  <div className={`w-[4.5rem] h-[6.75rem] relative rounded-xl ${
+                    isActive ? 'ring-2 ring-white/40 animate-pulse' : ''
                   }`}>
                     <div className="absolute inset-0 flex items-center justify-center z-10">
-                      <CardBase type={card.id} label={card.label} status="generic" variant="transparent" />
+                      <CardBase type={card.id} status="generic" variant="transparent" />
                     </div>
                   </div>
-                  {isActive && (
-                    <div className="mt-1.5 px-2 py-0.5 bg-yellow-400/20 border border-yellow-400/50 rounded-full">
-                      <span className="text-yellow-300 text-[8px] font-black uppercase tracking-widest">{card.label}</span>
-                    </div>
-                  )}
+                  <span className="mt-1 text-[8px] font-black uppercase tracking-widest text-white/50">
+                    {card.label}
+                  </span>
                 </button>
               );
             })}

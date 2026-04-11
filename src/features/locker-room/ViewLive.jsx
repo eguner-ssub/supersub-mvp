@@ -80,10 +80,10 @@ const ViewLive = () => {
         <div className="h-full overflow-y-auto scrollbar-hide p-6 pb-32">
             {/* Status pills — supplementary navigation */}
             {pendingBets.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="flex px-6 pt-2 pb-0">
                     <button
                         onClick={() => navigate('/inventory?tab=pending')}
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 border border-white/10 text-[10px] font-black uppercase tracking-wider text-zinc-400 hover:text-white transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-800 border border-white/10 text-[10px] font-black uppercase tracking-wider text-zinc-400"
                     >
                         <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
                         {pendingBets.length} PENDING

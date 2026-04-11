@@ -1,5 +1,5 @@
-import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 /**
  * JosebaBubble — reusable Joseba analyst message overlay.
@@ -65,42 +65,58 @@ const JosebaBubble = ({
   }
 
   /* ── compact (default) ─────────────────────────────────────── */
-  return (
-    <div
-      onClick={onAdvance}
-      className="fixed bottom-0 left-0 right-0 z-[400] cursor-pointer select-none animate-in slide-in-from-bottom-4 duration-300"
-      style={{
-        ...safeAreaStyle,
-        padding: `16px 16px calc(env(safe-area-inset-bottom, 0px) + 20px)`,
-      }}
-    >
-      <div className="flex items-start gap-3 relative">
-        {/* Avatar */}
-        <img
-          src={avatarSrc}
-          alt={label}
-          className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-white/10"
-          onError={(e) => { e.target.src = '/assets/assistant-head.png'; }}
-        />
+  const CompactBubble = () => {
+    const [expanded, setExpanded] = useState(false);
+    return (
+      <div
+        onClick={onAdvance}
+        className="fixed bottom-0 left-0 right-0 z-[400] cursor-pointer select-none animate-in slide-in-from-bottom-4 duration-300"
+        style={{
+          ...safeAreaStyle,
+          padding: `14px 16px calc(env(safe-area-inset-bottom, 0px) + 20px)`,
+        }}
+      >
+        <div className="flex items-start gap-3">
+          {/* Avatar — compact w-8 h-8 */}
+          <img
+            src={avatarSrc}
+            alt={label}
+            className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-white/10"
+            onError={(e) => { e.target.src = '/assets/assistant-head.png'; }}
+          />
 
-        {/* Text */}
-        <div className="flex-1 min-w-0 pr-12">
-          <span className="block text-[8px] font-black uppercase tracking-widest text-emerald-400 mb-1">
-            {label}
-          </span>
-          <p className="text-[13px] font-bold text-white/90 leading-relaxed">
-            {message}
-          </p>
+          {/* Text */}
+          <div className="flex-1 min-w-0">
+            <span className="block text-[8px] font-black uppercase tracking-widest text-emerald-400 mb-1">
+              {label}
+            </span>
+            <p className={`text-xs font-bold text-white/90 leading-relaxed ${
+              expanded ? '' : 'line-clamp-4'
+            }`}>
+              {message}
+            </p>
+          </div>
+
+          {/* Expand toggle */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(x => !x); }}
+            className="text-white/40 p-1 flex-shrink-0 mt-0.5"
+          >
+            {expanded
+              ? <ChevronUp className="w-3.5 h-3.5" />
+              : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
         </div>
 
-        {/* Tap indicator */}
-        <div className="absolute bottom-0 right-0 flex items-center gap-1">
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/30">tap</span>
-          <ChevronRight className="w-3.5 h-3.5 text-white/30" />
+        {/* Tap indicator — white/70 for visibility */}
+        <div className="flex items-center justify-end gap-1 pt-2">
+          <span className="text-white/70 text-xs font-black uppercase tracking-widest">TAP TO CONTINUE</span>
+          <ChevronRight className="w-4 h-4 text-white/70 animate-pulse" />
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+  return <CompactBubble />;
 };
 
 export default JosebaBubble;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ClipboardList, Tablet, Trophy } from 'lucide-react';
 import MobileLayout from '../../shared/ui/MobileLayout';
+import { usePredictions } from '../../shared/hooks/usePredictions';
 import ViewPendingGrid from './ViewPendingGrid';
 import ViewLive from './ViewLive';
 import ViewTrophyCabinet from './ViewTrophyCabinet';
@@ -12,10 +13,14 @@ const LockerRoom = () => {
     const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState('pending');
 
+    const { predictions: pendingBets } = usePredictions('PENDING');
+    const { predictions: liveBets }    = usePredictions('LIVE');
+
     // Read tab from query params on mount
     useEffect(() => {
         const tabParam = searchParams.get('tab');
         if (tabParam && ['pending', 'live', 'cabinet'].includes(tabParam)) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setActiveTab(tabParam);
         }
     }, [searchParams]);
@@ -35,7 +40,7 @@ const LockerRoom = () => {
     };
 
     return (
-        <MobileLayout bgImage="/bg-locker-room.webp">
+        <MobileLayout>
             <div className="h-screen w-full flex flex-col bg-[#0D0D0D] overflow-hidden">
                 {/* Header - Fixed */}
                 <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-black/60 backdrop-blur-md border-b border-white/10">
@@ -51,36 +56,54 @@ const LockerRoom = () => {
                 </div>
 
                 {/* Active View - Scrollable Content */}
-                <div className="flex-1 overflow-y-auto scrollbar-hide pb-32 pt-20 bg-[#0D0D0D]">
+                <div className={`flex-1 overflow-y-auto scrollbar-hide pb-32 pt-20 ${
+                    activeTab === 'cabinet' ? 'bg-transparent' : 'bg-[#0D0D0D]'
+                }`}>
                     <div className="relative z-10">
                         <ActiveComponent />
                     </div>
                 </div>
 
                 {/* Hotspot Navigation - Fixed */}
-                <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-t border-white/10 p-4">
-                    <div className="flex justify-around items-center max-w-md mx-auto">
+                <div
+                    className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-t border-white/10"
+                    style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+                >
+                    <div className="flex justify-around items-center max-w-md mx-auto py-4">
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.id;
+
+                            const badgeCount =
+                                tab.id === 'pending' ? pendingBets.length :
+                                tab.id === 'live'    ? liveBets.length :
+                                0;
 
                             return (
                                 <button
                                     key={tab.id}
                                     onClick={() => handleTabChange(tab.id)}
-                                    className={`flex flex-col items-center gap-1 transition-all ${isActive
-                                        ? 'scale-110'
-                                        : 'opacity-60 hover:opacity-100 hover:scale-105'
-                                        }`}
+                                    className={`flex flex-col items-center gap-1 transition-all relative ${
+                                        isActive ? 'scale-110' : 'opacity-60 hover:opacity-100 hover:scale-105'
+                                    }`}
                                 >
-                                    <div className={`p-3 rounded-xl transition-all ${isActive
-                                        ? 'bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                                        : 'bg-gray-700 hover:bg-gray-600'
-                                        }`}>
+                                    <div className={`relative p-3 rounded-xl transition-all ${
+                                        isActive
+                                            ? 'bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                                            : 'bg-gray-700 hover:bg-gray-600'
+                                    }`}>
                                         <Icon className={`w-6 h-6 ${isActive ? 'text-white' : 'text-gray-300'}`} />
+                                        {badgeCount > 0 && (
+                                            <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center px-1">
+                                                <span className="text-[9px] font-black text-white leading-none">
+                                                    {badgeCount > 99 ? '99+' : badgeCount}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
-                                    <span className={`text-[10px] font-bold uppercase tracking-wide ${isActive ? 'text-emerald-400' : 'text-gray-400'
-                                        }`}>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wide ${
+                                        isActive ? 'text-emerald-400' : 'text-gray-400'
+                                    }`}>
                                         {tab.label}
                                     </span>
                                 </button>

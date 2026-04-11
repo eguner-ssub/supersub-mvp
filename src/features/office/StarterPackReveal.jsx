@@ -3,10 +3,10 @@ import CardBase from '../../shared/ui/CardBase';
 import JosebaBubble from '../../shared/ui/JosebaBubble';
 
 const STARTER_CARDS = [
-  { id: 'c_match_result', label: 'Match Result' },
-  { id: 'c_total_goals',  label: 'Total Goals' },
-  { id: 'c_player_score', label: 'Player Score' },
-  { id: 'c_supersub',     label: 'Super Sub' },
+  { id: 'c_match_result', label: 'MATCH RESULT' },
+  { id: 'c_total_goals',  label: 'TOTAL GOALS'  },
+  { id: 'c_player_score', label: 'PLAYER SCORE' },
+  { id: 'c_supersub',     label: 'SUPERSUB'     },
 ];
 
 const JOSEBA_MESSAGE =
@@ -19,7 +19,7 @@ const JOSEBA_MESSAGE =
  */
 const StarterPackReveal = ({ onComplete }) => {
   return (
-    <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[200] bg-black flex flex-col overflow-hidden">
 
       {/* Header */}
       <div className="flex-none pt-14 pb-4 px-4 text-center">
@@ -38,23 +38,26 @@ const StarterPackReveal = ({ onComplete }) => {
           {STARTER_CARDS.map((card, i) => (
             <div
               key={card.id}
-              className="relative animate-in fade-in zoom-in-95 duration-300"
+              className="flex flex-col items-center gap-2 animate-in fade-in zoom-in-95 duration-300"
               style={{ animationDelay: `${i * 100}ms`, animationFillMode: 'backwards' }}
             >
-              <div className="opacity-100 drop-shadow-2xl">
-                <CardBase
-                  type={card.id}
-                  label={card.label}
-                  status="generic"
-                  variant="transparent"
-                />
-              </div>
-              <div className="absolute top-3 right-3 z-30">
-                <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-1">
-                  <span>x</span>
-                  <span className="text-sm">3</span>
+              {/* Card with ×3 badge */}
+              <div className="relative w-fit">
+                <div className="drop-shadow-2xl">
+                  <CardBase
+                    type={card.id}
+                    status="generic"
+                  />
+                </div>
+                <div className="absolute top-2 right-2 bg-yellow-500 text-black text-xs font-black rounded-full w-7 h-7 flex items-center justify-center shadow-lg z-30">
+                  ×3
                 </div>
               </div>
+
+              {/* Label — identical style for all four cards */}
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 text-center">
+                {card.label}
+              </p>
             </div>
           ))}
         </div>

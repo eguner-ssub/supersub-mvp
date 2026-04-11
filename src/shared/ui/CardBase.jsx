@@ -45,6 +45,7 @@ export default function CardBase({
 }) {
   // ---- Asset Resolution ----
   const bgSrc = BASE_MAP[type] || BASE_MAP.c_supersub;
+  if (!BASE_MAP[type]) console.warn(`[CardBase] No BASE_MAP entry for type: "${type}"`);
   const iconSrc = ICON_MAP[type] || ICON_MAP.c_supersub;
   const title = LABEL_MAP[type] || 'SUPERSUB';
   const footerColor = FOOTER_COLOR_MAP[type] || 'bg-slate-600';
@@ -157,17 +158,22 @@ export default function CardBase({
                 src={iconSrc}
                 alt="icon"
                 className="w-[40%] h-auto object-contain"
-                style={{ mixBlendMode: 'multiply', opacity: 0.3 }}
+                style={{ mixBlendMode: 'multiply', opacity: 0.15 }}
                 draggable={false}
               />
               {/* Prediction / Selection — large, prominent */}
               {displaySelection && (
                 <span
-                  className="mt-1 text-[11px] leading-tight uppercase text-center break-words max-w-full"
+                  className="mt-1 text-[9px] leading-tight uppercase text-center max-w-full"
                   style={{
                     fontFamily: "'Inter', 'Roboto Condensed', sans-serif",
-                    fontWeight: 900,
+                    fontWeight: 700,
                     color: '#121212',
+                    opacity: 0.85,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
                   }}
                 >
                   {displaySelection}

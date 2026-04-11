@@ -91,7 +91,7 @@ const ViewPendingGrid = () => {
     }
 
     return (
-        <div className="min-h-full bg-[#0D0D0D] px-5 py-4 space-y-8">
+        <div className="min-h-full bg-[#0D0D0D] px-5 py-6 space-y-16 overflow-visible">
             {matchGroups.map((group) => (
                 <div key={group.match_id}>
                     {/* Match label row */}
@@ -107,8 +107,8 @@ const ViewPendingGrid = () => {
 
                     {/* Fan panel */}
                     <div
-                        className="relative rounded-xl bg-white/5 px-4 py-6 flex items-end"
-                        style={{ minHeight: '11rem' }}
+                        className="relative rounded-xl bg-white/5 px-4 py-6 flex items-end mb-6"
+                        style={{ minHeight: '160px' }}
                     >
                         {/* Cards in fan arrangement */}
                         <div className="flex items-end" style={{ marginLeft: '0.5rem' }}>
