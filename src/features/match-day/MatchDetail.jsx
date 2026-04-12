@@ -1653,7 +1653,7 @@ const MatchDetail = () => {
           Only shown when userProfile.is_age_verified is true.
           Auto-dismisses after 8 seconds or on manual X tap.
       ─────────────────────────────────────────────────────────────────────── */}
-      {affiliateSheetData && userProfile?.is_age_verified && (
+      {false && affiliateSheetData && userProfile?.is_age_verified && (
         <PostPredictionSheet
           {...affiliateSheetData}
           onDismiss={() => setAffiliateSheetData(null)}
