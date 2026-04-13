@@ -1,3 +1,5 @@
+import { getLeagueById } from '../config/coverage';
+
 /**
  * normalizeMatch(raw)
  *
@@ -11,8 +13,21 @@
 export function normalizeMatch(raw) {
     if (!raw) return null;
 
-    // Already in nested fixture format — pass through unchanged
-    if (raw.fixture) return raw;
+    // Already in nested fixture format — patch league if missing then pass through
+    if (raw.fixture) {
+        if (!raw.league?.name && raw.league_id) {
+            const leagueInfo = getLeagueById(raw.league_id);
+            return {
+                ...raw,
+                league: {
+                    id: raw.league_id,
+                    name: leagueInfo?.name || raw.league_name || '',
+                    logo: raw.league?.logo || null,
+                },
+            };
+        }
+        return raw;
+    }
 
     // ── Flat Supabase row → nested shape ──────────────────────────────────
     return {
@@ -48,7 +63,7 @@ export function normalizeMatch(raw) {
 
         league: {
             id: raw.league_id ?? null,
-            name: raw.league_name || '',
+            name: raw.league_name || getLeagueById(raw.league_id)?.name || '',
             logo: raw.league_logo || null,
         },
     };

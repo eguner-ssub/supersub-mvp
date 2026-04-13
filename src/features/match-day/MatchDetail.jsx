@@ -858,6 +858,7 @@ const MatchDetail = () => {
 
   const [match, setMatch] = useState(null);
   const [odds, setOdds] = useState(null);
+  const [oddsLoading, setOddsLoading] = useState(true);
   const [activeBookie, setActiveBookie] = useState(null);
   const [matchPhase, setMatchPhase] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -914,10 +915,8 @@ const MatchDetail = () => {
             fetch(`/api/intel?match_id=${fixtureId}`)
               .then(r => r.ok ? r.json() : null)
               .then(d => {
-                // Only use intel analysis when SportMonks predictions were actually synced.
-                // If sportmonksAvailable=false, all 4 sections would show "unavailable" —
-                // the odds fallback view is more useful in that case.
-                if (d?.available && d?.analysis && d?.sportmonksAvailable) {
+                console.log('[MatchDetail] Intel response:', d);
+                if (d?.available && d?.analysis) {
                   setAnalysisData(d.analysis);
                 }
               })
@@ -935,12 +934,16 @@ const MatchDetail = () => {
           );
         }
 
+        if (phase === 'POST') {
+          setOddsLoading(false);
+        }
+
         if (phase !== 'POST') {
           secondaryFetches.push(
             fetch(`/api/odds?fixture=${fixtureId}`)
               .then(r => r.ok ? r.json() : null)
               .then(d => {
-                if (!d) { setOdds(null); setActiveBookie(null); return; }
+                if (!d) { setOdds(null); setActiveBookie(null); setOddsLoading(false); return; }
                 const mr = d.match_result || {};
                 const tg = d.total_goals || {};
                 setOdds({
@@ -952,8 +955,9 @@ const MatchDetail = () => {
                   goalscorers: d.goalscorers || [],
                 });
                 setActiveBookie(null);
+                setOddsLoading(false);
               })
-              .catch(e => { console.error('[MatchDetail] Odds fetch error:', e); setOdds(null); setActiveBookie(null); })
+              .catch(e => { console.error('[MatchDetail] Odds fetch error:', e); setOdds(null); setActiveBookie(null); setOddsLoading(false); })
           );
         }
 
@@ -1098,35 +1102,21 @@ const MatchDetail = () => {
   return (
     <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
       <div className="absolute inset-0 z-0">
-        {matchPhase === 'LIVE' && (
-          <img
-            src="/assets/bg-tunnel-live.webp"
-            className="absolute inset-0 w-full h-full object-cover"
-            alt="Live Match Tunnel"
-          />
-        )}
-        {(matchPhase === 'PRE' || matchPhase === 'POST') && (
-          <img
-            src="/assets/bg-tunnel-prepost.webp"
-            className="absolute inset-0 w-full h-full object-cover"
-            alt="Pre/Post Match Tunnel"
-          />
-        )}
+        <img src="/assets/bg-tunnel-live.webp" className="absolute inset-0 w-full h-full object-cover" alt="Match Tunnel" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
       </div>
 
       {match && (
         <div className="absolute top-0 w-full z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
           {/* Row 1: Back + League + Points */}
-          <div className="flex items-center justify-between px-4 pt-10 pb-2 gap-3">
+          <div className="flex items-center justify-between px-4 pt-6 pb-2 gap-3">
             <button onClick={() => navigate('/match-hub')} className="w-9 h-9 flex-shrink-0 bg-white/10 border border-white/20 rounded-full flex items-center justify-center text-white active:scale-95">
               <ArrowLeft className="w-4 h-4" />
             </button>
-            {match.league?.name && (
-              <span className="flex-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-400 truncate">
-                {match.league.name}
-              </span>
-            )}
+            {match.league?.name
+              ? <span className="flex-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-400 truncate">{match.league.name}</span>
+              : <span className="flex-1" />
+            }
             <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
               <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
               <span className="text-white font-bold text-xs font-mono">{userProfile.points ?? 0}</span>
@@ -1138,7 +1128,7 @@ const MatchDetail = () => {
             {/* Home */}
             <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
               <img src={match.teams.home.logo} className="w-9 h-9 object-contain" alt="Home" />
-              <span className="text-[10px] font-bold text-white uppercase truncate w-full text-center">{match.teams.home.name}</span>
+              <span className="text-[9px] font-bold text-white uppercase truncate w-full text-center">{match.teams.home.name}</span>
             </div>
 
             {/* Score + status */}
@@ -1148,7 +1138,7 @@ const MatchDetail = () => {
                   ? 'text-[#39ff14]' : 'text-zinc-400'
               }`}>
                 {match.fixture.status.short === 'NS'
-                  ? new Date(match.fixture.date).toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()
+                  ? `${new Date(match.fixture.date).toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()} · ${new Date(match.fixture.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`
                   : (['INPLAY_1ST_HALF','INPLAY_2ND_HALF','INPLAY_ET','INPLAY_ET_SECOND_HALF','INPLAY_PENALTIES'].includes(match.fixture.status.short) && match.fixture.status.elapsed)
                     ? `${match.fixture.status.elapsed}'`
                     : ({ INPLAY_1ST_HALF: '1st Half', HT: 'HT', INPLAY_2ND_HALF: '2nd Half', INPLAY_ET: 'ET', INPLAY_ET_SECOND_HALF: 'ET', EXTRA_TIME_BREAK: 'BT', INPLAY_PENALTIES: 'Pens', BREAK: 'BT', FT: 'FT', AET: 'AET', FT_PEN: 'FT-P', POSTPONED: 'PST', CANCELLED: 'CANC', ABANDONED: 'ABD', AWARDED: 'AWD', WO: 'WO' }[match.fixture.status.short] ?? match.fixture.status.short)
@@ -1162,7 +1152,7 @@ const MatchDetail = () => {
             {/* Away */}
             <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
               <img src={match.teams.away.logo} className="w-9 h-9 object-contain" alt="Away" />
-              <span className="text-[10px] font-bold text-white uppercase truncate w-full text-center">{match.teams.away.name}</span>
+              <span className="text-[9px] font-bold text-white uppercase truncate w-full text-center">{match.teams.away.name}</span>
             </div>
           </div>
         </div>
@@ -1453,15 +1443,15 @@ const MatchDetail = () => {
             {cardTypes.map(card => {
               const count = getCardCount(card.id);
               const needsOdds = card.id !== 'c_supersub';
-              const oddsDisabled = needsOdds && !odds;
+              const oddsDisabled = needsOdds && !oddsLoading && !odds;
               const inventoryDisabled = count === 0;
-              const isDisabled = inventoryDisabled || oddsDisabled;
+              const tapDisabled = inventoryDisabled || oddsDisabled || (needsOdds && oddsLoading);
               return (
                 <button
                   key={card.id}
                   data-testid={`card-${card.id}`}
                   onClick={() => {
-                    if (isDisabled) return;
+                    if (tapDisabled) return;
                     if (card.id === 'c_supersub') {
                       setActiveTab('SUBS');
                       return;
@@ -1469,14 +1459,16 @@ const MatchDetail = () => {
                     setSelectedCard(card.id);
                     setFlowState('selection');
                   }}
-                  disabled={isDisabled}
+                  disabled={tapDisabled}
                   className={`relative transition-all duration-300 ${selectedCard === card.id
                     ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
                     : inventoryDisabled
                       ? 'opacity-40 grayscale'
                       : oddsDisabled
                         ? 'opacity-50 saturate-50 cursor-not-allowed'
-                        : 'hover:translate-y-[-8px]'
+                        : (needsOdds && oddsLoading)
+                          ? 'opacity-70 cursor-wait'
+                          : 'hover:translate-y-[-8px]'
                     }`}
                 >
                   <div className="w-[5rem] h-[7.5rem] relative">
