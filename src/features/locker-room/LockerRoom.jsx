@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ClipboardList, Tablet, Trophy } from 'lucide-react';
+import { ClipboardList, Tablet, Trophy, ArrowLeft } from 'lucide-react';
 import MobileLayout from '../../shared/ui/MobileLayout';
 import { usePredictions } from '../../shared/hooks/usePredictions';
 import ViewPendingGrid from './ViewPendingGrid';
@@ -42,8 +42,23 @@ const LockerRoom = () => {
     return (
         <MobileLayout>
             <div className="h-screen w-full flex flex-col bg-[#0D0D0D] overflow-hidden">
+                {/* Fixed top header */}
+                <div className="fixed top-0 left-0 right-0 z-50 h-14 bg-black/80 backdrop-blur-md border-b border-white/10 flex items-center px-4">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="w-9 h-9 flex-shrink-0 bg-white/10 border border-white/20 rounded-full flex items-center justify-center text-white active:scale-95"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <span className="flex-1 text-center text-[11px] font-black uppercase tracking-widest text-white">
+                        {activeTabData.label}
+                    </span>
+                    {/* Spacer to balance the back button and keep label truly centred */}
+                    <div className="w-9 h-9 flex-shrink-0" />
+                </div>
+
                 {/* Active View - Scrollable Content */}
-                <div className={`flex-1 overflow-y-auto scrollbar-hide pb-32 pt-0 ${
+                <div className={`flex-1 overflow-y-auto scrollbar-hide pb-32 pt-14 ${
                     activeTab === 'cabinet' ? 'bg-transparent' : 'bg-[#0D0D0D]'
                 }`}>
                     <div className="relative z-10">

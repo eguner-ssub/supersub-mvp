@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Loader2, Trophy, Clock, X as XIcon } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import AffiliateDisclaimer from '../shared/ui/AffiliateDisclaimer';
@@ -83,9 +83,12 @@ const PublicShareView = () => {
     );
   }
 
+  const navigate = useNavigate();
   const status = prediction.settled_status || prediction.status || 'PENDING';
   const isWon = status === 'WON';
   const isLost = status === 'LOST';
+  const isPending = prediction.status === 'PENDING' || prediction.status === 'LIVE';
+  const matchId = prediction.match_id;
   const cardConf = CARD_CONFIG[prediction.card_type] || CARD_CONFIG.c_supersub;
   const selectionLabel = prediction.selection_label || prediction.selection || 'Prediction';
   const matchName = prediction.match_title || prediction.team_name || '';
@@ -164,19 +167,23 @@ const PublicShareView = () => {
 
       {/* CTA */}
       <div className="w-full max-w-sm mt-6 space-y-3">
-        <Link
-          to="/intro"
-          className="block w-full py-4 bg-cyan-500 text-black font-black uppercase text-sm tracking-widest rounded-2xl text-center hover:bg-cyan-400 transition-colors"
-        >
-          Make your own call — play free →
-        </Link>
+        {isPending && matchId && (
+          <button
+            onClick={() => navigate(`/match/${matchId}`)}
+            className="w-full py-4 bg-emerald-500 text-black font-black uppercase tracking-widest rounded-xl"
+          >
+            Make your own call →
+          </button>
+        )}
 
-        <Link
-          to="/login"
-          className="block w-full py-3 text-center text-zinc-500 text-xs font-bold uppercase tracking-widest hover:text-white transition-colors"
-        >
-          Already playing? Sign in →
-        </Link>
+        {isWon && (
+          <button
+            onClick={() => navigate('/')}
+            className="w-full py-4 bg-emerald-500 text-black font-black uppercase tracking-widest rounded-xl"
+          >
+            Play free at supersub.mobi →
+          </button>
+        )}
       </div>
 
       {/* Disclaimer */}
