@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight, Loader2, Star } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Dumbbell, Loader2, Star } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 
 const FILTERS = ['All', 'Live', 'Upcoming', 'Finished'];
@@ -129,6 +129,20 @@ const MatchHub = () => {
           <div className="flex justify-center py-20">
             <Loader2 className="animate-spin text-emerald-500 w-8 h-8" />
           </div>
+        ) : matches.length === 0 ? (
+          <div className="bg-zinc-900 border border-white/10 rounded-xl p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Dumbbell className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+              <p className="text-white font-black">No matches today</p>
+            </div>
+            <p className="text-zinc-400 text-sm mb-4">Train now to stock up your deck.</p>
+            <button
+              onClick={() => navigate('/training')}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black rounded-xl text-sm tracking-widest uppercase transition-all"
+            >
+              TRAIN NOW →
+            </button>
+          </div>
         ) : displayedMatches.length > 0 ? (
           displayedMatches.map((match) => {
             const status = match.status || 'NS';
@@ -178,7 +192,7 @@ const MatchHub = () => {
 
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex flex-col items-center flex-[1.2] min-w-0">
-                    {homeLogo && <img src={homeLogo} className="w-10 h-10 object-contain mb-1" alt="home" />}
+                    {homeLogo && <img src={homeLogo} className="w-10 h-10 object-contain mb-1" alt="home" loading="lazy" />}
                     <span className="text-[11px] font-bold text-center truncate w-full uppercase">{homeName}</span>
                   </div>
 
@@ -193,7 +207,7 @@ const MatchHub = () => {
                   </div>
 
                   <div className="flex flex-col items-center flex-[1.2] min-w-0">
-                    {awayLogo && <img src={awayLogo} className="w-10 h-10 object-contain mb-1" alt="away" />}
+                    {awayLogo && <img src={awayLogo} className="w-10 h-10 object-contain mb-1" alt="away" loading="lazy" />}
                     <span className="text-[11px] font-bold text-center truncate w-full uppercase">{awayName}</span>
                   </div>
                 </div>

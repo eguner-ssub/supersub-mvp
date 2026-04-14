@@ -1,6 +1,8 @@
 -- Migration 041: Replace watch_ad_reward with daily-cap + energy drink grant
 -- Requires: 040_economy_primitives (ads_watched_today, last_ad_date, energy_drinks columns)
 
+DROP FUNCTION IF EXISTS watch_ad_reward(UUID);
+
 CREATE OR REPLACE FUNCTION watch_ad_reward(p_user_id UUID)
 RETURNS TABLE(new_energy_drinks INT) AS $$
 DECLARE

@@ -140,6 +140,7 @@ export default async function handler(req, res) {
             goalscorers,
         };
 
+        res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=15');
         return res.status(200).json(result);
     } catch (err) {
         console.error('[Sportmonks Odds] Error:', err.message);

@@ -10,36 +10,36 @@ import { useAssetPreloader } from './hooks/useAssetPreloader';
 
 // Pages - Eager Loading
 import Landing from './pages/Landing';
+import LaunchPage from './pages/LaunchPage';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
 import InteractiveOnboarding from './pages/InteractiveOnboarding';
-import MatchHub from './features/match-day/MatchHub';
-import MatchDetail from './features/match-day/MatchDetail';
-import Training from './pages/Training';
-import LockerRoom from './features/locker-room/LockerRoom';
 import Inventory from './pages/Inventory';
-import CardsInPlay from './pages/CardsInPlay';
-import Settings from './pages/Settings';
-import Account from './pages/Account';
-import CardShowcase from './pages/CardShowcase';
-import CardBaseDemo from './pages/CardBaseDemo';
-import CardTest from './pages/CardTest';
-import CardLab from './pages/CardLab';
-import GenericLab from './features/inventory/GenericLab';
-import ComingSoon from './pages/ComingSoon';
-import Leaderboard from './pages/Leaderboard';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
-import FPLMarket from './pages/FPLMarket';
-import LeagueHub from './features/league-hub/LeagueHub';
-
-import APIDebugger from './features/debug/APIDebugger';
 
 // Pages - Eager Loading (Dashboard must not be lazy — chunk 404 on production)
 import Dashboard from './pages/Dashboard';
 
 // Pages - Lazy Loading
+const MatchHub = lazy(() => import('./features/match-day/MatchHub'));
+const MatchDetail = lazy(() => import('./features/match-day/MatchDetail'));
+const Training = lazy(() => import('./pages/Training'));
+const LockerRoom = lazy(() => import('./features/locker-room/LockerRoom'));
+const CardsInPlay = lazy(() => import('./pages/CardsInPlay'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Account = lazy(() => import('./pages/Account'));
+const CardShowcase = lazy(() => import('./pages/CardShowcase'));
+const CardBaseDemo = lazy(() => import('./pages/CardBaseDemo'));
+const CardTest = lazy(() => import('./pages/CardTest'));
+const CardLab = lazy(() => import('./pages/CardLab'));
+const GenericLab = lazy(() => import('./features/inventory/GenericLab'));
+const ComingSoon = lazy(() => import('./pages/ComingSoon'));
+const Leaderboard = lazy(() => import('./pages/Leaderboard'));
+const FPLMarket = lazy(() => import('./pages/FPLMarket'));
+const LeagueHub = lazy(() => import('./features/league-hub/LeagueHub'));
+const APIDebugger = lazy(() => import('./features/debug/APIDebugger'));
 const ManagerOffice = lazy(() => import('./features/office/ManagerOffice'));
 const PublicShareView = lazy(() => import('./pages/PublicShareView'));
 
@@ -74,7 +74,10 @@ const ProtectedRoute = ({ children, requireOnboarding = true }) => {
 export const AppRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
+      {/* PRE-LAUNCH: Remove these routes and restore Landing to / when going live */}
+      <Route path="/" element={<LaunchPage />} />
+      {/* PRE-LAUNCH: Remove these routes and restore Landing to / when going live */}
+      <Route path="/coming-soon" element={<LaunchPage />} />
       <Route path="/intro" element={<InteractiveOnboarding />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />

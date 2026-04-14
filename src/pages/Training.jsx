@@ -8,7 +8,7 @@ import GameHeader from '../shared/ui/GameHeader';
 import gameData from '../data/gameData.json';
 
 const TIMER_SECONDS = 10;
-const SESSION_CAP   = 2;
+const SESSION_CAP   = 4;
 
 // Joseba's in-quiz reactions, keyed on the running correct-answer count.
 const JOSEBA_REACTIONS = {
@@ -200,7 +200,7 @@ const Training = () => {
               <p className="text-gray-400 mb-7 text-center text-sm leading-relaxed">
                 Answer football trivia to earn{' '}
                 <span className="text-yellow-400 font-bold">Match Cards</span>.
-                {' '}2 sessions per day.
+                {' '}4 sessions per day.
               </p>
 
               {/* Stats row */}

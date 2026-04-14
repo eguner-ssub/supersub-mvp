@@ -59,7 +59,7 @@ API handlers always return JSON (never HTML), even on error.
 
 ### Database (`supabase/migrations/`)
 
-19 migrations. Key tables:
+43 migrations. Key tables:
 - `profiles` — user data (energy, coins, ads_watched)
 - `predictions` — bets (status: PENDING/LIVE/WON/LOST)
 - `matches` — fixtures with `events`, `lineups`, `odds` JSON columns
@@ -88,3 +88,39 @@ SITE_PASSWORD             # Basic auth gate (disabled if unset)
 ### Deployment
 
 Vercel with SPA routing rewrites in `vercel.json`. `middleware.js` enforces basic auth using `SITE_PASSWORD`. Build output goes to `dist/`.
+
+### Environments
+
+Branch model:
+```
+feature/* → staging → main
+```
+- `main` — production Vercel deployment, production Supabase project
+- `staging` — staging Vercel deployment, staging Supabase project
+- `feature/*` — local development; PRs open against `staging`
+
+Environment variables per environment (set in Vercel project settings):
+
+| Variable | Production | Staging |
+|---|---|---|
+| `SUPABASE_URL` | prod project URL | staging project URL |
+| `SUPABASE_ANON_KEY` | prod anon key | staging anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | prod service role key | staging service role key |
+| `SPORTMONKS_API_TOKEN` | shared | shared |
+| `CRON_SECRET` | prod secret | staging secret |
+| `SITE_PASSWORD` | set (gated) | set (gated) |
+
+**Bootstrapping a new staging database:**
+
+```bash
+# 1. Get the PostgreSQL connection string from Supabase Dashboard
+#    → Project Settings → Database → Connection string (URI mode)
+
+# 2. Run all 43 migrations in order against the staging DB
+DATABASE_URL=postgresql://postgres.xxxx:password@... node scripts/run-migrations.js
+
+# 3. After bootstrap, normal migration workflow resumes via the CLI
+supabase db push
+```
+
+After bootstrap, `supabase db push` will report "No migrations to apply" because `run-migrations.js` records each migration in `supabase_migrations.schema_migrations`.

@@ -1,6 +1,8 @@
 -- Migration: Update predictions schema for SportMonks integration
 
--- 1. team_id remains INTEGER — SportMonks integer team ID, no change needed
+-- 1. team_id — existed on production before this migration chain; add if missing
+ALTER TABLE predictions
+  ADD COLUMN IF NOT EXISTS team_id INTEGER DEFAULT NULL;
 COMMENT ON COLUMN predictions.team_id IS 'SportMonks integer team ID for Supersub settlement logic';
 
 -- 2. Add player_id for goalscorer and player-level supersub predictions

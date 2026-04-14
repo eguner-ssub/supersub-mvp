@@ -111,6 +111,7 @@ export default async function handler(req, res) {
         .eq('id', Number(id))
         .single();
       if (error || !data) return res.status(200).json({ response: [], error: error?.message });
+      res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
       return res.status(200).json({ response: [data] });
     }
 
@@ -127,6 +128,7 @@ export default async function handler(req, res) {
 
     if (error) return res.status(200).json({ response: [], error: error.message });
 
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
     return res.status(200).json({ response: data || [], date_queried: date, source: 'supabase' });
   } catch (err) {
     return res.status(500).json({ error: 'API_INIT_FAILED', message: err.message || 'Environment variables missing on server.' });

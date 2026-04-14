@@ -94,10 +94,10 @@ const STREAK_DRINK_MILESTONES = new Set([3, 5, 7]);
  * Pure helper — no side effects.
  */
 function trainingRewardForScore(score) {
-  if (score === 10) return { common: 5, supersub: true,  drink: true  };
-  if (score === 9)  return { common: 4, supersub: false, drink: false };
-  if (score >= 7)   return { common: 3, supersub: false, drink: false };
-  if (score >= 5)   return { common: 2, supersub: false, drink: false };
+  if (score === 10) return { common: 4, supersub: true,  drink: true  };
+  if (score === 9)  return { common: 3, supersub: false, drink: false };
+  if (score >= 7)   return { common: 2, supersub: false, drink: false };
+  if (score >= 5)   return { common: 1, supersub: false, drink: false };
   return              { common: 1, supersub: false, drink: false };
 }
 
@@ -605,12 +605,12 @@ export const GameProvider = ({ children }) => {
 
   /**
    * START TRAINING SESSION
-   * Guards: training_sessions_today < 2 AND energy > 0.
+   * Guards: training_sessions_today < 4 AND energy > 0.
    * On success: increments training_sessions_today, sets last_training_date = today,
    * and spends 1 energy. Returns { success: true } or { success: false, reason }.
    *
    * Reason values:
-   *   'cap'    — daily session limit reached (2/day)
+   *   'cap'    — daily session limit reached (4/day)
    *   'energy' — no energy remaining
    */
   const startTrainingSession = async () => {
@@ -620,7 +620,7 @@ export const GameProvider = ({ children }) => {
     const sessions = userProfile.last_training_date === today
       ? (userProfile.training_sessions_today ?? 0)
       : 0;
-    if (sessions >= 2) return { success: false, reason: 'cap' };
+    if (sessions >= 4) return { success: false, reason: 'cap' };
     const currentEnergy = computeCurrentEnergy(userProfile);
     if (currentEnergy <= 0) return { success: false, reason: 'energy' };
 

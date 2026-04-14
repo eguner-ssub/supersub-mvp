@@ -115,7 +115,7 @@ const ViewLive = () => {
                                 {/* Home */}
                                 <div className="flex flex-col items-center gap-1 w-16">
                                     {homeLogo
-                                        ? <img src={homeLogo} alt={homeName} className="w-8 h-8 object-contain" />
+                                        ? <img src={homeLogo} alt={homeName} className="w-8 h-8 object-contain" loading="lazy" />
                                         : <span className="text-white font-black text-xs uppercase">{homeName.slice(0, 3)}</span>
                                     }
                                     <span className="text-zinc-400 text-[8px] font-bold uppercase tracking-wide leading-tight text-center line-clamp-2">{homeName}</span>
@@ -133,7 +133,7 @@ const ViewLive = () => {
                                 {/* Away */}
                                 <div className="flex flex-col items-center gap-1 w-16">
                                     {awayLogo
-                                        ? <img src={awayLogo} alt={awayName} className="w-8 h-8 object-contain" />
+                                        ? <img src={awayLogo} alt={awayName} className="w-8 h-8 object-contain" loading="lazy" />
                                         : <span className="text-white font-black text-xs uppercase">{awayName.slice(0, 3)}</span>
                                     }
                                     <span className="text-zinc-400 text-[9px] font-bold uppercase tracking-wide leading-none text-center line-clamp-1">{awayName}</span>

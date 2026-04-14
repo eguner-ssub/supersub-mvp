@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ClipboardList, Tablet, Trophy, ArrowLeft } from 'lucide-react';
 import MobileLayout from '../../shared/ui/MobileLayout';
 import { usePredictions } from '../../shared/hooks/usePredictions';
+import { useGame } from '../../shared/context/GameContext';
 import ViewPendingGrid from './ViewPendingGrid';
 import ViewLive from './ViewLive';
 import ViewTrophyCabinet from './ViewTrophyCabinet';
@@ -16,6 +17,9 @@ const LockerRoom = () => {
     const { predictions: pendingBets } = usePredictions('PENDING');
     const { predictions: liveBets }    = usePredictions('LIVE');
 
+    const { unseenSettlements, markPredictionsSeen } = useGame();
+    const newWinsCount = unseenSettlements.filter(p => p.settled_status === 'WON').length;
+
     // Read tab from query params on mount
     useEffect(() => {
         const tabParam = searchParams.get('tab');
@@ -24,6 +28,16 @@ const LockerRoom = () => {
             setActiveTab(tabParam);
         }
     }, [searchParams]);
+
+    // Mark all unseen WON predictions as seen when entering the Cabinet tab.
+    // Covers both handler taps and direct URL deep-links (?tab=cabinet).
+    useEffect(() => {
+        if (activeTab !== 'cabinet') return;
+        const winIds = unseenSettlements
+            .filter(p => p.settled_status === 'WON')
+            .map(p => p.id);
+        if (winIds.length > 0) markPredictionsSeen(winIds);
+    }, [activeTab, unseenSettlements, markPredictionsSeen]);
 
     const tabs = [
         { id: 'whiteboard', label: 'Whiteboard', icon: ClipboardList, component: ViewPendingGrid },
@@ -79,6 +93,7 @@ const LockerRoom = () => {
                             const badgeCount =
                                 tab.id === 'whiteboard' ? pendingBets.length :
                                 tab.id === 'tablet'     ? liveBets.length :
+                                tab.id === 'cabinet'    ? newWinsCount :
                                 0;
 
                             return (
@@ -96,7 +111,9 @@ const LockerRoom = () => {
                                     }`}>
                                         <Icon className={`w-6 h-6 ${isActive ? 'text-white' : 'text-gray-300'}`} />
                                         {badgeCount > 0 && (
-                                            <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center px-1">
+                                            <div className={`absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center px-1 ${
+                                                tab.id === 'cabinet' ? 'bg-emerald-500' : 'bg-red-500'
+                                            }`}>
                                                 <span className="text-[9px] font-black text-white leading-none">
                                                     {badgeCount > 99 ? '99+' : badgeCount}
                                                 </span>

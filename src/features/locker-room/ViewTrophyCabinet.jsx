@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Trophy } from 'lucide-react';
 import { usePredictions } from '../../shared/hooks/usePredictions';
+import { useGame } from '../../shared/context/GameContext';
 import CardBase from '../../shared/ui/CardBase';
 import ShareCardButton from '../../shared/ui/ShareCardButton';
 
@@ -33,17 +34,25 @@ const getCardLabel = (type) => ({
 
 // ─── WinEntry ─────────────────────────────────────────────────────────────────
 
-const WinEntry = ({ matchId, predictions }) => {
+const NewBadge = () => (
+    <div className="absolute -top-1 -right-1 z-30 bg-emerald-500 text-black text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full shadow-lg">
+        New
+    </div>
+);
+
+const WinEntry = ({ matchId, predictions, unseenIdsOnEntry }) => {
     const navigate = useNavigate();
 
     if (predictions.length === 1) {
         const p = predictions[0];
+        const isNew = unseenIdsOnEntry.has(p.id);
         return (
             <div
                 onClick={() => navigate(`/match/${matchId}`)}
                 className="flex flex-col items-center gap-2 cursor-pointer active:scale-95 transition-transform"
             >
-                <div className="w-28 overflow-hidden drop-shadow-[0_8px_24px_rgba(0,0,0,0.8)]">
+                <div className="w-28 overflow-hidden drop-shadow-[0_8px_24px_rgba(0,0,0,0.8)] relative">
+                    {isNew && <NewBadge />}
                     <CardBase
                         type={normaliseCardType(p.card_type)}
                         label={getCardLabel(p.card_type)}
@@ -59,36 +68,40 @@ const WinEntry = ({ matchId, predictions }) => {
     }
 
     // Multiple wins — flex overlap fan stack
+    const stackHasNew = predictions.some(p => unseenIdsOnEntry.has(p.id));
     return (
         <div
             onClick={() => navigate(`/match/${matchId}`)}
             className="flex flex-col items-center gap-2 cursor-pointer active:scale-95 transition-transform"
         >
-            <div className="flex items-start justify-center">
-                {predictions.slice(0, 4).map((p, i) => {
-                    const rotations = [-6, 2, -3, 5];
-                    const yOffsets  = [0, -8, 0, -4];
-                    return (
-                        <div
-                            key={p.id}
-                            className="flex-shrink-0 drop-shadow-[0_8px_20px_rgba(0,0,0,0.7)]"
-                            style={{
-                                width: '6rem',
-                                transform: `rotate(${rotations[i]}deg) translateY(${yOffsets[i]}px)`,
-                                marginLeft: i === 0 ? 0 : '-1.5rem',
-                                zIndex: i,
-                                position: 'relative',
-                            }}
-                        >
-                            <CardBase
-                                type={normaliseCardType(p.card_type)}
-                                label={getCardLabel(p.card_type)}
-                                selection={p.team_name}
-                                status="won"
-                            />
-                        </div>
-                    );
-                })}
+            <div className="relative">
+                {stackHasNew && <NewBadge />}
+                <div className="flex items-start justify-center">
+                    {predictions.slice(0, 4).map((p, i) => {
+                        const rotations = [-6, 2, -3, 5];
+                        const yOffsets  = [0, -8, 0, -4];
+                        return (
+                            <div
+                                key={p.id}
+                                className="flex-shrink-0 drop-shadow-[0_8px_20px_rgba(0,0,0,0.7)]"
+                                style={{
+                                    width: '6rem',
+                                    transform: `rotate(${rotations[i]}deg) translateY(${yOffsets[i]}px)`,
+                                    marginLeft: i === 0 ? 0 : '-1.5rem',
+                                    zIndex: i,
+                                    position: 'relative',
+                                }}
+                            >
+                                <CardBase
+                                    type={normaliseCardType(p.card_type)}
+                                    label={getCardLabel(p.card_type)}
+                                    selection={p.team_name}
+                                    status="won"
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
             <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide text-center max-w-[140px] leading-tight">
                 {predictions[0].match_title}
@@ -104,14 +117,19 @@ const WinEntry = ({ matchId, predictions }) => {
 
 // ─── CSS Shelf ────────────────────────────────────────────────────────────────
 
-const Shelf = ({ groups }) => {
+const Shelf = ({ groups, unseenIdsOnEntry }) => {
     if (!groups || groups.length === 0) return null;
     return (
         <div className="relative z-10 mb-8 px-4">
             {/* Cards sitting on this shelf */}
             <div className="flex flex-row flex-wrap gap-6 justify-start pb-6 px-6">
                 {groups.map(([matchId, predictions]) => (
-                    <WinEntry key={matchId} matchId={matchId} predictions={predictions} />
+                    <WinEntry
+                        key={matchId}
+                        matchId={matchId}
+                        predictions={predictions}
+                        unseenIdsOnEntry={unseenIdsOnEntry}
+                    />
                 ))}
             </div>
             {/* CSS shelf edge — amber LED glow */}
@@ -130,7 +148,7 @@ const Shelf = ({ groups }) => {
 
 const GROUPS_PER_SHELF = 2;
 
-const WonContent = ({ wonPredictions }) => {
+const WonContent = ({ wonPredictions, unseenIdsOnEntry }) => {
 
     const sortedGroups = useMemo(() => {
         const grouped = wonPredictions.reduce((acc, p) => {
@@ -181,7 +199,7 @@ const WonContent = ({ wonPredictions }) => {
             {wonPredictions.length > 0 && (
                 <div className="relative z-10 pt-4 pb-48">
                     {shelves.map((shelfGroups, idx) => (
-                        <Shelf key={idx} groups={shelfGroups} />
+                        <Shelf key={idx} groups={shelfGroups} unseenIdsOnEntry={unseenIdsOnEntry} />
                     ))}
                 </div>
             )}
@@ -239,6 +257,19 @@ const ViewTrophyCabinet = () => {
     const { predictions: allSettled, loading } = usePredictions('SETTLED');
     const [activeSubTab, setActiveSubTab] = useState('won');
 
+    const { unseenSettlements } = useGame();
+    // Snapshot on mount — LockerRoom marks wins seen as soon as the Cabinet tab
+    // opens, which would clear `unseenSettlements` mid-render and make badges
+    // flash. Freezing the set for the component's lifetime keeps "New" badges
+    // stable for the whole viewing session.
+    const [unseenIdsOnEntry] = useState(() =>
+        new Set(
+            unseenSettlements
+                .filter(p => p.settled_status === 'WON')
+                .map(p => p.id)
+        )
+    );
+
     const wonPredictions = useMemo(
         () => allSettled.filter(p => p.settled_status === 'WON'),
         [allSettled]
@@ -282,7 +313,7 @@ const ViewTrophyCabinet = () => {
 
             {/* Content */}
             {activeSubTab === 'won' ? (
-                <WonContent wonPredictions={wonPredictions} />
+                <WonContent wonPredictions={wonPredictions} unseenIdsOnEntry={unseenIdsOnEntry} />
             ) : (
                 <HistoryContent allSettled={allSettled} />
             )}

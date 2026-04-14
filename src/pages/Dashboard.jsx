@@ -5,23 +5,17 @@ import { supabase } from '../supabaseClient';
 import { toast } from 'sonner';
 import { Zap, Loader2, ShoppingBag, TrendingUp, Cone } from 'lucide-react';
 import CardBase from '../shared/ui/CardBase';
-import WinModal from '../components/WinModal';
-import WinCelebrationModal from '../shared/ui/WinCelebrationModal';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userProfile, updateInventory, loading, bagAvailableToday, unseenSettlements, markPredictionsSeen, currentStreak, pendingDecay, saveStreakWithDrink, declineStreakSave, energyDrinks } = useGame();
+  const { userProfile, updateInventory, loading, bagAvailableToday, unseenSettlements, markPredictionsSeen, pendingDecay, saveStreakWithDrink, declineStreakSave, energyDrinks } = useGame();
 
   // --- LOCAL STATE ---
   const [showBagOverlay, setShowBagOverlay] = useState(false);
   const [bagStage, setBagStage] = useState('closed');
   const [newCards, setNewCards] = useState([]);
   const [showStreakSaveModal, setShowStreakSaveModal] = useState(false);
-
-  // REAL-TIME DATA
-  const [winAmount, setWinAmount] = useState(0);
-  const [showWinModal, setShowWinModal] = useState(false);
 
   // UX STATE
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -253,17 +247,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* WIN MODAL (onboarding/mock flow — kept intact) */}
-        {showWinModal && (
-          <WinModal
-            amount={winAmount}
-            onClose={() => {
-              setShowWinModal(false);
-              setWinAmount(0);
-            }}
-          />
-        )}
-
         {/* STREAK SAVE MODAL */}
         {showStreakSaveModal && pendingDecay && (
           <div className="fixed inset-0 z-[75] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
@@ -311,19 +294,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        )}
-
-        {/* ── Win Celebration Modal — real settled predictions ─────────────────
-            Shows the first unseen settled prediction. On dismiss, marks it seen
-            and the next one (if any) will appear on the following render.
-            Gated on is_age_verified so affiliate CTAs are never shown to
-            unverified users. Requires migration 034 + 035.
-        ──────────────────────────────────────────────────────────────────────── */}
-        {unseenSettlements.some(p => p.settled_status === 'WON') && userProfile?.is_age_verified && (
-          <WinCelebrationModal
-            prediction={unseenSettlements.find(p => p.settled_status === 'WON')}
-            onDismiss={() => markPredictionsSeen([unseenSettlements.find(p => p.settled_status === 'WON').id])}
-          />
         )}
 
       </div>

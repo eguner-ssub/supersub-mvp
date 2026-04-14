@@ -129,12 +129,11 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen text-white p-6 flex flex-col justify-center relative overflow-hidden bg-black">
-      <img
-        src="/bg-stadium.webp"
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover opacity-40"
+      <div
+        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/assets/bg-clubroom.webp')" }}
       />
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="fixed inset-0 bg-black/50 z-0" />
 
       <div className="max-w-md w-full mx-auto space-y-8 relative z-10">
         <Link to="/" className="text-gray-500 hover:text-white flex items-center gap-2 mb-4 transition-colors font-black text-[10px] uppercase tracking-[0.2em]">
@@ -144,7 +143,7 @@ const Signup = () => {
         {/* Feature rows */}
         <div className="flex flex-col gap-2">
           {FEATURES.map(({ icon, text }) => (
-            <div key={text} className="flex items-center gap-2 text-sm text-white/55">
+            <div key={text} className="flex items-center gap-2 text-sm text-white/60">
               <span>{icon}</span>
               <span>{text}</span>
             </div>
@@ -152,7 +151,7 @@ const Signup = () => {
         </div>
 
         <div>
-          <h2 className="text-4xl font-black italic mb-2 tracking-tighter uppercase">Join the Club</h2>
+          <h2 className="font-black italic text-4xl tracking-widest text-white uppercase mb-2">Join the Club</h2>
           <p className="text-gray-500 text-sm font-medium">Call the sub before the manager does.</p>
         </div>
 
@@ -160,7 +159,7 @@ const Signup = () => {
           <div className="space-y-4">
             {/* Email */}
             <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Email</label>
+              <label className="block text-[11px] font-black uppercase tracking-widest text-zinc-400 mb-2 ml-1">Email</label>
               <input
                 type="email"
                 required
@@ -173,7 +172,7 @@ const Signup = () => {
 
             {/* Password */}
             <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Password</label>
+              <label className="block text-[11px] font-black uppercase tracking-widest text-zinc-400 mb-2 ml-1">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -196,7 +195,7 @@ const Signup = () => {
 
             {/* Country picker */}
             <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Your Country</label>
+              <label className="block text-[11px] font-black uppercase tracking-widest text-zinc-400 mb-2 ml-1">Your Country</label>
               <select
                 value={countryCode}
                 onChange={e => setCountryCode(e.target.value)}
@@ -320,14 +319,17 @@ const Signup = () => {
           <button
             type="submit"
             disabled={loading}
-            className="group relative w-full h-[68px] rounded-full p-[2px] transition-all active:scale-95 shadow-[0_0_25px_rgba(34,197,94,0.3)]"
+            className="group relative w-full h-[68px] rounded-full p-[2px] transition-all active:scale-95 shadow-[0_0_30px_rgba(34,197,94,0.4)]"
             style={{ background: 'linear-gradient(180deg, #D4AF37 0%, #1a1a1a 100%)' }}
           >
-            <div className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[1px] border-green-400/50" style={carbonStyle}>
+            <div
+              className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[1px] border-green-400/50"
+              style={carbonStyle}
+            >
               {loading ? <Loader2 className="w-6 h-6 animate-spin text-green-400" /> : (
                 <>
-                  <UserPlus className="w-5 h-5 text-green-400" />
-                  <span className="text-white font-black text-lg tracking-widest italic">CREATE ACCOUNT</span>
+                  <UserPlus className="w-5 h-5 text-green-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-white font-black text-xl tracking-widest italic">CREATE ACCOUNT</span>
                 </>
               )}
             </div>
