@@ -2,17 +2,19 @@
 // Runs on all paths except the matcher exclusions below.
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|$|coming-soon).*)',
+  ],
 };
-
-const PUBLIC_PATHS = ['/', '/coming-soon'];
 
 export default function middleware(request) {
   const { pathname } = new URL(request.url);
 
   // Allow public paths, API routes, and static assets through without auth
   if (
-    PUBLIC_PATHS.includes(pathname) ||
+    pathname === '/' ||
+    pathname === '/coming-soon' ||
+    pathname.startsWith('/coming-soon') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/assets/') ||

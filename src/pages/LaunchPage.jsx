@@ -95,7 +95,7 @@ const LaunchPage = () => {
         </div>
 
         {/* Bottom: legal line */}
-        <p className="text-white/40 text-[11px] text-center">
+        <p className="text-white/40 text-[11px] text-center mt-4">
           Free to play. No deposits. No bets.
         </p>
       </div>
