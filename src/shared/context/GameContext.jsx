@@ -498,9 +498,14 @@ export const GameProvider = ({ children }) => {
     const newBest    = Math.max(newStreak, userProfile.best_streak ?? 0);
 
     // 7-day milestone: grant an energy drink + 1 Supersub card (rarity gate)
-    if (newStreak === 7) {
+    if (newStreak % 7 === 0 && newStreak > 0) {
       await grantEnergyDrink(1);
       await updateInventory(['c_supersub']);
+    }
+
+    // Day 3 & 5 milestones: energy drink only
+    if (newStreak === 3 || newStreak === 5) {
+      await grantEnergyDrink(1);
     }
 
     await supabase.from('profiles').update({
@@ -838,11 +843,16 @@ export const GameProvider = ({ children }) => {
     };
   }, [userProfile?.id]);
 
+  const bagAvailableToday = userProfile
+    ? (userProfile.last_streak_date !== todayUTC())
+    : false;
+
   const value = {
     userProfile,
     loading,
     statDictionary,
     supabase,
+    bagAvailableToday,
     // Energy
     energyDrinks: userProfile?.energy_drinks ?? 0,
     spendEnergy,

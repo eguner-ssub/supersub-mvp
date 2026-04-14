@@ -15,13 +15,13 @@ export function normalizeMatch(raw) {
 
     // Already in nested fixture format — patch league if missing then pass through
     if (raw.fixture) {
-        if (!raw.league?.name && raw.league_id) {
+        if (!raw.league?.name) {
             const leagueInfo = getLeagueById(raw.league_id);
             return {
                 ...raw,
                 league: {
                     id: raw.league_id,
-                    name: leagueInfo?.name || raw.league_name || '',
+                    name: raw.league_name || leagueInfo?.name || '',
                     logo: raw.league?.logo || null,
                 },
             };

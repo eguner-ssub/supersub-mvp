@@ -11,7 +11,7 @@ import ViewTrophyCabinet from './ViewTrophyCabinet';
 const LockerRoom = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const [activeTab, setActiveTab] = useState('pending');
+    const [activeTab, setActiveTab] = useState('whiteboard');
 
     const { predictions: pendingBets } = usePredictions('PENDING');
     const { predictions: liveBets }    = usePredictions('LIVE');
@@ -19,16 +19,16 @@ const LockerRoom = () => {
     // Read tab from query params on mount
     useEffect(() => {
         const tabParam = searchParams.get('tab');
-        if (tabParam && ['pending', 'live', 'cabinet'].includes(tabParam)) {
+        if (tabParam && ['whiteboard', 'tablet', 'cabinet'].includes(tabParam)) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setActiveTab(tabParam);
         }
     }, [searchParams]);
 
     const tabs = [
-        { id: 'pending', label: 'Whiteboard', icon: ClipboardList, component: ViewPendingGrid },
-        { id: 'live',    label: 'Tablet',     icon: Tablet,        component: ViewLive },
-        { id: 'cabinet', label: 'Cabinet',    icon: Trophy,        component: ViewTrophyCabinet },
+        { id: 'whiteboard', label: 'Whiteboard', icon: ClipboardList, component: ViewPendingGrid },
+        { id: 'tablet',     label: 'Tablet',     icon: Tablet,        component: ViewLive },
+        { id: 'cabinet',    label: 'Cabinet',    icon: Trophy,        component: ViewTrophyCabinet },
     ];
 
     const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
@@ -36,7 +36,7 @@ const LockerRoom = () => {
 
     const handleTabChange = (tabId) => {
         setActiveTab(tabId);
-        navigate(`/inventory?tab=${tabId}`, { replace: true });
+        navigate(`/predictions?tab=${tabId}`, { replace: true });
     };
 
     return (
@@ -77,8 +77,8 @@ const LockerRoom = () => {
                             const isActive = activeTab === tab.id;
 
                             const badgeCount =
-                                tab.id === 'pending' ? pendingBets.length :
-                                tab.id === 'live'    ? liveBets.length :
+                                tab.id === 'whiteboard' ? pendingBets.length :
+                                tab.id === 'tablet'     ? liveBets.length :
                                 0;
 
                             return (

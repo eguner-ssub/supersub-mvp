@@ -37,8 +37,8 @@ const COUNTABLE_GOAL_DETAILS = ['Normal Goal', 'Penalty'];
 const POINTS_MULTIPLIER = {
     c_match_result: 1.0,
     c_total_goals:  1.0,
-    c_player_score: 1.5,
-    c_supersub:     2.5,
+    c_player_score: 1.0,
+    c_supersub:     1.0,
 };
 
 /**

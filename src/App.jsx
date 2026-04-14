@@ -18,6 +18,7 @@ import MatchHub from './features/match-day/MatchHub';
 import MatchDetail from './features/match-day/MatchDetail';
 import Training from './pages/Training';
 import LockerRoom from './features/locker-room/LockerRoom';
+import Inventory from './pages/Inventory';
 import CardsInPlay from './pages/CardsInPlay';
 import Settings from './pages/Settings';
 import Account from './pages/Account';
@@ -114,7 +115,10 @@ export const AppRoutes = () => {
       />
 
       <Route path="/match/:id" element={<ProtectedRoute><MatchDetail /></ProtectedRoute>} />
-      <Route path="/inventory" element={<ProtectedRoute><LockerRoom /></ProtectedRoute>} />
+      <Route path="/inventory" element={<Navigate to="/predictions?tab=whiteboard" replace />} />
+      <Route path="/inventory/kit-bag" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+      <Route path="/inventory/energy-drinks" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+      <Route path="/predictions" element={<ProtectedRoute><LockerRoom /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
       <Route
@@ -131,7 +135,7 @@ export const AppRoutes = () => {
       <Route path="/stats" element={<ProtectedRoute><FPLMarket /></ProtectedRoute>} />
       <Route path="/scouting" element={<ProtectedRoute><FPLMarket /></ProtectedRoute>} />
       <Route path="/league-hub" element={<ProtectedRoute><LeagueHub /></ProtectedRoute>} />
-      <Route path="/history" element={<Navigate to="/inventory?tab=cabinet" replace />} />
+      <Route path="/history" element={<Navigate to="/predictions?tab=cabinet" replace />} />
       <Route path="/inbox" element={<ProtectedRoute><ComingSoon title="Manager Inbox" message="Social features are currently locked." /></ProtectedRoute>} />
       <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
 

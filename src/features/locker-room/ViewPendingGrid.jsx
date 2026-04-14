@@ -156,7 +156,7 @@ const ViewPendingGrid = () => {
 
                         {/* Fan panel */}
                         <div
-                            className="relative rounded-xl bg-white/8 border border-white/10 px-4 py-6 mb-6"
+                            className="relative rounded-xl bg-white/8 border border-white/10 px-4 pt-6 pb-4"
                             style={{ minHeight: '160px' }}
                         >
                             {/* Cards — centred */}
@@ -185,11 +185,13 @@ const ViewPendingGrid = () => {
                                     );
                                 })}
                             </div>
+                        </div>
 
-                            {/* Share button — bottom right of panel */}
+                        {/* Share row — sits below the fan panel, right-aligned */}
+                        <div className="flex justify-end mb-6">
                             <button
-                                onClick={(e) => { e.stopPropagation(); openSharePicker(group); }}
-                                className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/30 border border-white/10 text-zinc-400 hover:text-white hover:bg-black/50 transition-colors"
+                                onClick={() => openSharePicker(group)}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
                             >
                                 <Share2 className="w-3 h-3" />
                                 <span className="text-[9px] font-bold uppercase tracking-wide">Share</span>
