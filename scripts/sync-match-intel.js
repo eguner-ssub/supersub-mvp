@@ -110,17 +110,42 @@ async function loadInternalData(supabase, match, seasonId) {
     coach_name: awayCoach.data.coaches?.common_name || awayCoach.data.coaches?.name,
   } : null;
 
-  // Standings (for Form Guide)
-  const [homeStandings, awayStandings] = await Promise.all([
-    supabase.from('standings')
-      .select('position, played, won, drawn, lost, points, form')
-      .eq('team_id', match.home_team_id)
-      .eq('season_id', seasonId).single(),
-    supabase.from('standings')
-      .select('position, played, won, drawn, lost, points, form')
-      .eq('team_id', match.away_team_id)
-      .eq('season_id', seasonId).single(),
-  ]);
+  // Standings (for Form Guide).
+  // standings.team_id and standings.season_id are UUIDs (FKs to the local
+  // teams/seasons tables); this function receives Sportmonks integer IDs.
+  // Mirror the writer-side logic in sync-standings.js: resolve the current
+  // season UUID via leagues.current_season_id, and resolve team UUIDs via
+  // teams.sportmonks_id.
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('current_season_id')
+    .eq('sportmonks_id', match.league_id)
+    .single();
+  const currentSeasonUuid = league?.current_season_id || null;
+
+  const { data: teamRows } = await supabase
+    .from('teams')
+    .select('id, sportmonks_id')
+    .in('sportmonks_id', [match.home_team_id, match.away_team_id]);
+  const homeTeamUuid = teamRows?.find(t => t.sportmonks_id === match.home_team_id)?.id || null;
+  const awayTeamUuid = teamRows?.find(t => t.sportmonks_id === match.away_team_id)?.id || null;
+
+  const [homeStandings, awayStandings] = currentSeasonUuid
+    ? await Promise.all([
+        homeTeamUuid
+          ? supabase.from('standings')
+              .select('position, played, won, drawn, lost, points, form')
+              .eq('team_id', homeTeamUuid)
+              .eq('season_id', currentSeasonUuid).single()
+          : Promise.resolve({ data: null }),
+        awayTeamUuid
+          ? supabase.from('standings')
+              .select('position, played, won, drawn, lost, points, form')
+              .eq('team_id', awayTeamUuid)
+              .eq('season_id', currentSeasonUuid).single()
+          : Promise.resolve({ data: null }),
+      ])
+    : [{ data: null }, { data: null }];
 
   // Flatten supersub data with player name
   const flattenSubs = (rows) => (rows || []).map(s => ({
@@ -186,13 +211,34 @@ export async function syncMatchIntel(supabaseOverride) {
   let success = 0;
   let failed = 0;
 
+  // Resolve the Sportmonks integer season ID per league on demand.
+  // team_bench_stats / coach_substitution_patterns / player_supersub_stats
+  // all key on INTEGER season_id (e.g. 25583), not UUID. matches.season is
+  // never populated, so translate via leagues.current_season_id → seasons.sportmonks_id.
+  // Cached per-run by league so each supported league costs one pair of lookups max.
+  const leagueSeasonCache = new Map();
+  async function resolveSeasonSmId(leagueSmId) {
+    if (leagueSeasonCache.has(leagueSmId)) return leagueSeasonCache.get(leagueSmId);
+    const { data: lg } = await supabase
+      .from('leagues').select('current_season_id')
+      .eq('sportmonks_id', leagueSmId).single();
+    if (!lg?.current_season_id) { leagueSeasonCache.set(leagueSmId, null); return null; }
+    const { data: sn } = await supabase
+      .from('seasons').select('sportmonks_id')
+      .eq('id', lg.current_season_id).single();
+    const smId = sn?.sportmonks_id || null;
+    leagueSeasonCache.set(leagueSmId, smId);
+    return smId;
+  }
+
   for (const match of staleMatches) {
     try {
       // Fetch Sportmonks predictions
       const { data: sportmonksRaw } = await fetchSportmonksPredictions(match.id);
 
       // Load internal analytics
-      const internalData = await loadInternalData(supabase, match, match.season);
+      const seasonSmId = await resolveSeasonSmId(match.league_id);
+      const internalData = await loadInternalData(supabase, match, seasonSmId);
 
       // Process everything
       const { sportmonksAvailable, sections, prose } = processMatchIntel({

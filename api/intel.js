@@ -269,29 +269,54 @@ export default async function handler(req, res) {
     // without needing to re-run the sync script on stored records.
     // If formGuide was stored as unavailable (standings not synced at intel-sync time),
     // try fetching fresh standings now so the section can be populated.
+    //
+    // standings.team_id and standings.season_id are UUIDs (FKs to the local
+    // teams/seasons tables); matches stores only Sportmonks integer IDs.
+    // Mirror the writer-side logic in sync-standings.js: resolve the current
+    // season UUID via leagues.current_season_id, and resolve team UUIDs via
+    // teams.sportmonks_id.
     let sectionsToUse = intel.report_sections;
-    if (sectionsToUse && !sectionsToUse.formGuide?.available && match.season) {
-      const { data: standings } = await supabase
-        .from('standings')
-        .select('team_id, position, played, points, form')
-        .in('team_id', [match.home_team_id, match.away_team_id])
-        .eq('season_id', match.season);
-      if (standings?.length) {
-        const homeS = standings.find(s => s.team_id === match.home_team_id);
-        const awayS = standings.find(s => s.team_id === match.away_team_id);
-        if (homeS || awayS) {
-          sectionsToUse = {
-            ...sectionsToUse,
-            formGuide: {
-              source: 'internal',
-              available: true,
-              data: {
-                home: homeS ? { position: homeS.position, played: homeS.played, points: homeS.points, form: homeS.form } : null,
-                away: awayS ? { position: awayS.position, played: awayS.played, points: awayS.points, form: awayS.form } : null,
+    if (sectionsToUse && !sectionsToUse.formGuide?.available) {
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('current_season_id')
+        .eq('sportmonks_id', match.league_id)
+        .single();
+      const currentSeasonUuid = league?.current_season_id || null;
+
+      const { data: teamRows } = await supabase
+        .from('teams')
+        .select('id, sportmonks_id')
+        .in('sportmonks_id', [match.home_team_id, match.away_team_id]);
+      const homeTeamUuid = teamRows?.find(t => t.sportmonks_id === match.home_team_id)?.id || null;
+      const awayTeamUuid = teamRows?.find(t => t.sportmonks_id === match.away_team_id)?.id || null;
+
+      console.log('[Intel] Resolved season UUID:', currentSeasonUuid, 'home team UUID:', homeTeamUuid, 'away team UUID:', awayTeamUuid);
+
+      if (currentSeasonUuid && (homeTeamUuid || awayTeamUuid)) {
+        const teamUuids = [homeTeamUuid, awayTeamUuid].filter(Boolean);
+        const { data: standings } = await supabase
+          .from('standings')
+          .select('team_id, position, played, points, form')
+          .in('team_id', teamUuids)
+          .eq('season_id', currentSeasonUuid);
+        if (standings?.length) {
+          const homeS = homeTeamUuid ? standings.find(s => s.team_id === homeTeamUuid) : null;
+          const awayS = awayTeamUuid ? standings.find(s => s.team_id === awayTeamUuid) : null;
+          if (homeS || awayS) {
+            sectionsToUse = {
+              ...sectionsToUse,
+              formGuide: {
+                source: 'internal',
+                available: true,
+                data: {
+                  home: homeS ? { position: homeS.position, played: homeS.played, points: homeS.points, form: homeS.form } : null,
+                  away: awayS ? { position: awayS.position, played: awayS.played, points: awayS.points, form: awayS.form } : null,
+                },
+                insight: null,
               },
-              insight: null,
-            },
-          };
+            };
+          }
         }
       }
     }

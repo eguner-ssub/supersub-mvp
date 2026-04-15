@@ -106,8 +106,15 @@ async function syncStandings(db, smSeasonId, seasonUuid, teamCache) {
       goals_for: stat(133),
       goals_against: stat(134),
       points: entry.points ?? stat(187),
+      // Sportmonks v3 form shape: [{ fixture_id, form: 'W'|'D'|'L', sort_order, ... }].
+      // Items arrive unordered; sort by sort_order ascending so chronological order
+      // is preserved and the consumer's .slice(-5) picks up the most recent five.
       form: Array.isArray(entry.form)
-        ? entry.form.map(f => (f.result || '').toUpperCase()[0]).filter(Boolean).join('')
+        ? [...entry.form]
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+            .map(f => (f.form || '').toUpperCase()[0])
+            .filter(Boolean)
+            .join('')
         : null,
       updated_at: new Date().toISOString(),
     });
