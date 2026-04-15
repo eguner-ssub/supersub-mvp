@@ -10,10 +10,10 @@ export const LEAGUE_COVERAGE = {
         country: 'England',
         seasonType: 'european',
     },
-    CHAMPIONSHIP: {
-        id: 9,
-        name: 'Championship',
-        country: 'England',
+    LIGUE_1: {
+        id: 301,
+        name: 'Ligue 1',
+        country: 'France',
         seasonType: 'european',
     },
     SERIE_A: {

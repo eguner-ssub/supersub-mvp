@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 
 // ── Inline league IDs to avoid pathing issues in Vercel's function runtime ──
 // Mirrors: src/shared/config/coverage.js → SUPPORTED_LEAGUE_IDS
-// Sportmonks league IDs: EPL=8, Championship=9, Bundesliga=82, La Liga=564, Serie A=384
-const SUPPORTED_LEAGUE_IDS = [8, 9, 82, 564, 384];
+// Sportmonks league IDs: EPL=8, Ligue 1=301, Bundesliga=82, La Liga=564, Serie A=384
+const SUPPORTED_LEAGUE_IDS = [8, 301, 82, 564, 384];
 
 // ── Lazy Supabase Client ──────────────────────────────────────────────────────
 let _client = null;

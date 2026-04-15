@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // ────────────────────────────────────────────────────
 // CONFIGURATION
 // ────────────────────────────────────────────────────
-const SUPPORTED_LEAGUE_IDS = [8, 9, 82, 564, 384]; // EPL, Championship, Bundesliga, La Liga, Serie A
+const SUPPORTED_LEAGUE_IDS = [8, 301, 82, 564, 384]; // EPL, Ligue 1, Bundesliga, La Liga, Serie A
 
 // Statuses where the match is actively in progress (ball is in play or half-time)
 const IN_PLAY_STATUSES = ['INPLAY_1ST_HALF', 'HT', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'EXTRA_TIME_BREAK', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'BREAK'];

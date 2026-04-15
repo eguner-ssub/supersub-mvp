@@ -27,7 +27,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 // Adding a league later = uncomment one line. No other code changes needed.
 const LEAGUES = [
   { leagueId: 8, seasonId: 25583, name: 'Premier League' },
-  { leagueId: 9, seasonId: 25648, name: 'Championship' },
+  { leagueId: 301, seasonId: 25651, name: 'Ligue 1' },
   { leagueId: 82, seasonId: 25646, name: 'Bundesliga' },
   { leagueId: 564, seasonId: 25659, name: 'La Liga' },
   { leagueId: 384, seasonId: 25533, name: 'Serie A' },
