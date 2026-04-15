@@ -7,8 +7,9 @@ import MobileLayout from '../shared/ui/MobileLayout';
 
 const Onboarding = () => {
   const [managerName, setManagerName] = useState('');
-  
-  // FIX 1: REMOVED local state 'showSigningBonus'. 
+  const [clubNameError, setClubNameError] = useState('');
+
+  // FIX 1: REMOVED local state 'showSigningBonus'.
   // We now derive the view directly from the profile.
   const { createProfile, userProfile, loading } = useGame();
   const navigate = useNavigate();
@@ -32,12 +33,19 @@ const Onboarding = () => {
   });
 
   const handleSignContract = async () => {
-    if (managerName.trim()) {
-      // This will update 'userProfile' in context, triggering a re-render
-      // which switches 'hasSignedContract' to true instantly.
-      const result = await createProfile(managerName.trim());
-      if (result?.success) {
-        trackFunnelEvent('club_name_set', {}, result.data?.id ?? null);
+    if (!managerName.trim()) return;
+    setClubNameError('');
+    // This will update 'userProfile' in context, triggering a re-render
+    // which switches 'hasSignedContract' to true instantly.
+    const result = await createProfile(managerName.trim());
+    if (result?.success) {
+      trackFunnelEvent('club_name_set', {}, result.data?.id ?? null);
+    } else {
+      const msg = String(result?.error || '');
+      if (/duplicate|unique|23505/i.test(msg)) {
+        setClubNameError('That club name is already taken. Try another.');
+      } else {
+        setClubNameError('Something went wrong. Please try again.');
       }
     }
   };
@@ -85,7 +93,7 @@ const Onboarding = () => {
                   <strong>1.</strong> Your goal is to win as more Points as possible by using your prediction cards in real matches. You will have Match Result, Total Goals, Player to Score and Supersub cards at your disposal.
                 </p>
                 <p>
-                  <strong>2.</strong> By winning points, you can compete in the Leaderboards. To win more cards, don't forget to attend training. You will also receive a surprise card from your training bag every day.
+                  <strong>2.</strong> By winning points, you can compete in the Leaderboards. To win more cards, don't forget to attend training. Every day you'll receive cards from your training bag — train well and the bag gets bigger.
                 </p>
               </div>
 
@@ -113,13 +121,16 @@ const Onboarding = () => {
                   <input
                     type="text"
                     value={managerName}
-                    onChange={(e) => setManagerName(e.target.value)}
+                    onChange={(e) => { setManagerName(e.target.value); setClubNameError(''); }}
                     onKeyPress={(e) => e.key === 'Enter' && handleSignContract()}
                     placeholder="TEAM NAME"
                     className="w-full px-4 py-4 bg-[#e8e4dc] border-2 border-gray-300 rounded-lg text-gray-900 font-serif font-bold text-[19px] text-center uppercase tracking-widest focus:outline-none focus:border-gray-900 focus:bg-white transition-all placeholder:text-gray-300"
                     autoFocus
                   />
                   <PenTool className="absolute right-4 top-10 w-5 h-5 text-gray-400 opacity-50" />
+                  {clubNameError && (
+                    <p className="text-red-400 text-xs text-center mt-2 font-bold">{clubNameError}</p>
+                  )}
                 </div>
 
                 <button
@@ -173,7 +184,7 @@ const Onboarding = () => {
                       <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
                       <span className="text-gray-300 font-bold uppercase text-sm tracking-wider">Starting Points</span>
                     </div>
-                    <span className="text-yellow-400 font-mono font-bold text-lg drop-shadow-md">2500</span>
+                    <span className="text-yellow-400 font-mono font-bold text-lg drop-shadow-md">{userProfile?.points ?? 500}</span>
                   </div>
 
                   <div className="flex items-center justify-between p-2">
