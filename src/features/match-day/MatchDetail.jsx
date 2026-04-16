@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Star, Lock, Loader2, Trophy, Signal, Goal, User, ArrowUpCircle, X } from 'lucide-react';
+import { ArrowLeft, Star, Lock, Loader2, Trophy, Signal, Goal, User, ArrowUpCircle, X, Check } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
 import CardBase from '../../shared/ui/CardBase';
 import TacticalHUD from '../../shared/ui/TacticalHUD';
@@ -1103,7 +1103,10 @@ const MatchDetail = () => {
   const [loading, setLoading] = useState(true);
   const [flowState, setFlowState] = useState('idle');
   const [selectedCard, setSelectedCard] = useState(null);
+  const [selectedCardForConfirm, setSelectedCardForConfirm] = useState(null);
   const [stagedBet, setStagedBet] = useState(null);
+  const [showLockedIn, setShowLockedIn] = useState(false);
+  const bannerTimeoutRef = useRef(null);
   // Affiliate sheet — set after successful card placement, cleared on dismiss
   const [affiliateSheetData, setAffiliateSheetData] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
@@ -1210,7 +1213,13 @@ const MatchDetail = () => {
     fetchMatchDetail();
   }, [id]);
 
+  const dismissBanner = () => {
+    if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
+    setShowLockedIn(false);
+  };
+
   const handleOutcomeClick = (selection, oddsVal, displayLabel) => {
+    setSelectedCardForConfirm(selectedCard);
     setStagedBet({
       card: selectedCard,
       selection,
@@ -1239,7 +1248,14 @@ const MatchDetail = () => {
     const result = await placeBet(match, stagedBet.selection, stagedBet.reward, stagedBet.card, stagedBet.odds, stagedBet.displayLabel, stagedBet.teamId ?? null, snapshot, stagedBet.playerId ?? null);
     if (result.success) {
       await consumeCard(stagedBet.card);
-      setFlowState('resolved');
+      // Reset flow immediately — banner replaces the old blocking modal
+      setFlowState('idle');
+      setSelectedCard(null);
+      setSelectedCardForConfirm(null);
+      setStagedBet(null);
+      setShowLockedIn(true);
+      if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
+      bannerTimeoutRef.current = setTimeout(() => setShowLockedIn(false), 3500);
       // Show affiliate bottom sheet — not shown for Supersub (fixed reward, no market odds)
       // Include the newly created prediction (with share_token) for the share button
       const newPrediction = result.data?.[0] ?? null;
@@ -1256,6 +1272,7 @@ const MatchDetail = () => {
 
   const handleReset = () => {
     setSelectedCard(null);
+    setSelectedCardForConfirm(null);
     setStagedBet(null);
     setFlowState('idle');
   };
@@ -1264,6 +1281,7 @@ const MatchDetail = () => {
     const count = getCardCount('c_supersub');
     if (count > 0) {
       setSelectedCard('c_supersub');
+      setSelectedCardForConfirm('c_supersub');
       setStagedBet({
         card: 'c_supersub',
         selection: side,
@@ -1280,6 +1298,7 @@ const MatchDetail = () => {
     const count = getCardCount('c_supersub');
     if (count > 0) {
       setSelectedCard('c_supersub');
+      setSelectedCardForConfirm('c_supersub');
       setStagedBet({
         card: 'c_supersub',
         selection: side,
@@ -1296,6 +1315,16 @@ const MatchDetail = () => {
 
   // Reset scorer team tab when card selection changes
   useEffect(() => { setSelectedScorerTeam('home'); }, [selectedCard]);
+
+  // Lock body scroll while confirm sheet is visible
+  useEffect(() => {
+    if (flowState === 'staging') {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [flowState]);
 
   // ── Derived view state ────────────────────────────────────────
   const lineupsAnnounced = match?.lineups && Array.isArray(match.lineups) && match.lineups.length > 0;
@@ -1678,7 +1707,7 @@ const MatchDetail = () => {
       )}
 
       {shelfVisible && cardTypes.some(c => getCardCount(c.id) > 0) && (
-        <div data-testid="card-shelf" className="fixed bottom-0 w-full z-50 h-48 pointer-events-none">
+        <div data-testid="card-shelf" className={`fixed bottom-0 w-full h-48 pointer-events-none bg-zinc-950 border-t border-white/10 shadow-[0_-8px_20px_rgba(0,0,0,0.5)] ${flowState === 'staging' ? 'z-[146]' : 'z-50'}`}>
           <div className="absolute bottom-0 w-full h-24 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10"></div>
           <div className="absolute inset-0 flex justify-center items-end gap-2 pb-10 px-1 pointer-events-auto z-20">
             {cardTypes.map(card => {
@@ -1687,6 +1716,7 @@ const MatchDetail = () => {
               const oddsDisabled = needsOdds && !oddsLoading && !odds;
               const inventoryDisabled = count === 0;
               const tapDisabled = inventoryDisabled || oddsDisabled || (needsOdds && oddsLoading);
+              const isSelectedForConfirm = card.id === selectedCardForConfirm;
               return (
                 <button
                   key={card.id}
@@ -1701,15 +1731,20 @@ const MatchDetail = () => {
                     setFlowState('selection');
                   }}
                   disabled={tapDisabled}
-                  className={`relative transition-all duration-300 ${selectedCard === card.id
-                    ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
-                    : inventoryDisabled
-                      ? 'opacity-40 grayscale'
-                      : oddsDisabled
-                        ? 'opacity-50 saturate-50 cursor-not-allowed'
-                        : (needsOdds && oddsLoading)
-                          ? 'opacity-70 cursor-wait'
-                          : 'hover:translate-y-[-8px]'
+                  className={`relative transition-all duration-300 ${
+                    flowState === 'staging' && isSelectedForConfirm
+                      ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
+                      : inventoryDisabled
+                        ? 'opacity-40 grayscale'
+                        : oddsDisabled
+                          ? 'opacity-50 saturate-50 cursor-not-allowed'
+                          : (needsOdds && oddsLoading)
+                            ? 'opacity-70 cursor-wait'
+                            : flowState === 'staging'
+                              ? 'opacity-30'
+                              : selectedCard === card.id
+                                ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
+                                : 'hover:translate-y-[-8px]'
                     }`}
                 >
                   <div className="w-[5rem] h-[7.5rem] relative">
@@ -1753,8 +1788,12 @@ const MatchDetail = () => {
         );
 
         return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-            <button onClick={handleReset} className="absolute top-8 right-8 text-white/50 hover:text-white"><X className="w-8 h-8" /></button>
+          <div className={`fixed inset-0 z-[100] animate-in fade-in duration-300 ${selectedCard === 'c_player_score' ? 'flex items-end bg-black/80' : 'flex items-center justify-center px-4 bg-black/90 backdrop-blur-md'}`}>
+
+            {/* X button — only for centered-modal card types (Match Result, Total Goals) */}
+            {selectedCard !== 'c_player_score' && (
+              <button onClick={handleReset} className="absolute top-8 right-8 text-white/50 hover:text-white"><X className="w-8 h-8" /></button>
+            )}
 
             {selectedCard === 'c_match_result' && (
               oddsUnavailable ? <NoOddsState /> : (
@@ -1793,16 +1832,33 @@ const MatchDetail = () => {
               )
             )}
 
+            {/* ── PLAYER SCORE — bottom sheet ──────────────────── */}
             {selectedCard === 'c_player_score' && (
-              oddsUnavailable ? <NoOddsState /> : (
-                <div className="w-full max-w-lg bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
-                  {/* Header */}
-                  <div className="bg-zinc-800/50 px-6 py-5 border-b border-white/5">
-                    <h3 className="text-white font-black uppercase tracking-tighter text-xl">Pick a Player to Score</h3>
+              oddsUnavailable ? (
+                /* NoOddsState needs the centered-modal context; wrap it */
+                <div className="w-full flex items-center justify-center px-4 pb-8">
+                  <NoOddsState />
+                </div>
+              ) : (
+                <div className="relative w-full bg-zinc-900 border-t border-white/10 rounded-t-3xl max-h-[75vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300">
+                  {/* Drag handle */}
+                  <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mt-3 flex-shrink-0" />
+
+                  {/* Close button */}
+                  <button
+                    onClick={handleReset}
+                    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center z-10"
+                  >
+                    <X className="w-5 h-5 text-white" />
+                  </button>
+
+                  {/* Title */}
+                  <div className="px-5 pt-4 pb-3 flex-shrink-0">
+                    <h3 className="text-white font-black text-lg uppercase tracking-wide">Pick a Player to Score</h3>
                   </div>
 
-                  {/* Home / Away team selector — badge on top, name below */}
-                  <div className="grid grid-cols-2 gap-2 p-4 border-b border-white/5">
+                  {/* Home / Away team selector */}
+                  <div className="grid grid-cols-2 gap-2 px-5 pb-3 border-b border-white/5 flex-shrink-0">
                     <button
                       onClick={() => setSelectedScorerTeam('home')}
                       className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl border transition-all ${selectedScorerTeam === 'home' ? 'bg-white/10 border-emerald-500/50' : 'bg-white/5 border-transparent hover:bg-white/[0.07]'}`}
@@ -1819,14 +1875,14 @@ const MatchDetail = () => {
                     </button>
                   </div>
 
-                  {/* Player list for selected team */}
-                  <div className="h-[55vh] overflow-y-auto p-4 space-y-2 scrollbar-hide">
+                  {/* Scrollable player list */}
+                  <div className="flex-1 overflow-y-auto px-5 pt-2 pb-8 space-y-2 scrollbar-hide">
                     {visibleScorers.length === 0 && otherScorers.length === 0 ? (
                       <p className="text-zinc-600 text-[10px] text-center pt-4 uppercase tracking-widest">No players available</p>
                     ) : (
                       <>
                         {visibleScorers.map((player) => (
-                          <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 transition-all">
+                          <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 transition-all active:scale-95">
                             <span className="text-white font-bold text-sm truncate">{player.player_name}</span>
                             <span className="text-yellow-400 font-black text-sm whitespace-nowrap ml-3">+{Math.floor(player.odds * 100)} pts</span>
                           </button>
@@ -1837,7 +1893,7 @@ const MatchDetail = () => {
                           <>
                             <div className="pt-3 pb-1"><span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Other</span></div>
                             {otherScorers.map((player) => (
-                              <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 transition-all">
+                              <button key={player.player_name} onClick={() => handleOutcomeClick(`SCORE_${player.player_name}`, player.odds, player.player_name)} className="w-full flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-emerald-500/20 border border-transparent hover:border-emerald-500/50 transition-all active:scale-95">
                                 <span className="text-white font-bold text-sm truncate">{player.player_name}</span>
                                 <span className="text-yellow-400 font-black text-sm whitespace-nowrap ml-3">+{Math.floor(player.odds * 100)} pts</span>
                               </button>
@@ -1855,28 +1911,67 @@ const MatchDetail = () => {
       })()}
 
       {flowState === 'staging' && stagedBet && matchPhase !== 'POST' && (
-        <div data-testid="staging-bar" className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
-            <div className="flex justify-between items-start mb-8">
-              <div className="space-y-1"><p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Outcome Selection</p><h3 className="text-white font-black text-3xl uppercase italic tracking-tighter leading-tight">{stagedBet.displayLabel}</h3></div>
-              <div className="text-right space-y-1"><p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Reward</p><p className="text-yellow-400 font-black text-4xl tracking-tighter">{stagedBet.reward} <span className="text-xs uppercase">pts</span></p></div>
-            </div>
-            <div className="flex gap-4">
-              <button onClick={handleReset} className="flex-1 py-4 bg-zinc-800 rounded-2xl font-bold uppercase text-zinc-400 text-xs tracking-widest hover:bg-zinc-700 transition-colors">Cancel</button>
-              <button data-testid="play-button" onClick={handlePlay} className="flex-[2] py-4 bg-emerald-500 rounded-2xl font-black uppercase text-black text-xl shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:scale-105 transition-all">Confirm Play</button>
+        <>
+          {/* Partial backdrop — covers only above the card strip */}
+          <div
+            data-testid="staging-bar"
+            className="fixed inset-x-0 top-0 bottom-48 z-[140] bg-black/55 backdrop-blur-[2px]"
+            onClick={handleReset}
+          />
+          {/* Confirm sheet — docked above card strip */}
+          <div className="fixed inset-x-0 bottom-48 z-[145] bg-zinc-900 border-t border-white/15 rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="px-5 py-4 max-w-md mx-auto">
+              <div className="flex justify-between items-baseline mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Outcome</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Reward</span>
+              </div>
+              <div className="flex justify-between items-baseline mb-4">
+                <span className="text-white font-black text-xl italic uppercase tracking-tight">{stagedBet.displayLabel}</span>
+                <span className="text-yellow-400 font-black text-xl">{stagedBet.reward} <span className="text-xs font-bold">pts</span></span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleReset}
+                  className="flex-1 py-3 bg-white/[0.08] text-white/70 font-bold uppercase tracking-widest text-xs rounded-xl active:scale-95 transition-transform"
+                >
+                  Cancel
+                </button>
+                <button
+                  data-testid="play-button"
+                  onClick={handlePlay}
+                  className="flex-[2] py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-xs rounded-xl active:scale-95 transition-transform"
+                >
+                  Confirm Play
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {flowState === 'resolved' && (
-        <div className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6">
-          <div className="text-center w-full max-w-sm border border-white/10 bg-zinc-900/50 p-10 rounded-[3rem] relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent"></div>
-            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30"><Trophy className="w-10 h-10 text-emerald-400" /></div>
-            <h2 className="text-white font-black uppercase text-4xl tracking-tighter mb-4">Locked In!</h2>
-            <p className="text-zinc-500 text-sm mb-8 uppercase tracking-widest font-bold">Your prediction has been logged in the Locker Room</p>
-            <button onClick={handleReset} className="w-full py-5 bg-white text-black font-black uppercase rounded-2xl shadow-2xl hover:bg-zinc-200 transition-colors tracking-tighter text-lg">Continue Scouting</button>
+      {showLockedIn && (
+        <div
+          className="fixed inset-x-0 z-[150] cursor-pointer"
+          style={{ bottom: '12rem' }}
+          onClick={dismissBanner}
+        >
+          <div className="bg-emerald-500/95 backdrop-blur-md border-t border-emerald-400/60 shadow-[0_-4px_20px_rgba(16,185,129,0.4)] animate-in slide-in-from-bottom duration-300">
+            <div className="max-w-md mx-auto px-4 py-3 flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <Check className="w-5 h-5 text-white" strokeWidth={3} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-[11px] font-black uppercase tracking-widest">Prediction Made</p>
+                <p className="text-white/90 text-xs">Stamped on your tactical board.</p>
+                <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Tap to dismiss</p>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate('/predictions?tab=whiteboard'); }}
+                className="flex-shrink-0 bg-white text-emerald-700 font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg active:scale-95"
+              >
+                View
+              </button>
+            </div>
           </div>
         </div>
       )}

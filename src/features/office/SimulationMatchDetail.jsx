@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, X, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, X, Trophy, ChevronDown, Check } from 'lucide-react';
 import CardBase from '../../shared/ui/CardBase';
 import {
   PlayerNode,
@@ -14,6 +14,25 @@ import {
 const SETTLEMENT_KEYFRAMES = `
   @keyframes clockTick { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   @keyframes winner-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+`;
+
+/* ─── Card shelf arrow-bounce animation ───────────────────────── */
+const CARD_SHELF_KEYFRAMES = `
+  @keyframes arrowBounce {
+    0%, 100% { transform: translate(-50%, 0); }
+    50%       { transform: translate(-50%, 5px); }
+  }
+  .onboarding-arrow {
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    color: #10b981;
+    z-index: 20;
+    pointer-events: none;
+    animation: arrowBounce 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    filter: drop-shadow(0 0 6px rgba(16,185,129,0.6));
+    will-change: transform;
+  }
 `;
 
 /* ─── Static match data ───────────────────────────────────────── */
@@ -88,9 +107,9 @@ const INJURED = [
 
 const CARD_TYPES = [
   { id: 'c_match_result', label: 'Match Result' },
-  { id: 'c_total_goals', label: 'Total Goals' },
+  { id: 'c_total_goals',  label: 'Total Goals'  },
   { id: 'c_player_score', label: 'Player Score' },
-  { id: 'c_supersub', label: 'Supersub' },
+  { id: 'c_supersub',     label: 'Supersub'     },
 ];
 
 const TABS = ['LINEUP', 'SUBS', 'EVENTS', 'STATS'];
@@ -129,12 +148,11 @@ const CONTENT_PANEL = {
   borderLeft: '1px solid rgba(255,255,255,0.10)',
   borderRight: '1px solid rgba(255,255,255,0.10)',
   padding: '16px 0',
-  minHeight: '100%',
 };
 
 /* ─── Inline Joseba intel box — compact collapsible ── */
 const JosebaIntelBox = ({ message, isTappable, onTap }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   return (
     <div
       style={{
@@ -143,22 +161,20 @@ const JosebaIntelBox = ({ message, isTappable, onTap }) => {
         background: '#f5f0e8', borderRadius: '14px',
         boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
         cursor: isTappable ? 'pointer' : 'default',
-        maxHeight: '20vh',
-        overflow: 'hidden',
         position: 'relative',
       }}
-      onClick={isTappable ? onTap : () => setExpanded(e => !e)}
+      onClick={isTappable ? onTap : undefined}
     >
       <img
         src="/assets/assistant-head.png"
         alt="Joseba"
         style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)' }}
       />
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
         <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
           Joseba · Analyst
         </span>
-        <div style={{ maxHeight: expanded ? 'none' : '60px', overflow: 'hidden' }}>
+        <div style={{ maxHeight: collapsed ? '3.5rem' : '40vh', overflow: collapsed ? 'hidden' : 'auto', transition: 'max-height 0.2s ease' }}>
           <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '2px 0 0', lineHeight: 1.35 }}>
             {message}
           </p>
@@ -170,11 +186,13 @@ const JosebaIntelBox = ({ message, isTappable, onTap }) => {
         </div>
       </div>
       {!isTappable && (
-        <div style={{ position: 'absolute', bottom: 6, right: 8, color: '#888' }}>
-          {expanded
-            ? <ChevronUp style={{ width: 14, height: 14 }} />
-            : <ChevronDown style={{ width: 14, height: 14 }} />}
-        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); setCollapsed(v => !v); }}
+          style={{ position: 'absolute', bottom: 6, right: 8, color: '#888', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          aria-label={collapsed ? 'Expand' : 'Collapse'}
+        >
+          <ChevronDown style={{ width: 14, height: 14, transform: collapsed ? 'none' : 'rotate(180deg)', transition: 'transform 0.2s ease' }} />
+        </button>
       )}
     </div>
   );
@@ -190,7 +208,10 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
 
   // Staging + locked-in state (replaces pendingX vars)
   const [simStaged, setSimStaged] = useState(null); // { label, reward }
+  const [selectedCardForConfirm, setSelectedCardForConfirm] = useState(null);
   const [showLockedIn, setShowLockedIn] = useState(false);
+  const pendingAdvanceRef = useRef(null);
+  const bannerNextStepRef = useRef(null); // captures {nextStep, nextCard} for tap-dismiss
 
   // Settlement state
   const [settling, setSettling] = useState(false);
@@ -228,6 +249,16 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
     return () => timeouts.forEach(clearTimeout);
   }, [settling]);
 
+  /* Lock body scroll while confirm sheet is visible */
+  useEffect(() => {
+    if (simStaged && openSheet) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [simStaged, openSheet]);
+
   /* Bubble advance — only tappable steps (1, 3, 5, 7, 8) */
   const handleBubbleAdvance = () => {
     switch (step) {
@@ -245,9 +276,22 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
     }
   };
 
+  /* Tap-to-dismiss: clear auto-advance timeout and fire narrative immediately */
+  const dismissBanner = () => {
+    if (pendingAdvanceRef.current) clearTimeout(pendingAdvanceRef.current);
+    setShowLockedIn(false);
+    if (bannerNextStepRef.current) {
+      const { nextStep, nextCard } = bannerNextStepRef.current;
+      bannerNextStepRef.current = null;
+      setStep(nextStep);
+      setActiveCard(nextCard);
+    }
+  };
+
   /* Card tile tap — opens sheet directly */
   const handleCardTap = (cardId) => {
     if (cardId !== activeCard) return;
+    setSelectedCardForConfirm(cardId);
     switch (cardId) {
       case 'c_match_result': setOpenSheet('match_result'); break;
       case 'c_total_goals': setOpenSheet('total_goals'); break;
@@ -262,11 +306,29 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
     const sheet = openSheet;
     setSimStaged(null);
     setOpenSheet(null);
+
+    // Determine which step this card sets, and the next step to auto-advance to
+    let confirmedStep, nextStep, nextCard;
+    if (sheet === 'match_result')  { confirmedStep = 1; nextStep = 2; nextCard = 'c_total_goals'; }
+    else if (sheet === 'total_goals') { confirmedStep = 3; nextStep = 4; nextCard = 'c_player_score'; }
+    else if (sheet === 'player_score') { confirmedStep = 5; nextStep = 6; nextCard = 'c_supersub'; }
+    else if (sheet === 'supersub')    { confirmedStep = 7; nextStep = 8; nextCard = null; }
+
+    setStep(confirmedStep);
+    setActiveCard(null);
     setShowLockedIn(true);
-    if (sheet === 'match_result') { setStep(1); setActiveCard(null); }
-    else if (sheet === 'total_goals') { setStep(3); setActiveCard(null); }
-    else if (sheet === 'player_score') { setStep(5); setActiveCard(null); }
-    else if (sheet === 'supersub') { setStep(7); setActiveCard(null); }
+
+    // Clear any previous pending timeout
+    if (pendingAdvanceRef.current) clearTimeout(pendingAdvanceRef.current);
+    bannerNextStepRef.current = { nextStep, nextCard };
+
+    // Auto-dismiss banner after 3.5 s then advance narrative
+    pendingAdvanceRef.current = setTimeout(() => {
+      setShowLockedIn(false);
+      bannerNextStepRef.current = null;
+      setStep(nextStep);
+      setActiveCard(nextCard);
+    }, 3500);
   };
 
   /* Pre-compute formation positions */
@@ -276,21 +338,11 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
   const isTappable = [1, 3, 5, 7, 8].includes(step);
 
   return (
-    <div className="h-[100dvh] w-full relative overflow-hidden flex flex-col justify-between font-sans select-none">
-
-      {/* ── BACKGROUND — tunnel pre/post ──────────────────────── */}
-      <div className="absolute inset-0 z-0">
-        <img
-          src="/assets/bg-tunnel-live.webp"
-          className="absolute inset-0 w-full h-full object-cover"
-          alt=""
-          aria-hidden="true"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-      </div>
+    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden font-sans select-none">
+      <style>{CARD_SHELF_KEYFRAMES}</style>
 
       {/* ── HEADER ────────────────────────────────────────────── */}
-      <div className="absolute top-0 w-full z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
+      <div className="flex-shrink-0 w-full z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
         {/* Row 1: Back + League */}
         <div className="flex items-center justify-between px-4 pt-10 pb-2 gap-3">
           <button
@@ -339,7 +391,7 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
       </div>
 
       {/* ── TAB BAR ───────────────────────────────────────────── */}
-      <div className="absolute w-full z-[35]" style={{ top: '156px' }}>
+      <div className="flex-shrink-0 w-full z-[35]">
         <div
           style={{
             display: 'flex',
@@ -388,8 +440,8 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
 
       {/* ── TAB CONTENT ───────────────────────────────────────── */}
       <div
-        className="absolute w-full z-30 overflow-y-auto scrollbar-hide pb-36"
-        style={{ top: '196px', bottom: '192px', WebkitOverflowScrolling: 'touch' }}
+        className="flex-1 w-full z-30 overflow-y-auto overscroll-contain scrollbar-hide pb-48"
+        style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
         <div style={CONTENT_PANEL}>
 
@@ -515,23 +567,29 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
         </div>
       </div>
 
-      {/* ── CARD SHELF — hidden when any overlay is open ─────── */}
-      {!openSheet && !simStaged && !settling && !settled && (
-        <div data-testid="sim-card-shelf" className="fixed bottom-0 w-full z-[300] h-48">
+      {/* ── CARD SHELF — fixed above backdrop (z-[146] > z-[140]), hidden only during picker or settlement ── */}
+      {(!openSheet || simStaged) && !settling && !settled && (
+        <div data-testid="sim-card-shelf" className="fixed bottom-0 inset-x-0 z-[146] h-48 bg-zinc-950 border-t border-white/10 shadow-[0_-8px_20px_rgba(0,0,0,0.5)]">
           <div className="absolute bottom-0 w-full h-24 bg-[url('/shelf-console.webp')] bg-cover bg-bottom z-10" />
           <div className="absolute inset-0 flex justify-center items-end gap-1 pb-10 px-1 z-20">
             {CARD_TYPES.map(card => {
               const isActive = activeCard === card.id;
+              const isSelectedForConfirm = card.id === selectedCardForConfirm;
+              const showConfirm = !!(simStaged && openSheet);
+              const shouldDim = showConfirm ? !isSelectedForConfirm : !isActive;
               return (
                 <button
                   key={card.id}
                   onClick={() => handleCardTap(card.id)}
-                  className={`relative flex flex-col items-center transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-40'
-                    }`}
+                  className="relative flex flex-col items-center transition-opacity duration-[400ms]"
+                  style={{ opacity: shouldDim ? 0.3 : 1 }}
                 >
-                  {/* Consistent size for all tiles — only ring differs */}
-                  <div className={`w-[5rem] h-[7.5rem] relative rounded-xl ${isActive ? 'ring-2 ring-white/40 animate-pulse' : ''
-                    }`}>
+                  {isActive && !showConfirm && (
+                    <div className="onboarding-arrow animate-in fade-in duration-300">
+                      <ChevronDown className="w-5 h-5" strokeWidth={3} />
+                    </div>
+                  )}
+                  <div className="w-[5rem] h-[7.5rem] relative rounded-xl">
                     <div className="absolute inset-0 flex items-center justify-center z-10">
                       <CardBase type={card.id} status="generic" variant="transparent" />
                     </div>
@@ -605,15 +663,27 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
 
       {/* ── PLAYER SCORE SELECTION ────────────────────────────── */}
       {openSheet === 'player_score' && !simStaged && (
-        <div className="fixed inset-0 z-[100] flex flex-col bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-          <button onClick={() => setOpenSheet(null)} className="absolute top-8 right-8 text-white/50 hover:text-white">
-            <X className="w-8 h-8" />
-          </button>
-          <div className="w-full max-w-lg mx-auto bg-zinc-900 border border-white/10 rounded-t-3xl mt-auto overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
-            <div className="bg-zinc-800/50 px-6 py-5 border-b border-white/5">
-              <h3 className="text-white font-black uppercase tracking-tighter text-xl">Pick a Player to Score</h3>
+        <div className="fixed inset-0 z-[100] flex items-end">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setOpenSheet(null)} />
+          <div className="relative w-full bg-zinc-900 border-t border-white/10 rounded-t-3xl max-h-[75vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300">
+            {/* Drag handle */}
+            <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mt-3 flex-shrink-0" />
+
+            {/* Close button */}
+            <button
+              onClick={() => setOpenSheet(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center z-10"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+
+            {/* Title */}
+            <div className="px-5 pt-4 pb-3 flex-shrink-0">
+              <h3 className="text-white font-black text-lg uppercase tracking-wide">Pick a Player to Score</h3>
             </div>
-            <div className="h-[55vh] overflow-y-auto p-4 space-y-2 scrollbar-hide">
+
+            {/* Scrollable list */}
+            <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-2 scrollbar-hide">
               {SCORERS.map((player) => (
                 <button
                   key={player.player_id}
@@ -639,15 +709,28 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
 
       {/* ── SUPERSUB SELECTION ────────────────────────────────── */}
       {openSheet === 'supersub' && !simStaged && (
-        <div className="fixed inset-0 z-[100] flex flex-col bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-          <button onClick={() => setOpenSheet(null)} className="absolute top-8 right-8 text-white/50 hover:text-white">
-            <X className="w-8 h-8" />
-          </button>
-          <div className="w-full max-w-lg mx-auto bg-zinc-900 border border-white/10 rounded-t-3xl mt-auto overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
-            <div className="bg-zinc-800/50 px-6 py-5 border-b border-white/5">
-              <h3 className="text-white font-black uppercase tracking-tighter text-xl">Pick your Supersub</h3>
+        <div className="fixed inset-0 z-[100] flex items-end">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setOpenSheet(null)} />
+          <div className="relative w-full bg-zinc-900 border-t border-white/10 rounded-t-3xl max-h-[75vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300">
+            {/* Drag handle */}
+            <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mt-3 flex-shrink-0" />
+
+            {/* Close button */}
+            <button
+              onClick={() => setOpenSheet(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center z-10"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+
+            {/* Title */}
+            <div className="px-5 pt-4 pb-3 flex-shrink-0">
+              <h3 className="text-white font-black text-lg uppercase tracking-wide">Pick your Supersub</h3>
             </div>
-            <div className="p-4 space-y-2 overflow-y-auto max-h-[55vh] scrollbar-hide">
+
+            {/* Scrollable list */}
+            <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-2 scrollbar-hide">
+              {/* "Any Sub" — visually distinct highlighted option */}
               <button
                 onClick={() => setSimStaged({ label: 'Any Sub to Score', reward: SIM_REWARDS.BENCH })}
                 className="w-full flex justify-between items-center p-3 rounded-xl border border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all active:scale-95"
@@ -655,14 +738,15 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                 <span className="text-cyan-400 font-black text-sm">⚡ Any Sub to Score</span>
                 <span className="text-yellow-400 font-black text-sm ml-3">+{SIM_REWARDS.BENCH} pts</span>
               </button>
+
+              {/* Individual bench players */}
               {SIM_BENCH.map(player => {
                 const hi = player.player_name === 'G. Wijnaldum' || player.player_name === 'D. Sturridge';
                 return (
                   <button
                     key={player.player_id}
                     onClick={() => setSimStaged({ label: player.player_name, reward: SIM_REWARDS.SUPERSUB_SPECIFIC })}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all active:scale-95 ${hi ? 'bg-cyan-500/5 border-cyan-500/20 hover:bg-cyan-500/15' : 'bg-white/5 border-transparent hover:bg-emerald-500/20 hover:border-emerald-500/50'
-                      }`}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all active:scale-95 ${hi ? 'bg-cyan-500/5 border-cyan-500/20 hover:bg-cyan-500/15' : 'bg-white/5 border-transparent hover:bg-emerald-500/20 hover:border-emerald-500/50'}`}
                   >
                     <div className="text-left">
                       <span className="text-white font-bold text-sm block">{player.player_name}</span>
@@ -679,56 +763,64 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
         </div>
       )}
 
-      {/* ── STAGING MODAL — shared for all card types ─────────── */}
+      {/* ── CONFIRM SHEET — docked above card strip ───────────── */}
       {simStaged && openSheet && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
-            <div className="flex justify-between items-start mb-8">
-              <div className="space-y-1">
-                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Outcome Selection</p>
-                <h3 className="text-white font-black text-3xl uppercase italic tracking-tighter leading-tight">{simStaged.label}</h3>
+        <>
+          {/* Partial backdrop — covers only above the card strip */}
+          <div
+            className="fixed inset-x-0 top-0 bottom-48 z-[140] bg-black/55 backdrop-blur-[2px]"
+            onClick={() => setSimStaged(null)}
+          />
+          {/* Confirm sheet — docked above card strip */}
+          <div className="fixed inset-x-0 bottom-48 z-[145] bg-zinc-900 border-t border-white/15 rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="px-5 py-4 max-w-md mx-auto">
+              <div className="flex justify-between items-baseline mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Outcome</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Reward</span>
               </div>
-              <div className="text-right space-y-1">
-                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Reward</p>
-                <p className="text-yellow-400 font-black text-4xl tracking-tighter">
-                  {simStaged.reward} <span className="text-xs uppercase">pts</span>
-                </p>
+              <div className="flex justify-between items-baseline mb-4">
+                <span className="text-white font-black text-xl italic uppercase tracking-tight">{simStaged.label}</span>
+                <span className="text-yellow-400 font-black text-xl">{simStaged.reward} <span className="text-xs font-bold">pts</span></span>
               </div>
-            </div>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setSimStaged(null)}
-                className="flex-1 py-4 bg-zinc-800 rounded-2xl font-bold uppercase text-zinc-400 text-xs tracking-widest hover:bg-zinc-700 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSimConfirm}
-                className="flex-[2] py-4 bg-emerald-500 rounded-2xl font-black uppercase text-black text-xl shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:scale-105 transition-all"
-              >
-                Confirm Play
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSimStaged(null)}
+                  className="flex-1 py-3 bg-white/[0.08] text-white/70 font-bold uppercase tracking-widest text-xs rounded-xl active:scale-95 transition-transform"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSimConfirm}
+                  className="flex-[2] py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-xs rounded-xl active:scale-95 transition-transform"
+                >
+                  Confirm Play
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* ── LOCKED IN! CONFIRMATION — matches real MatchDetail ── */}
+      {/* ── PREDICTION BANNER — anchored above the card strip, tap to dismiss ── */}
       {showLockedIn && (
-        <div className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6">
-          <div className="text-center w-full max-w-sm border border-white/10 bg-zinc-900/50 p-10 rounded-[3rem] relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
-            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30">
-              <Trophy className="w-10 h-10 text-emerald-400" />
+        <div
+          className="fixed inset-x-0 z-[150] cursor-pointer"
+          style={{ bottom: '12rem' }}
+          onClick={dismissBanner}
+        >
+          <div className="bg-emerald-500/95 backdrop-blur-md border-t border-emerald-400/60 shadow-[0_-4px_20px_rgba(16,185,129,0.4)] animate-in slide-in-from-bottom duration-300">
+            <div className="max-w-md mx-auto px-4 py-3 flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <Check className="w-5 h-5 text-white" strokeWidth={3} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-[11px] font-black uppercase tracking-widest">Prediction Made</p>
+                <p className="text-white/90 text-xs">Stamped on your tactical board.</p>
+                <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Tap to dismiss</p>
+              </div>
+              {/* No View CTA during simulation — tap-to-dismiss advances narrative */}
+              <div className="flex-shrink-0 w-2" />
             </div>
-            <h2 className="text-white font-black uppercase text-4xl tracking-tighter mb-4">Locked In!</h2>
-            <p className="text-zinc-500 text-sm mb-8 uppercase tracking-widest font-bold">Your prediction has been logged in the Locker Room</p>
-            <button
-              onClick={() => setShowLockedIn(false)}
-              className="w-full py-5 bg-white text-black font-black uppercase rounded-2xl shadow-2xl hover:bg-zinc-200 transition-colors tracking-tighter text-lg"
-            >
-              Continue Scouting
-            </button>
           </div>
         </div>
       )}
@@ -784,20 +876,6 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
               </div>
             </div>
 
-            {/* Goal popup */}
-            {goalPopup && (
-              <div className="absolute inset-x-4 top-[28%] z-30 animate-in zoom-in duration-300">
-                <div className="w-full max-w-md mx-auto bg-zinc-900 border border-white/10 rounded-3xl p-8 shadow-2xl text-center relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
-                  <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
-                    <span className="text-3xl">⚽</span>
-                  </div>
-                  <h2 className="text-white font-black uppercase text-3xl tracking-tighter mb-2">Goal!</h2>
-                  <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest">Liverpool</p>
-                  <p className="text-zinc-500 text-xs mt-1">Scored by {goalPopup.scorer} · {goalPopup.minute}</p>
-                </div>
-              </div>
-            )}
 
             {/* WINNER popup */}
             {showWinnerPopup && (
@@ -831,6 +909,28 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
                 </div>
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      {/* ── GOAL CELEBRATION ── viewport-centred, above settlement layer ── */}
+      {goalPopup && (
+        <>
+          {/* Backdrop dim — sits just below the card */}
+          <div className="fixed inset-0 z-[149] bg-black/40 pointer-events-none" />
+
+          {/* Card */}
+          <div className="fixed inset-0 z-[150] flex items-center justify-center pointer-events-none">
+            <div className="bg-zinc-900/95 backdrop-blur-md border border-emerald-500/40 rounded-2xl p-8 shadow-2xl max-w-xs w-[85%] animate-in zoom-in-95 duration-300 text-center">
+              <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center mb-4">
+                <span className="text-4xl">⚽</span>
+              </div>
+              <h2 className="text-white text-3xl font-black tracking-tight mb-1">GOAL!</h2>
+              <p className="text-emerald-400 font-bold uppercase tracking-widest text-sm mb-3">Liverpool</p>
+              <p className="text-zinc-400 text-sm">
+                Scored by <span className="text-white font-bold">{goalPopup.scorer}</span> · {goalPopup.minute}
+              </p>
+            </div>
           </div>
         </>
       )}

@@ -139,6 +139,7 @@ export const GameProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [statDictionary, setStatDictionary] = useState(null);
+  const [isOnboardingActive, setIsOnboardingActive] = useState(false);
   // Settled predictions the user hasn't seen yet — drives WinCelebrationModal on Dashboard
   const [unseenSettlements, setUnseenSettlements] = useState([]);
   const activeRequestId = useRef(0);
@@ -890,6 +891,9 @@ export const GameProvider = ({ children }) => {
     // Settlements
     unseenSettlements,
     markPredictionsSeen,
+    // Onboarding overlay state
+    isOnboardingActive,
+    setIsOnboardingActive,
   };
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 };

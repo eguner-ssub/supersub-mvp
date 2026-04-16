@@ -7,7 +7,7 @@ import OfficeOnboarding from './OfficeOnboarding';
 
 const ManagerOffice = () => {
     const navigate = useNavigate();
-    const { userProfile, currentStreak } = useGame();
+    const { userProfile, currentStreak, isOnboardingActive } = useGame();
     const [notifications, setNotifications] = useState([]);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [onboardingDismissed, setOnboardingDismissed] = useState(false);
@@ -16,6 +16,8 @@ const ManagerOffice = () => {
     // Separate loaded state for each image to enable crossfade
     const [packedLoaded, setPackedLoaded] = useState(false);
     const [emptyLoaded, setEmptyLoaded] = useState(false);
+
+    const showPacked = isOnboardingActive || anyLiveMatches;
 
     useEffect(() => {
         if (userProfile && userProfile.onboarding_complete === false && !onboardingDismissed) {
@@ -155,14 +157,14 @@ const ManagerOffice = () => {
                     aria-hidden="true"
                     onLoad={() => setEmptyLoaded(true)}
                     className="absolute inset-0 w-full h-full object-fill z-0 transition-opacity duration-700"
-                    style={{ opacity: emptyLoaded && !anyLiveMatches ? 1 : 0 }}
+                    style={{ opacity: emptyLoaded && !showPacked ? 1 : 0 }}
                 />
                 <img
                     src="/assets/manager-room-packed.webp"
                     alt="Manager Office"
                     onLoad={() => setPackedLoaded(true)}
                     className="absolute inset-0 w-full h-full object-fill z-0 transition-opacity duration-700"
-                    style={{ opacity: packedLoaded && anyLiveMatches ? 1 : 0 }}
+                    style={{ opacity: packedLoaded && showPacked ? 1 : 0 }}
                 />
 
                 {/* ── PERSPECTIVE SCENE ── */}

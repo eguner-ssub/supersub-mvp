@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGame } from '../../shared/context/GameContext';
 import JosebaBubble from '../../shared/ui/JosebaBubble';
 import SimulationMatchHub from './SimulationMatchHub';
@@ -17,7 +17,13 @@ const INTRO_MESSAGES = [
  * at z-[300], above the NavigationShell nav dock (z-50). Controls all onboarding phases.
  */
 const OfficeOnboarding = ({ onComplete }) => {
-  const { supabase, userProfile } = useGame();
+  const { supabase, userProfile, setIsOnboardingActive } = useGame();
+
+  // Hide GameHeader for the entire duration of the onboarding overlay
+  useEffect(() => {
+    setIsOnboardingActive(true);
+    return () => setIsOnboardingActive(false);
+  }, [setIsOnboardingActive]);
 
   const [phase, setPhase]         = useState('office_intro');
   const [introStep, setIntroStep] = useState(0);
@@ -40,10 +46,14 @@ const OfficeOnboarding = ({ onComplete }) => {
   /* Write completion to Supabase and call onComplete */
   const handleOnboardingDone = async () => {
     if (userProfile?.id) {
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({ onboarding_complete: true })
         .eq('id', userProfile.id);
+      if (error) {
+        console.error('Failed to mark onboarding complete:', error);
+        return;
+      }
     }
     onComplete();
   };

@@ -10,7 +10,6 @@ import { useAssetPreloader } from './hooks/useAssetPreloader';
 
 // Pages - Eager Loading
 import Landing from './pages/Landing';
-import LaunchPage from './pages/LaunchPage';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
@@ -74,10 +73,7 @@ const ProtectedRoute = ({ children, requireOnboarding = true }) => {
 export const AppRoutes = () => {
   return (
     <Routes>
-      {/* PRE-LAUNCH: Remove these routes and restore Landing to / when going live */}
-      <Route path="/" element={<LaunchPage />} />
-      {/* PRE-LAUNCH: Remove these routes and restore Landing to / when going live */}
-      <Route path="/coming-soon" element={<LaunchPage />} />
+      <Route path="/" element={<Landing />} />
       <Route path="/intro" element={<InteractiveOnboarding />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
@@ -156,7 +152,7 @@ export const AppRoutes = () => {
       <Route path="/lab/generic" element={<GenericLab />} />
       <Route path="/debug" element={<APIDebugger />} />
 
-      <Route path="*" element={<Navigate to="/manager-office" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
