@@ -249,8 +249,9 @@ export default function Dashboard() {
 
         {/* STREAK SAVE MODAL */}
         {showStreakSaveModal && pendingDecay && (
-          <div className="fixed inset-0 z-[75] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-            <div className="w-full max-w-sm bg-zinc-900 border border-white/10 rounded-2xl p-8 text-center shadow-2xl relative overflow-hidden">
+          <div className="fixed inset-0 z-[75] bg-[url('/assets/bg-dashboard.webp')] bg-cover bg-center flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+            <div className="relative z-10 w-full max-w-sm bg-zinc-900 border border-white/10 rounded-2xl p-8 text-center shadow-2xl overflow-hidden">
               <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 blur-[80px] rounded-full" />
               <div className="relative z-10">
                 <div className="mb-6 flex justify-center">
@@ -260,14 +261,14 @@ export default function Dashboard() {
                 </div>
                 <h2 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">Streak at Risk</h2>
                 <p className="text-gray-400 text-sm mb-6">
-                  Your streak would drop from{' '}
+                  You missed a day. Without a drink, your streak drops from{' '}
                   <span className="text-white font-bold">{pendingDecay.fromStreak}</span> to{' '}
-                  <span className="text-red-400 font-bold">{pendingDecay.toStreak}</span>.
-                  Spend 1 energy drink to save it?
+                  <span className="text-red-400 font-bold">{pendingDecay.toStreak}</span> days.
+                  Use 1 energy drink to stay on track?
                 </p>
                 <div className="flex items-center justify-center gap-2 mb-6">
                   <Zap className="w-4 h-4 text-amber-400" />
-                  <span className="text-amber-400 font-bold text-sm">{energyDrinks} drink{energyDrinks !== 1 ? 's' : ''} available</span>
+                  <span className="text-amber-400 font-bold text-sm">You have {energyDrinks} energy drink{energyDrinks !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="flex gap-3">
                   <button

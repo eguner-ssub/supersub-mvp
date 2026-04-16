@@ -299,12 +299,12 @@ const Inventory = () => {
               Training Today
             </p>
             <p className="text-white font-bold text-sm mb-3">
-              {trainingSessionsToday} of 2 sessions used
+              {trainingSessionsToday} of 4 sessions used
             </p>
 
             {/* Progress segments */}
             <div className="flex gap-1.5 mb-4">
-              {[0, 1].map(i => (
+              {[0, 1, 2, 3].map(i => (
                 <div
                   key={i}
                   className={`h-1.5 flex-1 rounded-full ${
@@ -314,7 +314,7 @@ const Inventory = () => {
               ))}
             </div>
 
-            {trainingSessionsToday < 2 ? (
+            {trainingSessionsToday < 4 ? (
               <button
                 onClick={() => navigate('/training')}
                 className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-widest rounded-xl transition-colors active:scale-95"
@@ -323,7 +323,7 @@ const Inventory = () => {
               </button>
             ) : (
               <p className="text-zinc-500 text-xs font-bold text-center">
-                Come back tomorrow for 2 more sessions
+                Come back tomorrow for 4 more sessions
               </p>
             )}
           </div>

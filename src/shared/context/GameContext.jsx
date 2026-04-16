@@ -586,6 +586,13 @@ export const GameProvider = ({ children }) => {
     setUserProfile(prev => prev ? { ...prev, energy_drinks: newDrinks, pendingDecay: null } : prev);
     await supabase.from('profiles').update({ energy_drinks: newDrinks }).eq('id', userProfile.id);
 
+    // Backdate last_streak_date to yesterday so claimTrainingBag → incrementStreak()
+    // sees the gap as exactly one day and increments instead of resetting to 1.
+    // (Without this, missing 2+ days fails the lastDate === yesterday check.)
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
+    setUserProfile(prev => prev ? { ...prev, last_streak_date: yesterday } : prev);
+    await supabase.from('profiles').update({ last_streak_date: yesterday }).eq('id', userProfile.id);
+
     return claimTrainingBag();
   };
 

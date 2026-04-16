@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../shared/context/GameContext';
-import { Zap, HelpCircle, Clock, Loader2, Brain, Trophy, PlayCircle, CheckCircle, XCircle, Timer, Star } from 'lucide-react';
+import { Zap, HelpCircle, Clock, Loader2, Brain, Trophy, PlayCircle, CheckCircle, XCircle, Timer, Star, ArrowLeft } from 'lucide-react';
 import MobileLayout from '../shared/ui/MobileLayout';
 import AdOverlay from '../components/AdOverlay';
 import GameHeader from '../shared/ui/GameHeader';
+import JosebaBubble from '../shared/ui/JosebaBubble';
 import gameData from '../data/gameData.json';
 
 const TIMER_SECONDS = 10;
@@ -38,6 +39,7 @@ const Training = () => {
     trainingSessionsToday,
     startTrainingSession,
     completeTrainingSession,
+    supabase,
   } = useGame();
   const navigate = useNavigate();
 
@@ -55,6 +57,7 @@ const Training = () => {
   const [showCapMessage, setShowCapMessage] = useState(false);
   const [josebaToast, setJosebaToast]             = useState(false);
   const [josebaToastMessage, setJosebaToastMessage] = useState('');
+  const [showTrainingOnboarding, setShowTrainingOnboarding] = useState(false);
 
   /* ─── Build question deck (10 questions: 2 hard + 8 normal) ──────────── */
   useEffect(() => {
@@ -69,6 +72,17 @@ const Training = () => {
       setQuestions(shuffle([...hard, ...normal]));
     }
   }, [userProfile, loading, navigate]);
+
+  /* ─── One-time Joseba briefing bubble ─────────────────────────────────── */
+  // Mirrors the Kit Bag onboarding pattern (Inventory.jsx). Default-false column
+  // means every existing user sees it once on next visit; tapping the bubble
+  // optimistically hides it and writes training_onboarding_seen=true to profiles.
+  useEffect(() => {
+    if (!userProfile) return;
+    if (!userProfile.training_onboarding_seen) {
+      setShowTrainingOnboarding(true);
+    }
+  }, [userProfile]);
 
   /* ─── Countdown timer ─────────────────────────────────────────────────── */
   useEffect(() => {
@@ -136,6 +150,16 @@ const Training = () => {
     navigate('/dashboard');
   };
 
+  const handleTrainingOnboardingAdvance = async () => {
+    setShowTrainingOnboarding(false);
+    if (userProfile?.id) {
+      await supabase
+        .from('profiles')
+        .update({ training_onboarding_seen: true })
+        .eq('id', userProfile.id);
+    }
+  };
+
   const handleAdReward = async () => {
     try {
       await claimAdReward();
@@ -183,7 +207,14 @@ const Training = () => {
       <div className="relative min-h-screen">
         <GameHeader />
         <MobileLayout bgImage="/bg-training-brief.webp">
-          <div className="w-full max-w-md h-full flex flex-col justify-center px-5 py-6 pt-24">
+          <button
+            onClick={() => navigate(-1)}
+            className="absolute top-[72px] left-4 z-20 w-9 h-9 bg-white/10 border border-white/20 rounded-full flex items-center justify-center text-white active:scale-95"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div className="w-full max-w-md h-full flex flex-col justify-center px-5 py-6 pt-24 pb-40">
 
             <div className="bg-black/85 backdrop-blur-md border border-white/10 rounded-2xl p-7 shadow-2xl">
               {/* Icon */}
@@ -207,7 +238,7 @@ const Training = () => {
               <div className="grid grid-cols-3 gap-3 mb-7">
                 <StatTile icon={<Zap className={`w-5 h-5 ${hasEnergy ? 'text-yellow-400' : 'text-red-500'}`} />} label="Cost" value="1 Energy" valueColor={hasEnergy ? 'text-white' : 'text-red-400'} />
                 <StatTile icon={<HelpCircle className="w-5 h-5 text-emerald-400" />} label="Questions" value="10" />
-                <StatTile icon={<Timer className="w-5 h-5 text-blue-400" />} label="Sessions" value={`${trainingSessionsToday}/${SESSION_CAP}`} valueColor={isCapReached ? 'text-red-400' : 'text-white'} />
+                <StatTile icon={<Timer className="w-5 h-5 text-blue-400" />} label="Today" value={`${trainingSessionsToday} of ${SESSION_CAP} used`} valueColor={isCapReached ? 'text-red-400' : 'text-white'} />
               </div>
 
               {/* Cap message */}
@@ -227,18 +258,35 @@ const Training = () => {
                   Watch Ad (+1 Energy Drink)
                 </button>
               ) : (
-                <button
-                  onClick={handleStartSession}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black rounded-xl text-lg tracking-widest uppercase transition-all shadow-lg border-b-4 border-emerald-800"
-                >
-                  Start Session
-                </button>
+                <>
+                  <button
+                    onClick={handleStartSession}
+                    disabled={showTrainingOnboarding}
+                    className={`w-full py-4 bg-emerald-600 text-white font-black rounded-xl text-lg tracking-widest uppercase transition-all shadow-lg border-b-4 border-emerald-800 ${
+                      showTrainingOnboarding
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'hover:bg-emerald-500 active:scale-95'
+                    }`}
+                  >
+                    Start Session
+                  </button>
+                  {showTrainingOnboarding && (
+                    <p className="text-zinc-500 text-xs text-center mt-2">Read Joseba's brief first</p>
+                  )}
+                </>
               )}
             </div>
           </div>
         </MobileLayout>
 
         {showAd && <AdOverlay onReward={handleAdReward} onClose={() => setShowAd(false)} />}
+
+        {showTrainingOnboarding && (
+          <JosebaBubble
+            message="Each session is 10 questions — you have 10 seconds per question. Your score determines your card reward: 7+ correct earns 2 cards, a perfect 10 earns 4 cards plus a Supersub and an energy drink. Costs 1 energy to start. Good luck, Boss."
+            onAdvance={handleTrainingOnboardingAdvance}
+          />
+        )}
       </div>
     );
   }
@@ -252,7 +300,7 @@ const Training = () => {
         <GameHeader />
         <MobileLayout bgImage="/bg-training-quiz.webp">
           <div className="h-full flex flex-col items-center justify-center p-5 relative z-50">
-            <div className="w-full max-w-md bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-7 border border-gray-700 text-center relative overflow-hidden">
+            <div className="w-full max-w-md bg-black/85 backdrop-blur-md rounded-2xl shadow-2xl p-7 border border-white/10 text-center relative overflow-hidden">
               {/* Top accent bar */}
               <div className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500" />
 
@@ -262,7 +310,7 @@ const Training = () => {
               </div>
               <h2 className="text-3xl font-black text-white mb-1 uppercase tracking-wide">Session Clear!</h2>
               <p className="text-gray-400 text-sm mb-6">
-                {score === 10 ? 'Perfect score! Outstanding.' : score >= 7 ? 'Excellent work, manager.' : 'Not bad, manager. Keep training.'}
+                {score === 10 ? 'Perfect score! Outstanding.' : score >= 7 ? 'Excellent work, Boss.' : 'Not bad, Boss. Keep training.'}
               </p>
 
               {/* Score + Rewards */}
@@ -283,7 +331,7 @@ const Training = () => {
                   <div className="flex flex-col items-end gap-1.5">
                     {earnedReward ? (
                       <>
-                        <RewardBadge icon="🏆" label={`Match Result ×${earnedReward.commonCount}`} color="text-blue-400" border="border-blue-500/40" bg="bg-blue-500/10" />
+                        <RewardBadge label={`Match Result ×${earnedReward.commonCount}`} color="text-blue-400" border="border-blue-500/40" bg="bg-blue-500/10" />
                         {earnedReward.hasSupersub && (
                           <RewardBadge icon="⚡" label="Super Sub ×1" color="text-cyan-400" border="border-cyan-500/40" bg="bg-cyan-500/10" />
                         )}
@@ -300,7 +348,7 @@ const Training = () => {
 
               <button
                 onClick={handleFinish}
-                className="w-full py-4 font-black rounded-xl text-lg uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 cursor-pointer bg-yellow-500 hover:bg-yellow-400 text-black border-yellow-700"
+                className="w-full py-4 font-black rounded-xl text-lg uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-black border-emerald-700"
               >
                 Continue
               </button>
@@ -482,7 +530,7 @@ const StatTile = ({ icon, label, value, valueColor = 'text-white' }) => (
 /* ─── Reward badge used on complete screen ───────────────────────────────── */
 const RewardBadge = ({ icon, label, color, border, bg }) => (
   <div className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border ${bg} ${border}`}>
-    <span className="text-base">{icon}</span>
+    {icon && <span className="text-base">{icon}</span>}
     <span className={`font-black text-sm ${color}`}>{label}</span>
   </div>
 );
