@@ -3,6 +3,7 @@ import { calculateResult, isFinished, isLive, isVoid } from '../../scripts/settl
 import { refreshLeaderboards } from '../../lib/leaderboard/refresh.js';
 import { syncMatchIntel } from '../../scripts/sync-match-intel.js';
 import { syncNewsIntel } from '../../scripts/sync-news-intel.js';
+import { backfillUpcomingMatches } from '../../scripts/backfill-matches-full.js';
 
 // ── Lazy Supabase client ──────────────────────────────────────────────────────
 let _client = null;
@@ -182,6 +183,18 @@ async function runSyncNewsIntel() {
   return await syncNewsIntel();
 }
 
+// ── Job: backfill-upcoming ───────────────────────────────────────────────────
+// Keeps matches.lineup_confirmed / lineups / events / statistics fresh for
+// fixtures in the next few days. LINEUP_CONFIRMED flips ~1h pre-kickoff, so an
+// hourly run catches flips within ~30 min on average. Narrow date window keeps
+// runtime under the serverless budget: 5 leagues × 1 request each, throttled
+// at ~1 req/sec.
+async function runBackfillUpcoming(supabase) {
+  const daysAheadRaw = Number.parseInt(process.env.BACKFILL_UPCOMING_DAYS_AHEAD ?? '', 10);
+  const daysAhead = Number.isFinite(daysAheadRaw) && daysAheadRaw > 0 ? daysAheadRaw : 3;
+  return await backfillUpcomingMatches(supabase, { daysAhead });
+}
+
 // ── Job registry ─────────────────────────────────────────────────────────────
 const JOBS = {
   'settle':               runSettle,
@@ -189,18 +202,24 @@ const JOBS = {
   'refresh-leaderboards': runRefreshLeaderboards,
   'sync-match-intel':     runSyncMatchIntel,
   'sync-news-intel':      runSyncNewsIntel,
+  'backfill-upcoming':    runBackfillUpcoming,
 };
 
 /**
- * POST /api/cron?job=<name>
+ * GET|POST /api/cron?job=<name>
  *
  * Unified cron endpoint. Dispatches to the correct job by ?job= param.
  * Protected by CRON_SECRET bearer token.
  *
- * Valid jobs: settle, sync-coaches, refresh-leaderboards, sync-match-intel, sync-news-intel
+ * GET is accepted so Vercel's native cron (vercel.json `crons[]`) can hit this
+ * endpoint — Vercel always sends GET with an Authorization: Bearer header.
+ * POST is kept for external triggers (cron-job.org, manual curl).
+ *
+ * Valid jobs: settle, sync-coaches, refresh-leaderboards, sync-match-intel,
+ * sync-news-intel, backfill-upcoming
  */
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 

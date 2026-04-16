@@ -136,6 +136,85 @@ function deriveCustomStatus(status) {
   return 'UPCOMING';
 }
 
+// ── Row building ─────────────────────────────────────────────────────────────
+
+function buildRowFromFixture(f, now) {
+  const { homeTeam, awayTeam }   = extractParticipants(f);
+  const { scoreHome, scoreAway } = extractCurrentScore(f);
+  const status                   = extractStateName(f) || 'NS';
+
+  if (!homeTeam || !awayTeam) return null;
+
+  // Sportmonks LINEUP_CONFIRMED metadata flips ~1h pre-kickoff once team
+  // sheets are released. When the entry is missing entirely (older fixtures
+  // pulled before metadata was included, or matches still in the
+  // far-future window) we OMIT the column from the upsert payload so
+  // Supabase preserves whatever is already stored — avoids clobbering a
+  // previously-confirmed value back to false on a re-sync that drops
+  // metadata for any reason.
+  const lineupMeta = (f.metadata || []).find(
+    (m) => m.developer_name === 'LINEUP_CONFIRMED'
+  );
+
+  const row = {
+    id:             f.id,
+    league_id:      f.league_id ?? null,
+    date:           toUtcIso(f.starting_at)?.split('T')[0] ?? null,
+    kickoff_time:   toUtcIso(f.starting_at),
+    home_team:      homeTeam.name,
+    away_team:      awayTeam.name,
+    home_logo:      homeTeam.image_path ?? null,
+    away_logo:      awayTeam.image_path ?? null,
+    home_team_id:   homeTeam.id ?? null,
+    away_team_id:   awayTeam.id ?? null,
+    status,
+    custom_status:  deriveCustomStatus(status),
+    home_score:     scoreHome ?? 0,
+    away_score:     scoreAway ?? 0,
+    events:         f.events?.length     ? f.events     : null,
+    lineups:        f.lineups?.length     ? f.lineups    : null,
+    statistics:     f.statistics?.length  ? f.statistics : null,
+    raw_data:       f,
+    last_updated:   now,
+    last_synced_at: now,
+  };
+
+  if (lineupMeta) {
+    row.lineup_confirmed = !!lineupMeta.values?.confirmed;
+  }
+
+  return row;
+}
+
+async function fetchAndUpsertWindow(db, leagueName, smLeagueId, from, to) {
+  const res      = await api(getFixturesByDateRangeFull, from, to, smLeagueId);
+  const fixtures = res.data || [];
+
+  if (fixtures.length === 0) {
+    console.log(`  ${leagueName}: ${from} → ${to} — 0 fixtures`);
+    return 0;
+  }
+
+  const now  = new Date().toISOString();
+  const rows = fixtures
+    .map((f) => buildRowFromFixture(f, now))
+    .filter(Boolean);
+
+  if (rows.length === 0) return 0;
+
+  const { error } = await db
+    .from('matches')
+    .upsert(rows, { onConflict: 'id' });
+
+  if (error) {
+    console.error(`  ✗ ${leagueName} ${from}–${to}: ${error.message}`);
+    return 0;
+  }
+
+  console.log(`  ✓ ${leagueName}: ${from} → ${to} — ${rows.length} matches upserted`);
+  return rows.length;
+}
+
 // ── Main backfill ─────────────────────────────────────────────────────────────
 
 async function backfillLeague(db, leagueName, smLeagueId, seasonStart, seasonEnd) {
@@ -143,80 +222,41 @@ async function backfillLeague(db, leagueName, smLeagueId, seasonStart, seasonEnd
   let total    = 0;
 
   for (const chunk of chunks) {
-    const res      = await api(getFixturesByDateRangeFull, chunk.from, chunk.to, smLeagueId);
-    const fixtures = res.data || [];
-
-    if (fixtures.length === 0) {
-      console.log(`  ${leagueName}: ${chunk.from} → ${chunk.to} — 0 fixtures`);
-      continue;
-    }
-
-    const now  = new Date().toISOString();
-    const rows = [];
-
-    for (const f of fixtures) {
-      const { homeTeam, awayTeam }     = extractParticipants(f);
-      const { scoreHome, scoreAway }   = extractCurrentScore(f);
-      const status                     = extractStateName(f) || 'NS';
-
-      if (!homeTeam || !awayTeam) continue;
-
-      // Sportmonks LINEUP_CONFIRMED metadata flips ~1h pre-kickoff once team
-      // sheets are released. When the entry is missing entirely (older fixtures
-      // pulled before metadata was included, or matches still in the
-      // far-future window) we OMIT the column from the upsert payload so
-      // Supabase preserves whatever is already stored — avoids clobbering a
-      // previously-confirmed value back to false on a re-sync that drops
-      // metadata for any reason.
-      const lineupMeta = (f.metadata || []).find(
-        (m) => m.developer_name === 'LINEUP_CONFIRMED'
-      );
-
-      const row = {
-        id:             f.id,
-        league_id:      f.league_id ?? null,
-        date:           toUtcIso(f.starting_at)?.split('T')[0] ?? null,
-        kickoff_time:   toUtcIso(f.starting_at),
-        home_team:      homeTeam.name,
-        away_team:      awayTeam.name,
-        home_logo:      homeTeam.image_path ?? null,
-        away_logo:      awayTeam.image_path ?? null,
-        home_team_id:   homeTeam.id ?? null,
-        away_team_id:   awayTeam.id ?? null,
-        status,
-        custom_status:  deriveCustomStatus(status),
-        home_score:     scoreHome ?? 0,
-        away_score:     scoreAway ?? 0,
-        events:         f.events?.length     ? f.events     : null,
-        lineups:        f.lineups?.length     ? f.lineups    : null,
-        statistics:     f.statistics?.length  ? f.statistics : null,
-        raw_data:       f,
-        last_updated:   now,
-        last_synced_at: now,
-      };
-
-      if (lineupMeta) {
-        row.lineup_confirmed = !!lineupMeta.values?.confirmed;
-      }
-
-      rows.push(row);
-    }
-
-    if (rows.length > 0) {
-      const { error } = await db
-        .from('matches')
-        .upsert(rows, { onConflict: 'id' });
-
-      if (error) {
-        console.error(`  ✗ ${leagueName} ${chunk.from}–${chunk.to}: ${error.message}`);
-      } else {
-        total += rows.length;
-        console.log(`  ✓ ${leagueName}: ${chunk.from} → ${chunk.to} — ${rows.length} matches upserted`);
-      }
-    }
+    total += await fetchAndUpsertWindow(db, leagueName, smLeagueId, chunk.from, chunk.to);
   }
 
   return total;
+}
+
+/**
+ * Backfill ONLY upcoming matches in a short window (default: next 3 days).
+ *
+ * Intended for the hourly Vercel cron handler: keeps `matches.lineup_confirmed`,
+ * `lineups`, `events`, and `statistics` fresh for imminent fixtures without
+ * re-processing a full season on every run. Skips past matches entirely since
+ * the LINEUP_CONFIRMED flag is only meaningful pre-kickoff.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} db
+ * @param {{ daysAhead?: number }} [opts]
+ * @returns {Promise<{ daysAhead: number, from: string, to: string, leagues: number, matches: number }>}
+ */
+export async function backfillUpcomingMatches(db, { daysAhead = 3 } = {}) {
+  const today = new Date();
+  const end   = new Date(today);
+  end.setDate(end.getDate() + daysAhead);
+
+  const from = toDateStr(today);
+  const to   = toDateStr(end);
+
+  const leaguesRes = await api(getLeagues);
+  const leagues    = leaguesRes.data || [];
+
+  let matches = 0;
+  for (const league of leagues) {
+    matches += await fetchAndUpsertWindow(db, league.name, league.id, from, to);
+  }
+
+  return { daysAhead, from, to, leagues: leagues.length, matches };
 }
 
 async function main() {
@@ -254,8 +294,12 @@ async function main() {
   console.log(`✓ Done. ${grandTotal} matches upserted across all leagues.`);
 }
 
-main().catch((err) => {
-  console.error('✗ Fatal:', err.message);
-  console.error(err.stack);
-  process.exit(1);
-});
+// Only run main() when invoked directly via CLI, not when imported by the
+// Vercel cron handler (api/cron/index.js pulls in `backfillUpcomingMatches`).
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((err) => {
+    console.error('✗ Fatal:', err.message);
+    console.error(err.stack);
+    process.exit(1);
+  });
+}
