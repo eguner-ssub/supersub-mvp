@@ -6,6 +6,7 @@ import MobileLayout from '../shared/ui/MobileLayout';
 import AdOverlay from '../components/AdOverlay';
 import GameHeader from '../shared/ui/GameHeader';
 import JosebaBubble from '../shared/ui/JosebaBubble';
+import CardBase from '../shared/ui/CardBase';
 import gameData from '../data/gameData.json';
 
 const TIMER_SECONDS = 10;
@@ -205,18 +206,29 @@ const Training = () => {
   if (phase === 'briefing') {
     return (
       <div className="relative min-h-screen">
-        <GameHeader />
-        <MobileLayout bgImage="/bg-training-brief.webp">
+        {/* Fixed header bar — replaces GameHeader for briefing */}
+        <div className="fixed top-0 left-0 right-0 z-50 h-14 bg-black/80 backdrop-blur-md border-b border-white/10 flex items-center px-4">
           <button
             onClick={() => navigate(-1)}
-            className="absolute top-[72px] left-4 z-20 w-9 h-9 bg-white/10 border border-white/20 rounded-full flex items-center justify-center text-white active:scale-95"
+            className="w-9 h-9 bg-white/10 border border-white/20 rounded-full flex items-center justify-center text-white active:scale-95"
             aria-label="Back"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div className="w-full max-w-md h-full flex flex-col justify-center px-5 py-6 pt-24 pb-40">
+          <span className="flex-1 text-center text-[11px] font-black uppercase tracking-widest text-white">
+            Training Camp
+          </span>
+          {/* Right spacer to balance back button */}
+          <div className="w-9" />
+        </div>
 
-            <div className="bg-black/85 backdrop-blur-md border border-white/10 rounded-2xl p-7 shadow-2xl">
+        <MobileLayout bgImage="/bg-training-brief.webp">
+          <div className="w-full max-w-md h-full flex flex-col justify-center px-5 py-6 pt-20 pb-40">
+
+            <div className="bg-black/85 backdrop-blur-md border border-white/10 rounded-2xl p-7 shadow-[0_0_40px_rgba(16,185,129,0.15)] relative overflow-hidden">
+              {/* Top accent bar */}
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500" />
+
               {/* Icon */}
               <div className="flex justify-center mb-5">
                 <div className="p-4 bg-emerald-500/20 rounded-full border border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.25)]">
@@ -283,6 +295,7 @@ const Training = () => {
 
         {showTrainingOnboarding && (
           <JosebaBubble
+            variant="warm"
             message="Each session is 10 questions — you have 10 seconds per question. Your score determines your card reward: 7+ correct earns 2 cards, a perfect 10 earns 4 cards plus a Supersub and an energy drink. Costs 1 energy to start. Good luck, Boss."
             onAdvance={handleTrainingOnboardingAdvance}
           />
@@ -295,66 +308,111 @@ const Training = () => {
      PHASE: COMPLETE
   ══════════════════════════════════════════════════════════════ */
   if (phase === 'complete') {
-    return (
-      <div className="relative min-h-screen">
-        <GameHeader />
-        <MobileLayout bgImage="/bg-training-quiz.webp">
-          <div className="h-full flex flex-col items-center justify-center p-5 relative z-50">
-            <div className="w-full max-w-md bg-black/85 backdrop-blur-md rounded-2xl shadow-2xl p-7 border border-white/10 text-center relative overflow-hidden">
-              {/* Top accent bar */}
-              <div className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500" />
+    const josebaCopy =
+      score === 10 ? "Flawless. That's how a manager operates." :
+      score === 9  ? 'Almost perfect. One slip — but still a strong haul.' :
+      score >= 7   ? "Good session. You've earned yourself some cards." :
+      score >= 5   ? 'Solid effort. A few more right next time unlocks better rewards.' :
+                     'Rough session, Boss. Shake it off and go again.';
 
-              {/* Trophy */}
-              <div className="mb-5 inline-block p-4 rounded-full bg-yellow-500/10 border border-yellow-500/30">
+    return (
+      <div className="fixed inset-0 z-[100]">
+        {/* Top area — tap to dismiss */}
+        <button
+          onClick={handleFinish}
+          className="absolute top-0 left-0 right-0 h-[15vh] w-full bg-black/60"
+          aria-label="Dismiss"
+        />
+
+        {/* Bottom sheet */}
+        <div className="absolute bottom-0 left-0 right-0 top-[15vh] bg-zinc-900 rounded-t-3xl flex flex-col animate-in slide-in-from-bottom duration-500">
+          {/* Drag handle */}
+          <div className="w-12 h-1 bg-emerald-500 rounded-full mx-auto mt-3 flex-shrink-0" />
+
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto px-6 pt-4 pb-8">
+
+            {/* Trophy + title */}
+            <div className="text-center mb-5">
+              <div className="mb-4 inline-block p-4 rounded-full bg-yellow-500/10 border border-yellow-500/30">
                 <Trophy className="w-14 h-14 text-yellow-400 animate-bounce" />
               </div>
-              <h2 className="text-3xl font-black text-white mb-1 uppercase tracking-wide">Session Clear!</h2>
-              <p className="text-gray-400 text-sm mb-6">
-                {score === 10 ? 'Perfect score! Outstanding.' : score >= 7 ? 'Excellent work, Boss.' : 'Not bad, Boss. Keep training.'}
-              </p>
+              <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-wide">Session Clear!</h2>
+              <p className="text-zinc-400 text-sm text-center">{josebaCopy}</p>
+            </div>
 
-              {/* Score + Rewards */}
-              <div className="bg-gray-800/80 rounded-xl p-4 mb-5 border border-gray-700 space-y-3">
-                {/* Score row */}
-                <div className="flex justify-between items-center">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest">Score</p>
-                  <p className="text-2xl font-black text-white">
-                    {score}<span className="text-gray-600 text-base font-normal">/10</span>
-                  </p>
-                </div>
+            {/* Score box */}
+            <div className="bg-zinc-800/80 rounded-xl p-4 mb-5 border border-zinc-700">
+              <div className="flex justify-between items-center">
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Score</p>
+                <p className="text-2xl font-black text-white">
+                  {score}<span className="text-gray-600 text-base font-normal">/10</span>
+                </p>
+              </div>
+            </div>
 
-                <div className="border-t border-gray-700/60" />
+            {/* Rewards row */}
+            {earnedReward ? (
+              <div className="flex items-end justify-center gap-4 mb-6">
 
-                {/* Rewards */}
-                <div className="flex justify-between items-start">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest pt-0.5">Earned</p>
-                  <div className="flex flex-col items-end gap-1.5">
-                    {earnedReward ? (
-                      <>
-                        <RewardBadge label={`Match Result ×${earnedReward.commonCount}`} color="text-blue-400" border="border-blue-500/40" bg="bg-blue-500/10" />
-                        {earnedReward.hasSupersub && (
-                          <RewardBadge icon="⚡" label="Super Sub ×1" color="text-cyan-400" border="border-cyan-500/40" bg="bg-cyan-500/10" />
-                        )}
-                        {earnedReward.hasDrink && (
-                          <RewardBadge icon="🧃" label="Energy Drink ×1" color="text-yellow-400" border="border-yellow-500/40" bg="bg-yellow-500/10" />
-                        )}
-                      </>
-                    ) : (
-                      <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-                    )}
+                {/* Match Result card */}
+                <div className="relative flex flex-col items-center">
+                  <div style={{ transform: 'scale(0.55)', transformOrigin: 'bottom center' }}>
+                    <CardBase type="c_match_result" status="generic" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 z-30">
+                    <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-0.5">
+                      <span>x</span>
+                      <span className="text-sm">{earnedReward.commonCount}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <button
-                onClick={handleFinish}
-                className="w-full py-4 font-black rounded-xl text-lg uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-black border-emerald-700"
-              >
-                Continue
-              </button>
-            </div>
+                {/* Supersub card */}
+                {earnedReward.hasSupersub && (
+                  <div className="relative flex flex-col items-center">
+                    <div style={{ transform: 'scale(0.55)', transformOrigin: 'bottom center' }}>
+                      <CardBase type="c_supersub" status="generic" />
+                    </div>
+                    <div className="absolute -top-2 -right-2 z-30">
+                      <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-0.5">
+                        <span>x</span>
+                        <span className="text-sm">1</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Energy drink icon */}
+                {earnedReward.hasDrink && (
+                  <div className="relative flex flex-col items-center">
+                    <div className="w-16 h-20 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center">
+                      <Zap className="w-8 h-8 text-yellow-400 fill-yellow-400" />
+                    </div>
+                    <div className="absolute -top-2 -right-2 z-30">
+                      <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-0.5">
+                        <span>x</span><span className="text-sm">1</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            ) : (
+              <div className="flex justify-center mb-6">
+                <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+              </div>
+            )}
+
+            {/* Continue button */}
+            <button
+              onClick={handleFinish}
+              className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest rounded-xl transition-all active:scale-95"
+            >
+              Continue
+            </button>
           </div>
-        </MobileLayout>
+        </div>
       </div>
     );
   }
@@ -377,25 +435,30 @@ const Training = () => {
     <div className="relative min-h-screen">
       <GameHeader />
       <MobileLayout bgImage="/bg-training-quiz.webp">
-        <div className="flex flex-col h-full relative p-4 pt-20 max-w-md mx-auto">
+        <div className="flex flex-col h-full max-w-md mx-auto">
 
-          {/* ── Top bar: question counter + timer ── */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2 bg-black/50 px-3 py-1.5 rounded-full border border-white/10">
+          {/* Spacer for GameHeader (~72px) */}
+          <div className="h-[72px] flex-shrink-0" />
+
+          {/* ── Status bar: question counter | timer | close ── */}
+          <div className="flex justify-between items-center bg-black/60 backdrop-blur-md border-b border-white/10 px-4 py-3 flex-shrink-0">
+            {/* Question counter */}
+            <div className="flex items-center gap-1.5 bg-black/50 px-3 py-1.5 rounded-full border border-white/10">
               <span className="text-[10px] text-gray-400 uppercase tracking-widest">Question</span>
               <span className="text-white font-bold text-sm">
                 {currentQIndex + 1}<span className="text-gray-500">/10</span>
               </span>
             </div>
 
-            {/* Countdown pill */}
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors duration-300 ${timerBg}`}>
-              <Clock className={`w-3.5 h-3.5 ${timerColor}`} />
-              <span className={`font-black text-sm font-mono tabular-nums w-5 text-center ${timerColor}`}>
+            {/* Timer pill — larger */}
+            <div className={`flex items-center gap-1.5 px-4 py-2 rounded-full border transition-colors duration-300 ${timerBg}`}>
+              <Clock className={`w-5 h-5 ${timerColor}`} />
+              <span className={`font-black text-lg font-mono tabular-nums w-6 text-center ${timerColor}`}>
                 {timeLeft}
               </span>
             </div>
 
+            {/* Close button */}
             <button
               onClick={() => navigate('/dashboard')}
               className="p-2 bg-black/50 rounded-full text-gray-400 hover:text-white border border-white/10 active:scale-95"
@@ -404,77 +467,89 @@ const Training = () => {
             </button>
           </div>
 
-          {/* ── Score HUD ── */}
-          <ScoreHUD score={score} currentQIndex={currentQIndex} />
+          {/* ── Content area ── */}
+          <div className="flex flex-col flex-1 px-4 pt-3 pb-4">
 
-          {/* ── Category + difficulty tags ── */}
-          <div className="flex gap-2 mb-4">
-            <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-900/30 text-blue-300 border border-blue-500/30 uppercase tracking-wider">
-              {currentQuestion.category}
-            </span>
-            {currentQuestion.difficulty && (
-              <span className={`px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getDifficultyColor(currentQuestion.difficulty)}`}>
-                {currentQuestion.difficulty}
+            {/* Score HUD */}
+            <ScoreHUD score={score} currentQIndex={currentQIndex} />
+
+            {/* Step indicators — replaces progress bar */}
+            <div className="flex justify-center gap-2 mb-3">
+              {Array.from({ length: 10 }, (_, i) => {
+                const wasAnswered = i < currentQIndex;
+                const isCurrent  = i === currentQIndex;
+                return (
+                  <div
+                    key={i}
+                    className={
+                      isCurrent  ? 'w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-emerald-400/50' :
+                      wasAnswered ? 'w-2.5 h-2.5 rounded-full bg-emerald-500' :
+                                   'w-2.5 h-2.5 rounded-full bg-zinc-700'
+                    }
+                  />
+                );
+              })}
+            </div>
+
+            {/* Category + difficulty tags */}
+            <div className="flex gap-2 mb-3">
+              <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-900/30 text-blue-300 border border-blue-500/30 uppercase tracking-wider">
+                {currentQuestion.category}
               </span>
-            )}
-          </div>
+              {currentQuestion.difficulty && (
+                <span className={`px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getDifficultyColor(currentQuestion.difficulty)}`}>
+                  {currentQuestion.difficulty}
+                </span>
+              )}
+            </div>
 
-          {/* ── Question text ── */}
-          <h2 className="text-xl font-bold text-white mb-6 leading-snug drop-shadow-md">
-            {currentQuestion.text}
-          </h2>
+            {/* Question text */}
+            <h2 className="text-xl font-bold text-white mb-3 leading-snug drop-shadow-md">
+              {currentQuestion.text}
+            </h2>
 
-          {/* ── Answer options ── */}
-          <div className="grid gap-3 flex-1">
-            {currentQuestion.options.map((option, index) => {
-              let btnClass = 'bg-gray-800/80 border-gray-600/60 text-gray-200 hover:bg-gray-700/80 hover:border-gray-500';
-              let rightIcon = null;
+            {/* Answer options */}
+            <div className="grid gap-3 flex-1">
+              {currentQuestion.options.map((option, index) => {
+                let btnClass = 'bg-gray-800/80 border-gray-600/60 text-gray-200 hover:bg-gray-700/80 hover:border-gray-500';
+                let rightIcon = null;
 
-              if (isAnswered) {
-                if (index === currentQuestion.correctIndex) {
-                  btnClass = 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold';
-                  rightIcon = <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />;
-                } else if (index === selectedOption && selectedOption !== -1) {
-                  btnClass = 'bg-red-500/20 border-red-500 text-red-400';
-                  rightIcon = <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />;
-                } else {
-                  btnClass = 'bg-gray-900/40 border-gray-800/50 text-gray-600 opacity-40';
+                if (isAnswered) {
+                  if (index === currentQuestion.correctIndex) {
+                    btnClass = 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold';
+                    rightIcon = <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />;
+                  } else if (index === selectedOption && selectedOption !== -1) {
+                    btnClass = 'bg-red-500/20 border-red-500 text-red-400';
+                    rightIcon = <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />;
+                  } else {
+                    btnClass = 'bg-gray-900/40 border-gray-800/50 text-gray-600 opacity-40';
+                  }
                 }
-              }
 
-              return (
-                <button
-                  key={`q${currentQIndex}-opt${index}`}
-                  onClick={() => handleOptionClick(index)}
-                  disabled={isAnswered}
-                  className={`relative p-4 rounded-xl border-2 text-left transition-all duration-200 shadow-md active:scale-[0.98] ${btnClass}`}
-                >
-                  <div className="flex justify-between items-center gap-3">
-                    <span className="text-sm leading-snug">{option}</span>
-                    {rightIcon}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* ── Timeout message ── */}
-          {isAnswered && selectedOption === -1 && (
-            <div className="mt-3 text-center text-red-400 text-xs font-bold uppercase tracking-widest animate-in fade-in">
-              ⏱ Time's up!
+                return (
+                  <button
+                    key={`q${currentQIndex}-opt${index}`}
+                    onClick={() => handleOptionClick(index)}
+                    disabled={isAnswered}
+                    className={`relative p-4 rounded-xl border-2 text-left transition-all duration-200 shadow-md active:scale-[0.98] ${btnClass}`}
+                  >
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-sm leading-snug">{option}</span>
+                      {rightIcon}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          )}
 
-          {/* ── Progress bar ── */}
-          <div className="mt-5 mb-2">
-            <div className="w-full bg-gray-800/50 rounded-full h-1 overflow-hidden">
-              <div
-                className="bg-emerald-500 h-full transition-all duration-500"
-                style={{ width: `${((currentQIndex + 1) / 10) * 100}%` }}
-              />
-            </div>
+            {/* Timeout message */}
+            {isAnswered && selectedOption === -1 && (
+              <div className="mt-3 text-center text-red-400 text-xs font-bold uppercase tracking-widest animate-in fade-in">
+                ⏱ Time's up!
+              </div>
+            )}
+
           </div>
-
         </div>
       </MobileLayout>
 
@@ -524,14 +599,6 @@ const StatTile = ({ icon, label, value, valueColor = 'text-white' }) => (
     <div className="flex justify-center mb-1">{icon}</div>
     <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
     <p className={`font-bold text-sm ${valueColor}`}>{value}</p>
-  </div>
-);
-
-/* ─── Reward badge used on complete screen ───────────────────────────────── */
-const RewardBadge = ({ icon, label, color, border, bg }) => (
-  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border ${bg} ${border}`}>
-    {icon && <span className="text-base">{icon}</span>}
-    <span className={`font-black text-sm ${color}`}>{label}</span>
   </div>
 );
 

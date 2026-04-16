@@ -64,7 +64,54 @@ const JosebaBubble = ({
     );
   }
 
-  /* ── compact (default) ─────────────────────────────────────── */
+  /* ── warm — light parchment background for Training briefing ── */
+  if (variant === 'warm') {
+    const warmStyle = {
+      background: '#F5F0E8',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      borderTop: '1px solid rgba(16, 185, 129, 0.3)',
+      borderRadius: '20px 20px 0 0',
+      padding: `14px 16px calc(env(safe-area-inset-bottom, 0px) + 20px)`,
+    };
+    return (
+      <div
+        onClick={onAdvance}
+        className="fixed bottom-0 left-0 right-0 z-[400] cursor-pointer select-none animate-in slide-in-from-bottom-4 duration-300"
+        style={warmStyle}
+      >
+        <div className="flex items-start gap-3">
+          <img
+            src={avatarSrc}
+            alt={label}
+            className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-zinc-300"
+            onError={(e) => { e.target.src = '/assets/assistant-head.png'; }}
+          />
+          <div className="flex-1 min-w-0">
+            <span className="block text-[8px] font-black uppercase tracking-widest text-emerald-700 mb-1">
+              {label}
+            </span>
+            <p className="text-xs font-bold text-zinc-900 leading-relaxed">
+              {message}
+            </p>
+          </div>
+          <ChevronDown className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0 mt-0.5" />
+        </div>
+        <div className="flex items-center justify-end gap-1 pt-2">
+          <span className="text-zinc-500 text-xs font-black uppercase tracking-widest">TAP TO CONTINUE</span>
+          <ChevronRight className="w-4 h-4 text-zinc-500 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  /* ── compact / compact-warm ───────────────────────────────── */
+  const isWarm = variant === 'compact-warm';
+  const compactWarmStyle = {
+    background: '#F5F0E8',
+    borderTop: '1px solid #E5DFD5',
+    borderRadius: '20px 20px 0 0',
+  };
   const CompactBubble = () => {
     const [expanded, setExpanded] = useState(false);
     return (
@@ -72,27 +119,25 @@ const JosebaBubble = ({
         onClick={onAdvance}
         className="fixed bottom-0 left-0 right-0 z-[400] cursor-pointer select-none animate-in slide-in-from-bottom-4 duration-300"
         style={{
-          ...safeAreaStyle,
+          ...(isWarm ? compactWarmStyle : safeAreaStyle),
           padding: `14px 16px calc(env(safe-area-inset-bottom, 0px) + 20px)`,
         }}
       >
         <div className="flex items-start gap-3">
-          {/* Avatar — compact w-8 h-8 */}
+          {/* Avatar */}
           <img
             src={avatarSrc}
             alt={label}
-            className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-white/10"
+            className={`w-8 h-8 rounded-full object-cover flex-shrink-0 ${isWarm ? 'border border-[#E5DFD5]' : 'border border-white/10'}`}
             onError={(e) => { e.target.src = '/assets/assistant-head.png'; }}
           />
 
           {/* Text */}
           <div className="flex-1 min-w-0">
-            <span className="block text-[8px] font-black uppercase tracking-widest text-emerald-400 mb-1">
+            <span className={`block text-[8px] font-black uppercase tracking-widest mb-1 ${isWarm ? 'text-emerald-700' : 'text-emerald-400'}`}>
               {label}
             </span>
-            <p className={`text-xs font-bold text-white/90 leading-relaxed ${
-              expanded ? '' : 'line-clamp-4'
-            }`}>
+            <p className={`text-xs font-bold leading-relaxed ${expanded ? '' : 'line-clamp-4'} ${isWarm ? 'text-zinc-800' : 'text-white/90'}`}>
               {message}
             </p>
           </div>
@@ -100,7 +145,7 @@ const JosebaBubble = ({
           {/* Expand toggle */}
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(x => !x); }}
-            className="text-white/40 p-1 flex-shrink-0 mt-0.5"
+            className={`p-1 flex-shrink-0 mt-0.5 ${isWarm ? 'text-zinc-400' : 'text-white/40'}`}
           >
             {expanded
               ? <ChevronUp className="w-3.5 h-3.5" />
@@ -108,10 +153,10 @@ const JosebaBubble = ({
           </button>
         </div>
 
-        {/* Tap indicator — white/70 for visibility */}
+        {/* Tap indicator */}
         <div className="flex items-center justify-end gap-1 pt-2">
-          <span className="text-white/70 text-xs font-black uppercase tracking-widest">TAP TO CONTINUE</span>
-          <ChevronRight className="w-4 h-4 text-white/70 animate-pulse" />
+          <span className={`text-xs font-black uppercase tracking-widest ${isWarm ? 'text-zinc-600' : 'text-white/70'}`}>TAP TO CONTINUE</span>
+          <ChevronRight className={`w-4 h-4 animate-pulse ${isWarm ? 'text-zinc-600' : 'text-white/70'}`} />
         </div>
       </div>
     );

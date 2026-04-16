@@ -216,7 +216,7 @@ const Inventory = () => {
       <div className="fixed inset-0 bg-black/50 z-0" />
 
       {/* Scrollable content */}
-      <div className="relative z-10 overflow-y-auto flex justify-center">
+      <div className="relative z-10 h-screen overflow-y-auto flex justify-center">
         <div className="w-full max-w-md flex flex-col px-5 pb-40">
 
           {/* ── Header ── */}
@@ -531,22 +531,26 @@ const Inventory = () => {
           />
 
           {/* Bottom 88% — sheet */}
-          <div className="absolute bottom-0 left-0 right-0 top-[12vh] bg-zinc-900 rounded-t-3xl flex flex-col animate-in slide-in-from-bottom duration-500">
+          <div className="absolute bottom-0 left-0 right-0 top-[12vh] bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 rounded-t-3xl flex flex-col animate-in slide-in-from-bottom duration-500">
             {/* Drag handle */}
             <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mt-3 flex-shrink-0" />
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8 flex flex-col items-center justify-center">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-1">
+            <div className="flex-1 overflow-y-auto px-6 pt-8 pb-8 flex flex-col items-center justify-start">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-1 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">
                 Today's Training Bag
               </p>
-              <p className="text-zinc-400 text-sm mb-8">
+              <p className="text-zinc-400 text-sm">
                 Day {currentStreak} · Tier {bagReward.tier}
               </p>
+              <div className="w-16 h-px bg-white/10 mx-auto mt-3 mb-6" />
 
               {/* Single CardBase + ×count badge */}
               <div className="relative mb-6 animate-in fade-in zoom-in-95 duration-500">
-                <CardBase type={bagReward.cardType} status="generic" />
+                <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-3xl scale-110" />
+                <div className="relative" style={{ transform: 'scale(1.1)' }}>
+                  <CardBase type={bagReward.cardType} status="generic" />
+                </div>
                 <div className="absolute -top-2 -right-2 bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg z-30 flex items-center gap-0.5">
                   <span>x</span>
                   <span className="text-sm">{bagReward.cardCount}</span>
@@ -564,7 +568,7 @@ const Inventory = () => {
                   <JosebaBubble
                     message={josebaMessage}
                     onAdvance={handleJosebaAdvance}
-                    variant="compact"
+                    variant="compact-warm"
                   />
                 </div>
               ) : (
