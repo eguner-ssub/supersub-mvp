@@ -161,7 +161,18 @@ async function backfillLeague(db, leagueName, smLeagueId, seasonStart, seasonEnd
 
       if (!homeTeam || !awayTeam) continue;
 
-      rows.push({
+      // Sportmonks LINEUP_CONFIRMED metadata flips ~1h pre-kickoff once team
+      // sheets are released. When the entry is missing entirely (older fixtures
+      // pulled before metadata was included, or matches still in the
+      // far-future window) we OMIT the column from the upsert payload so
+      // Supabase preserves whatever is already stored — avoids clobbering a
+      // previously-confirmed value back to false on a re-sync that drops
+      // metadata for any reason.
+      const lineupMeta = (f.metadata || []).find(
+        (m) => m.developer_name === 'LINEUP_CONFIRMED'
+      );
+
+      const row = {
         id:             f.id,
         league_id:      f.league_id ?? null,
         date:           toUtcIso(f.starting_at)?.split('T')[0] ?? null,
@@ -182,7 +193,13 @@ async function backfillLeague(db, leagueName, smLeagueId, seasonStart, seasonEnd
         raw_data:       f,
         last_updated:   now,
         last_synced_at: now,
-      });
+      };
+
+      if (lineupMeta) {
+        row.lineup_confirmed = !!lineupMeta.values?.confirmed;
+      }
+
+      rows.push(row);
     }
 
     if (rows.length > 0) {

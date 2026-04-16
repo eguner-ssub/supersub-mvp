@@ -352,10 +352,68 @@ const LiveSupersubPanel = ({ insights, onUseSupersubCard, supersubCount }) => {
    SUBSTITUTES TAB
    ───────────────────────────────────────────────────────────── */
 const SM_BENCH_TYPE_ID = 12;
+const SM_GK_POSITION_ID = 24;
+
+// Sportmonks integer season_id (e.g. 25583) is what player_supersub_efficiency
+// keys on, but match.league_id is the league sportmonks_id. Resolution chain:
+//   leagues.sportmonks_id → leagues.current_season_id (UUID)
+//                        → seasons.sportmonks_id (integer)
+// Cache the result per-league so subsequent matches in the same league are free.
+const leagueSeasonSmIdCache = new Map();
+
+async function resolveSeasonSmId(supabase, smLeagueId) {
+  if (!supabase || !smLeagueId) return null;
+  if (leagueSeasonSmIdCache.has(smLeagueId)) {
+    return leagueSeasonSmIdCache.get(smLeagueId);
+  }
+  const { data: lg } = await supabase
+    .from('leagues')
+    .select('current_season_id')
+    .eq('sportmonks_id', smLeagueId)
+    .single();
+  if (!lg?.current_season_id) {
+    leagueSeasonSmIdCache.set(smLeagueId, null);
+    return null;
+  }
+  const { data: sn } = await supabase
+    .from('seasons')
+    .select('sportmonks_id')
+    .eq('id', lg.current_season_id)
+    .single();
+  const smSeasonId = sn?.sportmonks_id ?? null;
+  leagueSeasonSmIdCache.set(smLeagueId, smSeasonId);
+  return smSeasonId;
+}
+
+// Threat dot color encodes "how dangerous is this player as a Supersub pick".
+// Bucketed by raw goals_as_sub since that's the metric the view is indexed on.
+function getThreatColor(stats) {
+  const g = stats?.goals_as_sub ?? 0;
+  if (g >= 3) return '#ef4444'; // red — proven supersub finisher
+  if (g === 2) return '#f97316'; // orange
+  if (g === 1) return '#facc15'; // yellow
+  if ((stats?.apps_as_sub ?? 0) > 0) return '#6b7280'; // grey — has cameos, no goals
+  return '#374151'; // dim — no record this season
+}
+
+// Compact stats line shown next to each candidate. Returns null when there's
+// nothing tracked yet so the UI can suppress it instead of showing "0G · 0A · 0".
+function formatSubStats(stats) {
+  if (!stats || (!stats.apps_as_sub && !stats.goals_as_sub && !stats.assists_as_sub)) {
+    return null;
+  }
+  const g = stats.goals_as_sub ?? 0;
+  const a = stats.assists_as_sub ?? 0;
+  const apps = stats.apps_as_sub ?? 0;
+  const per90 = stats.goals_per_90_as_sub;
+  const per90Str = per90 != null && per90 > 0 ? ` · ${Number(per90).toFixed(2)}/90` : '';
+  return `${g}G · ${a}A · ${apps} sub${apps === 1 ? '' : 's'}${per90Str}`;
+}
 
 const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersubCount }) => {
-  const allLineups = Array.isArray(match?.lineups) ? match.lineups : [];
-  const events     = Array.isArray(match?.events)  ? match.events  : [];
+  const { supabase } = useGame();
+
+  const events = Array.isArray(match?.events) ? match.events : [];
 
   // Players who have already been subbed ON (incoming player = assist.id or player_id on sub event)
   const subbedOnIds = new Set(
@@ -366,12 +424,153 @@ const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersu
       .map(Number)
   );
 
-  // Coerce to string to defeat JSON serialization type mismatches
-  const benchPlayers = allLineups.filter((p) => String(p.type_id) === String(SM_BENCH_TYPE_ID));
-
   const hasCards = supersubCount > 0;
 
-  if (benchPlayers.length === 0) {
+  // Team identifiers — prefer flat sportmonks IDs (match.home_team_id) which is
+  // what player_supersub_efficiency.team_id keys on. Fall back to nested shape
+  // for older normalized rows.
+  const homeTeamId = match?.home_team_id ?? match?.teams?.home?.id ?? null;
+  const awayTeamId = match?.away_team_id ?? match?.teams?.away?.id ?? null;
+  const leagueSmId = match?.league_id ?? null;
+
+  // canFetch gates the data fetch AND drives the initial loading state. If we
+  // can't fetch (no supabase or no team IDs) we skip the loading spinner and
+  // fall through to the team-CTA fallback render below.
+  const canFetch = !!(supabase && homeTeamId && awayTeamId);
+
+  // Async-loaded: per-team ranked candidate list + sub stats lookup.
+  // `source` tracks where each side's candidates came from so we can show
+  // a subtle hint (e.g. "from full squad — lineup not yet released").
+  const [bench, setBench] = useState({
+    home: [], away: [], homeSource: null, awaySource: null, loading: true,
+  });
+  const [statsMap, setStatsMap] = useState(() => new Map());
+
+  // match?.lineups?.length is the cheapest dep that flips when realtime
+  // delivers an UPDATE turning lineups from null/empty into populated.
+  const lineupsLength = match?.lineups?.length ?? 0;
+
+  useEffect(() => {
+    if (!canFetch) return;
+
+    let cancelled = false;
+
+    (async () => {
+      // 1. Resolve the Sportmonks integer season_id for this match's league.
+      const seasonSmId = await resolveSeasonSmId(supabase, leagueSmId);
+
+      // 2. Build per-team candidate lists. Prefer announced bench; fall back
+      //    to the full squad for any side without bench data so the user can
+      //    still see ranked candidates pre-lineup.
+      const allLineups = Array.isArray(match?.lineups) ? match.lineups : [];
+      const announcedBench = allLineups.filter(
+        (p) =>
+          String(p.type_id) === String(SM_BENCH_TYPE_ID) &&
+          Number(p.position_id) !== SM_GK_POSITION_ID
+      );
+
+      let homeCandidates = announcedBench.filter(
+        (p) => String(p.team_id) === String(homeTeamId)
+      );
+      let awayCandidates = announcedBench.filter(
+        (p) => String(p.team_id) === String(awayTeamId)
+      );
+
+      let homeSource = homeCandidates.length > 0 ? 'lineup' : null;
+      let awaySource = awayCandidates.length > 0 ? 'lineup' : null;
+
+      // Squad-cache fallback for any side with no announced bench.
+      const teamsMissing = [];
+      if (homeCandidates.length === 0) teamsMissing.push(homeTeamId);
+      if (awayCandidates.length === 0) teamsMissing.push(awayTeamId);
+
+      if (teamsMissing.length > 0 && seasonSmId) {
+        const { data: squadRows } = await supabase
+          .from('player_squad_cache')
+          .select('player_id, player_name, team_id, position_id, jersey_number, image_path')
+          .in('team_id', teamsMissing)
+          .eq('season_id', seasonSmId)
+          .neq('position_id', SM_GK_POSITION_ID);
+
+        if (homeCandidates.length === 0) {
+          homeCandidates = (squadRows || []).filter((p) => p.team_id === homeTeamId);
+          homeSource = homeCandidates.length > 0 ? 'squad' : null;
+        }
+        if (awayCandidates.length === 0) {
+          awayCandidates = (squadRows || []).filter((p) => p.team_id === awayTeamId);
+          awaySource = awayCandidates.length > 0 ? 'squad' : null;
+        }
+      }
+
+      // 3. Fetch sub-efficiency stats for every candidate in one round-trip.
+      //    The view exposes goals_per_90_as_sub which we'd otherwise compute
+      //    client-side from goals_as_sub / minutes_as_sub.
+      const candidatePlayerIds = [
+        ...homeCandidates.map((p) => p.player_id).filter(Boolean),
+        ...awayCandidates.map((p) => p.player_id).filter(Boolean),
+      ];
+
+      let nextStatsMap = new Map();
+      if (candidatePlayerIds.length > 0 && seasonSmId) {
+        const { data: statsRows } = await supabase
+          .from('player_supersub_efficiency')
+          .select('player_id, goals_as_sub, assists_as_sub, apps_as_sub, goals_per_90_as_sub')
+          .in('player_id', candidatePlayerIds)
+          .eq('season_id', seasonSmId);
+
+        nextStatsMap = new Map((statsRows || []).map((r) => [r.player_id, r]));
+      }
+
+      // 4. Sort each side by raw threat: goals desc, then assists desc, then
+      //    appearances desc. Players with no record sink to the bottom.
+      const sortByThreat = (a, b) => {
+        const sa = nextStatsMap.get(a.player_id) || {};
+        const sb = nextStatsMap.get(b.player_id) || {};
+        return (
+          (sb.goals_as_sub || 0) - (sa.goals_as_sub || 0) ||
+          (sb.assists_as_sub || 0) - (sa.assists_as_sub || 0) ||
+          (sb.apps_as_sub || 0) - (sa.apps_as_sub || 0)
+        );
+      };
+      homeCandidates = [...homeCandidates].sort(sortByThreat);
+      awayCandidates = [...awayCandidates].sort(sortByThreat);
+
+      if (cancelled) return;
+
+      setStatsMap(nextStatsMap);
+      setBench({
+        home: homeCandidates,
+        away: awayCandidates,
+        homeSource,
+        awaySource,
+        loading: false,
+      });
+    })();
+
+    return () => { cancelled = true; };
+    // We deliberately depend on match.lineups.length (lineupsLength) instead
+    // of match.lineups itself: realtime UPDATEs from the parent re-spread the
+    // match object every time, returning a new array reference on each tick
+    // even when nothing about the lineup actually changed. lineupsLength
+    // changes only when the lineup goes empty→populated (or shrinks/grows),
+    // which is the only condition where re-fetching makes sense.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canFetch, supabase, leagueSmId, homeTeamId, awayTeamId, match?.id, lineupsLength]);
+
+  // Loading spinner while we resolve season_id + fetch stats. Skipped when we
+  // know the fetch can't run (canFetch false) so we fall straight through to
+  // the team-CTA fallback below.
+  if (canFetch && bench.loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+        <Loader2 className="animate-spin text-white/40 w-6 h-6" />
+      </div>
+    );
+  }
+
+  // No candidates either side — degrade to the original team-CTA fallback so
+  // the user can still place a Supersub bet even without roster info.
+  if (bench.home.length === 0 && bench.away.length === 0) {
     const homeName = match?.teams?.home?.name || 'Home';
     const awayName = match?.teams?.away?.name || 'Away';
     const homeLogo = match?.teams?.home?.logo;
@@ -432,24 +631,35 @@ const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersu
     );
   }
 
-  const homeId = String(match?.teams?.home?.id);
-  const awayId = String(match?.teams?.away?.id);
-
-  const homeBench = benchPlayers.filter(p => String(p.team_id) === homeId);
-  const awayBench = benchPlayers.filter(p => String(p.team_id) === awayId);
-
-  const renderBench = (side, teamId, teamName, teamLogo, players) => {
+  const renderBench = (side, teamId, teamName, teamLogo, players, source) => {
     if (!players || players.length === 0) return null;
 
     return (
       <div style={{ marginBottom: '24px' }}>
         {/* Team Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           {teamLogo && <img src={teamLogo} alt={teamName} style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
           <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: '12px', color: '#fff', textTransform: 'uppercase' }}>
             {teamName} Bench
           </span>
         </div>
+
+        {/* Source hint — only shown for the squad-cache fallback so users
+            understand why a non-keeper is listed before the lineup is out. */}
+        {source === 'squad' && (
+          <div style={{
+            fontFamily: "'Montserrat', sans-serif",
+            fontSize: '9px',
+            fontWeight: 700,
+            color: 'rgba(255,255,255,0.35)',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            marginBottom: '12px',
+          }}>
+            From full squad · lineup not yet released
+          </div>
+        )}
+        {source !== 'squad' && <div style={{ marginBottom: '12px' }} />}
 
         {/* Bench supersub CTA (whole team) */}
         <button
@@ -476,13 +686,17 @@ const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersu
           ⚡ Any Sub to Score — 500 pts
         </button>
 
-        {/* Bench list with per-player supersub button */}
+        {/* Ranked candidate list with per-player supersub button */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {players.map((entry, i) => {
             const playerName = entry.player_name || entry.player?.display_name || entry.player?.name || 'Unknown';
             const jerseyNum  = entry.jersey_number ?? '-';
             const playerId   = entry.player_id || entry.player?.id || i;
             const alreadyOn  = subbedOnIds.has(Number(playerId));
+
+            const stats = statsMap.get(playerId);
+            const threatColor = getThreatColor(stats);
+            const statsLine = formatSubStats(stats);
 
             return (
               <div
@@ -497,7 +711,7 @@ const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersu
                   opacity: alreadyOn ? 0.4 : 1,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                   <div style={{
                     width: '28px', height: '28px', borderRadius: '50%',
                     background: 'rgba(255,255,255,0.08)',
@@ -508,13 +722,38 @@ const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersu
                       {jerseyNum}
                     </span>
                   </div>
-                  <span style={{
-                    fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
-                    fontSize: '11px', color: alreadyOn ? 'rgba(255,255,255,0.4)' : '#FFFFFF',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {playerName}{alreadyOn ? ' · On pitch' : ''}
-                  </span>
+
+                  {/* Threat dot — colored circle indicates how dangerous this
+                      player has been off the bench this season. */}
+                  <div
+                    title={statsLine || 'No sub record yet this season'}
+                    style={{
+                      width: '8px', height: '8px', borderRadius: '50%',
+                      background: threatColor,
+                      flexShrink: 0,
+                      boxShadow: `0 0 6px ${threatColor}66`,
+                    }}
+                  />
+
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                    <span style={{
+                      fontFamily: "'Montserrat', sans-serif", fontWeight: 700,
+                      fontSize: '11px', color: alreadyOn ? 'rgba(255,255,255,0.4)' : '#FFFFFF',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {playerName}{alreadyOn ? ' · On pitch' : ''}
+                    </span>
+                    {statsLine && (
+                      <span style={{
+                        fontFamily: "'Montserrat', sans-serif", fontWeight: 600,
+                        fontSize: '9px', color: 'rgba(255,255,255,0.45)',
+                        letterSpacing: '0.3px', marginTop: '1px',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {statsLine}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Per-player supersub button — only for players still on bench */}
@@ -552,8 +791,8 @@ const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersu
 
   return (
     <div style={{ padding: '0 12px' }}>
-      {renderBench('HOME', match?.teams?.home?.id, match?.teams?.home?.name || 'Home', match?.teams?.home?.logo, homeBench)}
-      {renderBench('AWAY', match?.teams?.away?.id, match?.teams?.away?.name || 'Away', match?.teams?.away?.logo, awayBench)}
+      {renderBench('HOME', homeTeamId, match?.teams?.home?.name || 'Home', match?.teams?.home?.logo, bench.home, bench.homeSource)}
+      {renderBench('AWAY', awayTeamId, match?.teams?.away?.name || 'Away', match?.teams?.away?.logo, bench.away, bench.awaySource)}
     </div>
   );
 };
@@ -1332,6 +1571,7 @@ const MatchDetail = () => {
                 fixtureDate={match.fixture?.date}
                 activeTab={activeTab}
                 odds={odds}
+                lineupConfirmed={match.lineup_confirmed}
               />
             )}
 
@@ -1398,6 +1638,7 @@ const MatchDetail = () => {
                 fixtureDate={match.fixture?.date}
                 activeTab={activeTab}
                 odds={odds}
+                lineupConfirmed={match.lineup_confirmed}
               />
             )}
 

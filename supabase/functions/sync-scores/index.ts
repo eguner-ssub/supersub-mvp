@@ -274,6 +274,19 @@ function buildPayload(
     payload.lineups = existingLineups;
   }
 
+  // Lineup confirmed flag — Sportmonks metadata carries a LINEUP_CONFIRMED
+  // entry (values.confirmed: boolean) once the team sheets are released
+  // ~1h pre-kickoff. Only set the field when we have an explicit boolean so
+  // upsert doesn't stomp on a previously-confirmed row with a stale default.
+  if (Array.isArray(fixture.metadata)) {
+    const lc = fixture.metadata.find(
+      (m: any) => m?.type?.developer_name === 'LINEUP_CONFIRMED'
+    );
+    if (lc?.values && typeof lc.values.confirmed === 'boolean') {
+      payload.lineup_confirmed = lc.values.confirmed;
+    }
+  }
+
   // Statistics (Sportmonks includes statistics in the fixture when requested)
   if (fixture.statistics && Array.isArray(fixture.statistics) && fixture.statistics.length > 0) {
     payload.statistics = fixture.statistics;
@@ -654,7 +667,9 @@ async function liveScoresService(
           try {
             result.apiCalls++;
             const json = await smRequest(`/fixtures/${m.id}`, {
-              include: 'scores;state;participants;lineups',
+              // metadata → LINEUP_CONFIRMED flag (see buildPayload); referees
+              // → surfaced via raw_data for /api/stats-gen/referee-watch.
+              include: 'scores;state;participants;lineups;metadata;referees',
             });
             if (json.data) plFixtures.push(json.data);
           } catch (err) {
@@ -758,7 +773,9 @@ async function liveScoresService(
           try {
             result.apiCalls++;
             const suppJson = await smRequest(`/fixtures/${fId}`, {
-              include: 'scores;state;participants;lineups',
+              // Same enrichment as the pre-live path so the same parsers
+              // (lineup_confirmed, raw_data.referees) fire during lineup supplements.
+              include: 'scores;state;participants;lineups;metadata;referees',
             });
             if (suppJson.data) suppFixtures.push(suppJson.data);
           } catch (suppErr) {

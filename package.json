@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "sync:referees": "node scripts/sync-referee-stats.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.1",

@@ -84,13 +84,9 @@ async function syncStandings(db, smSeasonId, seasonUuid, teamCache) {
     if (!teamUuid) continue;
 
     // Sportmonks standings detail type_id mapping (verified from /v3/core/types):
-    //   129 = Overall Matches Played
-    //   130 = Overall Won
-    //   131 = Overall Draw
-    //   132 = Overall Lost
-    //   133 = Overall Goals Scored
-    //   134 = Overall Goals Conceded
-    //   187 = Overall Points
+    //   Overall:  129=MP  130=W  131=D  132=L  133=GF  134=GA  187=Pts
+    //   Home:     135=MP  136=W  137=D  138=L  139=GF  140=GA  185=Pts
+    //   Away:     141=MP  142=W  143=D  144=L  145=GF  146=GA  186=Pts
     const detail = entry.details || [];
     const detailMap = new Map(detail.map((d) => [d.type_id, d.value]));
     const stat = (typeId) => detailMap.get(typeId) ?? null;
@@ -106,6 +102,23 @@ async function syncStandings(db, smSeasonId, seasonUuid, teamCache) {
       goals_for: stat(133),
       goals_against: stat(134),
       points: entry.points ?? stat(187),
+      // Home split — powers the /stats-gen/fortress endpoint and any future
+      // home/away-aware feature without a second pass through Sportmonks.
+      home_matches_played: stat(135),
+      home_won:            stat(136),
+      home_drawn:          stat(137),
+      home_lost:           stat(138),
+      home_goals_for:      stat(139),
+      home_goals_against:  stat(140),
+      home_points:         stat(185),
+      // Away split — stored for symmetry and future endpoints.
+      away_matches_played: stat(141),
+      away_won:            stat(142),
+      away_drawn:          stat(143),
+      away_lost:           stat(144),
+      away_goals_for:      stat(145),
+      away_goals_against:  stat(146),
+      away_points:         stat(186),
       // Sportmonks v3 form shape: [{ fixture_id, form: 'W'|'D'|'L', sort_order, ... }].
       // Items arrive unordered; sort by sort_order ascending so chronological order
       // is preserved and the consumer's .slice(-5) picks up the most recent five.

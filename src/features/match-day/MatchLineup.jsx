@@ -324,7 +324,7 @@ const PreMatchPlaceholder = ({ odds }) => (
     </div>
 );
 
-const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP', odds = null }) => {
+const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP', odds = null, lineupConfirmed = false }) => {
     const [lineups, setLineups] = useState(null);
     const [lineupStatus, setLineupStatus] = useState(null); // 'probable' | 'confirmed'
     const [loading, setLoading] = useState(true);
@@ -394,6 +394,23 @@ const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP',
 
     return (
         <div style={{ padding: '0 12px', marginBottom: '16px' }}>
+            {/* ── LINEUP STATUS BADGE ──
+                lineupConfirmed comes from matches.lineup_confirmed, set by
+                backfill-matches-full.js when Sportmonks metadata flips the
+                LINEUP_CONFIRMED flag (~1h pre-kickoff). Until then the
+                lineups Sportmonks gives us are predicted/probable. */}
+            <div className="flex justify-center mb-3">
+                {lineupConfirmed ? (
+                    <span className="bg-emerald-500 text-black font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full">
+                        ✓ Confirmed XI
+                    </span>
+                ) : (
+                    <span className="bg-zinc-700 text-zinc-200 font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full">
+                        ⟳ Predicted XI
+                    </span>
+                )}
+            </div>
+
             {/* ── PITCH ── */}
             <div style={pitchContainerStyle}>
                 {/* Paper grain overlay */}

@@ -10,10 +10,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { processMatchIntel } from '../lib/intel/processor.js';
 import { INTEL_CONFIG } from '../config/intel.js';
+import { resolveSeasonSmId } from '../lib/statsGen/resolveSeason.js';
 
 const PREFIX = '[sync-match-intel]';
 const { SYNC_DAYS_AHEAD, MIN_DAYS_BEFORE_KICKOFF, STALE_AFTER_HOURS } = INTEL_CONFIG;
 const MAX_PER_RUN = 8; // Prevent Vercel 10s function timeout
+const H2H_STALE_HOURS = 72;
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
 const RATE_LIMIT_MS = 1100;
@@ -37,6 +39,55 @@ function getSupabase() {
   if (!url || !key) throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   _client = createClient(url, key);
   return _client;
+}
+
+// ── H2H fetch + cache ────────────────────────────────────────────────────────
+// Fetches Sportmonks head-to-head once per fixture, caches in h2h_cache with
+// a 72h TTL enforced here. Errors are logged and swallowed so intel sync for
+// the match continues regardless.
+async function fetchAndCacheH2H(supabase, match) {
+  const token = process.env.SPORTMONKS_API_TOKEN;
+  if (!token) return;
+  if (!match.home_team_id || !match.away_team_id) return;
+
+  // Cache check — skip if fresh
+  const { data: existing } = await supabase
+    .from('h2h_cache')
+    .select('fetched_at')
+    .eq('fixture_id', match.id)
+    .maybeSingle();
+
+  if (existing?.fetched_at) {
+    const ageHours = (Date.now() - new Date(existing.fetched_at).getTime()) / 3_600_000;
+    if (ageHours < H2H_STALE_HOURS) return;
+  }
+
+  await throttle();
+
+  const url = `https://api.sportmonks.com/v3/football/fixtures/head-to-head/${match.home_team_id}/${match.away_team_id}?api_token=${token}&include=participants;scores&per_page=10`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`${PREFIX}   H2H ${match.home_team} vs ${match.away_team}: ${res.status}`);
+      return;
+    }
+    const data = await res.json();
+
+    const { error } = await supabase
+      .from('h2h_cache')
+      .upsert({
+        team1_id:   match.home_team_id,
+        team2_id:   match.away_team_id,
+        fixture_id: match.id,
+        data,
+        fetched_at: new Date().toISOString(),
+      }, { onConflict: 'fixture_id' });
+
+    if (error) console.warn(`${PREFIX}   H2H upsert error for ${match.id}: ${error.message}`);
+  } catch (err) {
+    console.warn(`${PREFIX}   H2H fetch error for ${match.id}: ${err.message}`);
+  }
 }
 
 // ── Sportmonks predictions fetch ─────────────────────────────────────────────
@@ -211,33 +262,19 @@ export async function syncMatchIntel(supabaseOverride) {
   let success = 0;
   let failed = 0;
 
-  // Resolve the Sportmonks integer season ID per league on demand.
-  // team_bench_stats / coach_substitution_patterns / player_supersub_stats
-  // all key on INTEGER season_id (e.g. 25583), not UUID. matches.season is
-  // never populated, so translate via leagues.current_season_id → seasons.sportmonks_id.
-  // Cached per-run by league so each supported league costs one pair of lookups max.
-  const leagueSeasonCache = new Map();
-  async function resolveSeasonSmId(leagueSmId) {
-    if (leagueSeasonCache.has(leagueSmId)) return leagueSeasonCache.get(leagueSmId);
-    const { data: lg } = await supabase
-      .from('leagues').select('current_season_id')
-      .eq('sportmonks_id', leagueSmId).single();
-    if (!lg?.current_season_id) { leagueSeasonCache.set(leagueSmId, null); return null; }
-    const { data: sn } = await supabase
-      .from('seasons').select('sportmonks_id')
-      .eq('id', lg.current_season_id).single();
-    const smId = sn?.sportmonks_id || null;
-    leagueSeasonCache.set(leagueSmId, smId);
-    return smId;
-  }
+  // Season resolver + H2H cache both live outside this script — see
+  // lib/statsGen/resolveSeason.js and the fetchAndCacheH2H helper above.
 
   for (const match of staleMatches) {
     try {
+      // Head-to-head cache top-up (swallows errors internally)
+      await fetchAndCacheH2H(supabase, match);
+
       // Fetch Sportmonks predictions
       const { data: sportmonksRaw } = await fetchSportmonksPredictions(match.id);
 
       // Load internal analytics
-      const seasonSmId = await resolveSeasonSmId(match.league_id);
+      const seasonSmId = await resolveSeasonSmId(supabase, match.league_id);
       const internalData = await loadInternalData(supabase, match, seasonSmId);
 
       // Process everything
