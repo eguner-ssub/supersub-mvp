@@ -101,14 +101,24 @@ async function run() {
   console.log(`${PREFIX}   YELLOWCARD=${typeMap.get('YELLOWCARD')}  REDCARD=${typeMap.get('REDCARD')}  PENALTY=${typeMap.get('PENALTY')}  REFEREE=${refTypeId}`);
 
   console.log(`${PREFIX} Fetching completed matches...`);
-  const { data: matches, error } = await supabase
-    .from('matches')
-    .select('id, league_id, home_score, away_score, events, raw_data, kickoff_time, date, home_team, away_team')
-    .in('status', ['FT', 'AET', 'FT_PEN'])
-    .not('raw_data', 'is', null);
-
-  if (error) throw error;
-  console.log(`${PREFIX}   loaded ${matches?.length ?? 0} completed matches with raw_data`);
+  // Paginate — PostgREST caps a single response at 1000 rows. Silent
+  // truncation left ~468 completed matches out of the first aggregation.
+  const matches = [];
+  const SCAN_BATCH = 1000;
+  for (let offset = 0; ; offset += SCAN_BATCH) {
+    const { data, error } = await supabase
+      .from('matches')
+      .select('id, league_id, home_score, away_score, events, raw_data, kickoff_time, date, home_team, away_team')
+      .in('status', ['FT', 'AET', 'FT_PEN'])
+      .not('raw_data', 'is', null)
+      .order('kickoff_time', { ascending: false })
+      .range(offset, offset + SCAN_BATCH - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    matches.push(...data);
+    if (data.length < SCAN_BATCH) break;
+  }
+  console.log(`${PREFIX}   loaded ${matches.length} completed matches with raw_data`);
 
   // Aggregate into buckets keyed by (referee_id, season_id, league_id).
   // Sportmonks `referees` include is a pivot: each row has fixture_id +
