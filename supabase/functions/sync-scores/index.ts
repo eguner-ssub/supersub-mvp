@@ -218,6 +218,7 @@ function buildPayload(
   existingFinishedAt: string | null,
   existingStartedAt: string | null,
   existingLineups: any,
+  existingRawData: any,
   isPreLive: boolean,
   homeCoachId: number | null = null,
   awayCoachId: number | null = null
@@ -243,7 +244,11 @@ function buildPayload(
     date:           fixture.starting_at?.split('T')[0] ?? todayStr(now),
     last_updated:   now.toISOString(),
     last_synced_at: now.toISOString(),
-    raw_data:       fixture,
+    // Merge-preserve: keep any keys the existing row has (e.g. `referees`,
+    // `metadata`) that this particular fetch didn't request in its include
+    // chain. The live/inplay track doesn't carry `referees`, so a plain
+    // replace here would wipe enrichment written during the pre-live fetch.
+    raw_data:       existingRawData ? { ...existingRawData, ...fixture } : fixture,
   };
 
   // Coach IDs — only set when we have them to avoid overwriting stored values
@@ -320,7 +325,7 @@ async function upsertFixtures(
   const fixtureIds = fixtures.map((f: any) => f.id);
   const { data: existingRows } = await supabase
     .from('matches')
-    .select('id, finished_at, started_at, lineups')
+    .select('id, finished_at, started_at, lineups, raw_data')
     .in('id', fixtureIds);
 
   const existingMap = new Map(
@@ -328,6 +333,7 @@ async function upsertFixtures(
       finished_at: r.finished_at,
       started_at:  r.started_at,
       lineups:     r.lineups ?? null,
+      raw_data:    r.raw_data ?? null,
     }])
   );
 
@@ -363,6 +369,7 @@ async function upsertFixtures(
       existing?.finished_at || null,
       existing?.started_at  || null,
       existingLineups,
+      existing?.raw_data ?? null,
       itemIsPreLive,
       homeCoachId,
       awayCoachId

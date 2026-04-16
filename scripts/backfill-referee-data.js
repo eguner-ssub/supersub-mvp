@@ -85,20 +85,29 @@ async function run(opts) {
   // Select every completed match with raw_data but no referees yet.
   // We can't easily filter "raw_data.referees IS NULL" server-side across
   // all PostgREST versions, so we fetch the IDs + a tiny raw_data shape
-  // check and filter in JS. Select is narrow to keep the response small.
-  let query = supabase
-    .from('matches')
-    .select('id, league_id, home_team, away_team, raw_data, kickoff_time')
-    .in('status', TERMINAL)
-    .not('raw_data', 'is', null)
-    .order('kickoff_time', { ascending: false });
+  // check and filter in JS. Paginate in 1000-row chunks because that's the
+  // PostgREST default cap — a single un-ranged query silently truncates,
+  // which is exactly how the first backfill run missed 468 older matches.
+  const rows = [];
+  const BATCH = 1000;
+  for (let offset = 0; ; offset += BATCH) {
+    let q = supabase
+      .from('matches')
+      .select('id, league_id, home_team, away_team, raw_data, kickoff_time')
+      .in('status', TERMINAL)
+      .not('raw_data', 'is', null)
+      .order('kickoff_time', { ascending: false })
+      .range(offset, offset + BATCH - 1);
+    if (opts.league) q = q.eq('league_id', opts.league);
 
-  if (opts.league) query = query.eq('league_id', opts.league);
+    const { data, error } = await q;
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < BATCH) break;
+  }
 
-  const { data: rows, error } = await query;
-  if (error) throw error;
-
-  const pending = (rows || []).filter(m => {
+  const pending = rows.filter(m => {
     const r = m.raw_data;
     return !r || !Array.isArray(r.referees);
   });

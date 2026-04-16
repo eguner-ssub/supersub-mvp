@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js';
 import { resolveSeasonSmId } from '../lib/statsGen/resolveSeason.js';
 
 const PREFIX = '[sync-referee-stats]';
+const RATE_LIMIT_MS = 1100;
 
 // ── Env + lazy Supabase ──────────────────────────────────────────────────────
 function getSupabase() {
@@ -24,6 +25,31 @@ function getSupabase() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   return createClient(url, key);
+}
+
+// ── Referee name resolver (one Sportmonks call per unique referee) ──────────
+// The `referees` include on fixtures returns a flattened pivot row
+//   { id: <pivot id>, type_id, fixture_id, referee_id }
+// with NO name. Names live on /v3/football/referees/{id} — we only hit it
+// once per unique referee_id, rate-limited, with a fallback to "Referee {id}".
+let lastReqAt = 0;
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+async function throttle() {
+  const gap = Date.now() - lastReqAt;
+  if (gap < RATE_LIMIT_MS) await sleep(RATE_LIMIT_MS - gap);
+  lastReqAt = Date.now();
+}
+async function fetchRefereeName(id, token) {
+  await throttle();
+  try {
+    const res = await fetch(`https://api.sportmonks.com/v3/football/referees/${id}?api_token=${token}`);
+    if (!res.ok) return `Referee ${id}`;
+    const j = await res.json();
+    const r = j.data || {};
+    return r.fullname || r.common_name || r.name || `Referee ${id}`;
+  } catch {
+    return `Referee ${id}`;
+  }
 }
 
 // ── Core-types lookup ────────────────────────────────────────────────────────
@@ -63,12 +89,16 @@ function makeMatcher(typeMap, developerName) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function run() {
   const supabase = getSupabase();
+  const token = process.env.SPORTMONKS_API_TOKEN;
+  if (!token) throw new Error('Missing SPORTMONKS_API_TOKEN');
+
   console.log(`${PREFIX} Loading core/types...`);
   const typeMap = await loadTypeMap();
   const isYellow = makeMatcher(typeMap, 'YELLOWCARD');
   const isRed    = makeMatcher(typeMap, 'REDCARD');
   const isPen    = makeMatcher(typeMap, 'PENALTY');
-  console.log(`${PREFIX}   YELLOWCARD=${typeMap.get('YELLOWCARD')}  REDCARD=${typeMap.get('REDCARD')}  PENALTY=${typeMap.get('PENALTY')}  REFEREE=${typeMap.get('REFEREE')}`);
+  const refTypeId = typeMap.get('REFEREE');
+  console.log(`${PREFIX}   YELLOWCARD=${typeMap.get('YELLOWCARD')}  REDCARD=${typeMap.get('REDCARD')}  PENALTY=${typeMap.get('PENALTY')}  REFEREE=${refTypeId}`);
 
   console.log(`${PREFIX} Fetching completed matches...`);
   const { data: matches, error } = await supabase
@@ -81,6 +111,9 @@ async function run() {
   console.log(`${PREFIX}   loaded ${matches?.length ?? 0} completed matches with raw_data`);
 
   // Aggregate into buckets keyed by (referee_id, season_id, league_id).
+  // Sportmonks `referees` include is a pivot: each row has fixture_id +
+  // referee_id + type_id (6 = head referee). No name on the pivot row —
+  // resolved later in one pass via /v3/football/referees/{id}.
   const buckets = new Map(); // key → row-in-progress
 
   let skippedNoRef = 0;
@@ -88,12 +121,10 @@ async function run() {
 
   for (const m of (matches || [])) {
     const referees = Array.isArray(m.raw_data?.referees) ? m.raw_data.referees : [];
-    const head = referees.find(r => r?.type?.developer_name === 'REFEREE');
-    if (!head) { skippedNoRef++; continue; }
+    const head = referees.find(r => r?.type_id === refTypeId);
+    if (!head?.referee_id) { skippedNoRef++; continue; }
 
-    const refId   = head.id ?? head.referee_id;
-    const refName = head.fullname || head.name || head.common_name || `Referee ${refId}`;
-    if (!refId) { skippedNoRef++; continue; }
+    const refId = head.referee_id;
 
     const seasonSmId = await resolveSeasonSmId(supabase, m.league_id);
     if (!seasonSmId) { skippedNoSeason++; continue; }
@@ -103,7 +134,7 @@ async function run() {
     if (!row) {
       row = {
         referee_id: refId,
-        referee_name: refName,
+        referee_name: null, // filled in one pass after aggregation
         season_id: seasonSmId,
         league_id: m.league_id,
         matches_officiated: 0,
@@ -144,7 +175,21 @@ async function run() {
   if (skippedNoRef)    console.log(`${PREFIX}   skipped ${skippedNoRef} matches without a referee in raw_data`);
   if (skippedNoSeason) console.log(`${PREFIX}   skipped ${skippedNoSeason} matches with unresolved season`);
 
-  // Finalise rows: last-5 recent_fixtures + last_synced_at
+  // Resolve referee names — one call per unique referee_id across all buckets.
+  // Sportmonks pivot rows don't carry names; /v3/football/referees/{id} does.
+  // Rate-limited to 1 req / 1100 ms to stay clear of the per-minute cap.
+  const uniqueRefIds = [...new Set([...buckets.values()].map(b => b.referee_id))];
+  console.log(`${PREFIX} Resolving ${uniqueRefIds.length} unique referee name(s) ~${Math.ceil(uniqueRefIds.length * RATE_LIMIT_MS / 1000)}s ...`);
+  const nameById = new Map();
+  for (let i = 0; i < uniqueRefIds.length; i++) {
+    const rid = uniqueRefIds[i];
+    nameById.set(rid, await fetchRefereeName(rid, token));
+    if ((i + 1) % 20 === 0 || i === uniqueRefIds.length - 1) {
+      console.log(`${PREFIX}   names: ${i + 1}/${uniqueRefIds.length}`);
+    }
+  }
+
+  // Finalise rows: last-5 recent_fixtures + name + last_synced_at
   const nowIso = new Date().toISOString();
   const rows = [...buckets.values()].map(r => {
     const sorted = r._fixtures
@@ -152,7 +197,12 @@ async function run() {
       .slice(0, 5)
       .map(({ kickoff_time, ...rest }) => rest);
     const { _fixtures, ...clean } = r;
-    return { ...clean, recent_fixtures: sorted, last_synced_at: nowIso };
+    return {
+      ...clean,
+      referee_name: nameById.get(r.referee_id) || `Referee ${r.referee_id}`,
+      recent_fixtures: sorted,
+      last_synced_at: nowIso,
+    };
   });
 
   if (rows.length === 0) {
