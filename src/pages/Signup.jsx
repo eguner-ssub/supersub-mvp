@@ -3,30 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Loader2, ArrowLeft, Mail, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { trackFunnelEvent } from '../shared/utils/trackFunnelEvent';
-
-const COUNTRIES = [
-  { code: 'GB', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', label: 'England' },
-  { code: 'DE', flag: '🇩🇪', label: 'Germany' },
-  { code: 'ES', flag: '🇪🇸', label: 'Spain' },
-  { code: 'IT', flag: '🇮🇹', label: 'Italy' },
-  { code: 'BR', flag: '🇧🇷', label: 'Brazil' },
-  { code: 'FR', flag: '🇫🇷', label: 'France' },
-  { code: 'AR', flag: '🇦🇷', label: 'Argentina' },
-  { code: 'NL', flag: '🇳🇱', label: 'Netherlands' },
-  { code: 'PT', flag: '🇵🇹', label: 'Portugal' },
-  { code: 'TR', flag: '🇹🇷', label: 'Turkey' },
-  { code: 'NG', flag: '🇳🇬', label: 'Nigeria' },
-  { code: 'GH', flag: '🇬🇭', label: 'Ghana' },
-  { code: 'US', flag: '🇺🇸', label: 'United States' },
-  { code: 'MX', flag: '🇲🇽', label: 'Mexico' },
-  { code: 'CO', flag: '🇨🇴', label: 'Colombia' },
-  { code: 'ZA', flag: '🇿🇦', label: 'South Africa' },
-  { code: 'EG', flag: '🇪🇬', label: 'Egypt' },
-  { code: 'MA', flag: '🇲🇦', label: 'Morocco' },
-  { code: 'JP', flag: '🇯🇵', label: 'Japan' },
-  { code: 'KR', flag: '🇰🇷', label: 'South Korea' },
-  { code: 'OTHER', flag: '🌍', label: 'Other' },
-];
+import { COUNTRIES } from '../shared/config/countries';
 
 const FEATURES = [
   { icon: '⚡', text: 'Play free — no real money' },
@@ -128,14 +105,15 @@ const Signup = () => {
   }
 
   return (
-    <div className="min-h-screen text-white p-6 flex flex-col justify-center relative overflow-hidden bg-black">
+    <div className="relative h-screen w-full overflow-hidden bg-black text-white">
       <div
-        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/assets/bg-clubroom.webp')" }}
       />
-      <div className="fixed inset-0 bg-black/50 z-0" />
+      <div className="absolute inset-0 bg-black/50 z-0" />
 
-      <div className="max-w-md w-full mx-auto space-y-8 relative z-10">
+      <div className="relative z-10 h-full overflow-y-auto">
+      <div className="max-w-md w-full mx-auto space-y-8 p-6 pb-12">
         <Link to="/" className="text-gray-500 hover:text-white flex items-center gap-2 mb-4 transition-colors font-black text-[10px] uppercase tracking-[0.2em]">
           <ArrowLeft className="w-3 h-3" /> Back
         </Link>
@@ -352,6 +330,7 @@ const Signup = () => {
             </Link>
           </div>
         </form>
+      </div>
       </div>
     </div>
   );

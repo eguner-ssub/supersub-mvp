@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 
 /**
  * JosebaBubble — reusable Joseba analyst message overlay.
@@ -113,7 +113,6 @@ const JosebaBubble = ({
     borderRadius: '20px 20px 0 0',
   };
   const CompactBubble = () => {
-    const [expanded, setExpanded] = useState(false);
     return (
       <div
         onClick={onAdvance}
@@ -137,20 +136,10 @@ const JosebaBubble = ({
             <span className={`block text-[8px] font-black uppercase tracking-widest mb-1 ${isWarm ? 'text-emerald-700' : 'text-emerald-400'}`}>
               {label}
             </span>
-            <p className={`text-xs font-bold leading-relaxed ${expanded ? '' : 'line-clamp-4'} ${isWarm ? 'text-zinc-800' : 'text-white/90'}`}>
+            <p className={`text-xs font-bold leading-relaxed ${isWarm ? 'text-zinc-800' : 'text-white/90'}`}>
               {message}
             </p>
           </div>
-
-          {/* Expand toggle */}
-          <button
-            onClick={(e) => { e.stopPropagation(); setExpanded(x => !x); }}
-            className={`p-1 flex-shrink-0 mt-0.5 ${isWarm ? 'text-zinc-400' : 'text-white/40'}`}
-          >
-            {expanded
-              ? <ChevronUp className="w-3.5 h-3.5" />
-              : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
         </div>
 
         {/* Tap indicator */}

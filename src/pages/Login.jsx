@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom'; // Bring back useNavigate
 import { supabase } from '../supabaseClient';
 import { Loader2, ArrowLeft, Mail, Key, Eye, EyeOff } from 'lucide-react';
@@ -68,10 +68,10 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white p-6 flex flex-col justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-black text-white flex flex-col justify-center relative">
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-500/5 blur-[120px] rounded-full"></div>
 
-      <div className="max-w-md w-full mx-auto space-y-8 relative z-10">
+      <div className="max-w-md w-full mx-auto space-y-8 relative z-10 p-6 py-12">
         <Link to="/" className="text-gray-500 hover:text-white flex items-center gap-2 mb-4 transition-colors font-black text-[10px] uppercase tracking-[0.2em]">
           <ArrowLeft className="w-3 h-3" /> Gate
         </Link>

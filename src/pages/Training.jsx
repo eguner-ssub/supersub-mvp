@@ -50,6 +50,7 @@ const Training = () => {
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered]     = useState(false);
   const [score, setScore]               = useState(0);
+  const [answerResults, setAnswerResults] = useState([]); // true = correct
   const [showAd, setShowAd]             = useState(false);
   const [showReward, setShowReward]     = useState(false);
   const [capToast, setCapToast]         = useState(false);
@@ -109,6 +110,7 @@ const Training = () => {
   const handleStartSession = async () => {
     const result = await startTrainingSession();
     if (result.success) {
+      setAnswerResults([]);
       setTimeLeft(TIMER_SECONDS);
       setPhase('quiz');
     } else if (result.reason === 'cap') {
@@ -121,7 +123,9 @@ const Training = () => {
     if (isAnswered) return;
     setSelectedOption(index);
     setIsAnswered(true);
-    if (index === questions[currentQIndex].correctIndex) {
+    const isCorrect = index === questions[currentQIndex].correctIndex;
+    setAnswerResults(prev => [...prev, isCorrect]);
+    if (isCorrect) {
       const newScore = score + 1;
       setScore(newScore);
       const reaction = JOSEBA_REACTIONS[newScore];
@@ -308,111 +312,120 @@ const Training = () => {
      PHASE: COMPLETE
   ══════════════════════════════════════════════════════════════ */
   if (phase === 'complete') {
-    const josebaCopy =
-      score === 10 ? "Flawless. That's how a manager operates." :
-      score === 9  ? 'Almost perfect. One slip — but still a strong haul.' :
-      score >= 7   ? "Good session. You've earned yourself some cards." :
-      score >= 5   ? 'Solid effort. A few more right next time unlocks better rewards.' :
-                     'Rough session, Boss. Shake it off and go again.';
+    const tagline =
+      score <= 4 ? "Rough session, Boss. Shake it off and go again." :
+      score <= 6 ? "Solid effort. A few more right next time unlocks better rewards." :
+      score <= 8 ? "Good session. You've earned yourself some cards." :
+      score === 9 ? "Almost perfect. One slip — but still a strong haul." :
+                   "Flawless. That's how a manager operates.";
 
     return (
-      <div className="fixed inset-0 z-[100]">
-        {/* Top area — tap to dismiss */}
-        <button
-          onClick={handleFinish}
-          className="absolute top-0 left-0 right-0 h-[15vh] w-full bg-black/60"
-          aria-label="Dismiss"
-        />
+      <div className="relative min-h-screen">
+        <GameHeader />
+        <MobileLayout bgImage="/bg-training-quiz.webp">
+          {/* Bottom sheet overlay */}
+          <div className="fixed inset-0 z-[100]">
+            {/* Top dismiss area */}
+            <button
+              onClick={handleFinish}
+              className="absolute top-0 left-0 right-0 h-[15vh] w-full bg-black/60"
+              aria-label="Dismiss"
+            />
 
-        {/* Bottom sheet */}
-        <div className="absolute bottom-0 left-0 right-0 top-[15vh] bg-zinc-900 rounded-t-3xl flex flex-col animate-in slide-in-from-bottom duration-500">
-          {/* Drag handle */}
-          <div className="w-12 h-1 bg-emerald-500 rounded-full mx-auto mt-3 flex-shrink-0" />
+            {/* Sheet */}
+            <div className="absolute bottom-0 left-0 right-0 top-[15vh] bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 rounded-t-3xl flex flex-col animate-in slide-in-from-bottom duration-500">
+              {/* Drag handle */}
+              <div className="w-12 h-1 bg-emerald-500 rounded-full mx-auto mt-3 flex-shrink-0" />
 
-          {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto px-6 pt-4 pb-8">
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8 flex flex-col items-center">
+                {/* Trophy */}
+                <div className="mb-4 p-4 rounded-full bg-yellow-500/10 border border-yellow-500/30">
+                  <Trophy className="w-12 h-12 text-yellow-400" />
+                </div>
 
-            {/* Trophy + title */}
-            <div className="text-center mb-5">
-              <div className="mb-4 inline-block p-4 rounded-full bg-yellow-500/10 border border-yellow-500/30">
-                <Trophy className="w-14 h-14 text-yellow-400 animate-bounce" />
-              </div>
-              <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-wide">Session Clear!</h2>
-              <p className="text-zinc-400 text-sm text-center">{josebaCopy}</p>
-            </div>
+                {/* Title */}
+                <h2 className="text-2xl font-black text-white uppercase tracking-wide mb-2">
+                  Session Clear!
+                </h2>
 
-            {/* Score box */}
-            <div className="bg-zinc-800/80 rounded-xl p-4 mb-5 border border-zinc-700">
-              <div className="flex justify-between items-center">
-                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Score</p>
-                <p className="text-2xl font-black text-white">
-                  {score}<span className="text-gray-600 text-base font-normal">/10</span>
-                </p>
-              </div>
-            </div>
+                {/* Tagline */}
+                <p className="text-zinc-400 text-sm text-center mb-6">{tagline}</p>
 
-            {/* Rewards row */}
-            {earnedReward ? (
-              <div className="flex items-end justify-center gap-4 mb-6">
-
-                {/* Match Result card */}
-                <div className="relative flex flex-col items-center">
-                  <div style={{ transform: 'scale(0.55)', transformOrigin: 'bottom center' }}>
-                    <CardBase type="c_match_result" status="generic" />
-                  </div>
-                  <div className="absolute -top-2 -right-2 z-30">
-                    <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-0.5">
-                      <span>x</span>
-                      <span className="text-sm">{earnedReward.commonCount}</span>
-                    </div>
+                {/* Score box */}
+                <div className="w-full max-w-xs bg-zinc-800/80 rounded-xl p-4 border border-zinc-700 mb-6">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-widest">Score</span>
+                    <span className="text-2xl font-black text-white">
+                      {score}<span className="text-zinc-600 text-base font-normal">/10</span>
+                    </span>
                   </div>
                 </div>
 
-                {/* Supersub card */}
-                {earnedReward.hasSupersub && (
-                  <div className="relative flex flex-col items-center">
-                    <div style={{ transform: 'scale(0.55)', transformOrigin: 'bottom center' }}>
-                      <CardBase type="c_supersub" status="generic" />
-                    </div>
-                    <div className="absolute -top-2 -right-2 z-30">
-                      <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-0.5">
-                        <span>x</span>
-                        <span className="text-sm">1</span>
+                {/* Rewards row */}
+                <div className="flex items-end justify-center gap-4 mb-8">
+                  {/* Common card */}
+                  {earnedReward && (
+                    <div className="relative">
+                      <div style={{ transform: 'scale(0.55)', transformOrigin: 'bottom center' }}>
+                        <CardBase type="c_match_result" status="generic" />
+                      </div>
+                      <div className="absolute -top-2 -right-2 z-30">
+                        <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-0.5">
+                          <span>x</span>
+                          <span className="text-sm">{earnedReward.commonCount}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Energy drink icon */}
-                {earnedReward.hasDrink && (
-                  <div className="relative flex flex-col items-center">
-                    <div className="w-16 h-20 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center">
-                      <Zap className="w-8 h-8 text-yellow-400 fill-yellow-400" />
-                    </div>
-                    <div className="absolute -top-2 -right-2 z-30">
-                      <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-0.5">
-                        <span>x</span><span className="text-sm">1</span>
+                  {/* Supersub card (if earned) */}
+                  {earnedReward?.hasSupersub && (
+                    <div className="relative">
+                      <div style={{ transform: 'scale(0.55)', transformOrigin: 'bottom center' }}>
+                        <CardBase type="c_supersub" status="generic" />
+                      </div>
+                      <div className="absolute -top-2 -right-2 z-30">
+                        <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-0.5">
+                          <span>x</span>
+                          <span className="text-sm">1</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-              </div>
-            ) : (
-              <div className="flex justify-center mb-6">
-                <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-              </div>
-            )}
+                  {/* Energy drink (if earned) */}
+                  {earnedReward?.hasDrink && (
+                    <div className="relative">
+                      <div className="w-16 h-24 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center">
+                        <Zap className="w-8 h-8 text-yellow-400 fill-yellow-400" />
+                      </div>
+                      <div className="absolute -top-2 -right-2 z-30">
+                        <div className="bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg flex items-center gap-0.5">
+                          <span>x</span>
+                          <span className="text-sm">1</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-            {/* Continue button */}
-            <button
-              onClick={handleFinish}
-              className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest rounded-xl transition-all active:scale-95"
-            >
-              Continue
-            </button>
+                  {/* Loading state */}
+                  {!earnedReward && (
+                    <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
+                  )}
+                </div>
+
+                {/* Continue button */}
+                <button
+                  onClick={handleFinish}
+                  className="w-full max-w-xs py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest rounded-xl transition-colors active:scale-95"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </MobileLayout>
       </div>
     );
   }
@@ -473,21 +486,23 @@ const Training = () => {
             {/* Score HUD */}
             <ScoreHUD score={score} currentQIndex={currentQIndex} />
 
-            {/* Step indicators — replaces progress bar */}
-            <div className="flex justify-center gap-2 mb-3">
-              {Array.from({ length: 10 }, (_, i) => {
-                const wasAnswered = i < currentQIndex;
-                const isCurrent  = i === currentQIndex;
-                return (
-                  <div
-                    key={i}
-                    className={
-                      isCurrent  ? 'w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-emerald-400/50' :
-                      wasAnswered ? 'w-2.5 h-2.5 rounded-full bg-emerald-500' :
-                                   'w-2.5 h-2.5 rounded-full bg-zinc-700'
-                    }
-                  />
-                );
+            {/* Step indicators — correct/wrong/current/unanswered */}
+            <div className="flex items-center justify-center gap-2 mt-3">
+              {Array.from({ length: 10 }).map((_, idx) => {
+                const isAnsweredDot = idx < answerResults.length;
+                const isCurrentDot  = idx === currentQIndex;
+                const wasCorrect    = answerResults[idx];
+
+                let dotClass = 'w-2.5 h-2.5 rounded-full transition-all ';
+                if (isCurrentDot) {
+                  dotClass += 'w-3 h-3 bg-emerald-400 ring-2 ring-emerald-400/50';
+                } else if (isAnsweredDot) {
+                  dotClass += wasCorrect ? 'bg-emerald-500' : 'bg-red-500';
+                } else {
+                  dotClass += 'bg-zinc-700';
+                }
+
+                return <div key={idx} className={dotClass} />;
               })}
             </div>
 

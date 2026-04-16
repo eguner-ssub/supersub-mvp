@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../shared/context/GameContext';
 import { ArrowLeft, LogOut, User, Mail, Shield, ChevronRight } from 'lucide-react';
-import MobileLayout from '../shared/ui/MobileLayout';
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -20,12 +19,13 @@ const Settings = () => {
   };
 
   return (
-    <MobileLayout>
-      <div className="flex flex-col h-full bg-black text-white font-sans">
-        
+    <div className="relative h-screen w-full overflow-hidden bg-black text-white font-sans">
+      <div className="relative z-10 h-full overflow-y-auto">
+        <div className="w-full max-w-md mx-auto flex flex-col pb-12">
+
         {/* Header */}
         <div className="p-4 pt-6 flex items-center gap-4 border-b border-gray-800 bg-gray-900">
-          <button 
+          <button
             onClick={() => navigate('/dashboard')}
             className="p-2 -ml-2 rounded-full hover:bg-gray-800 transition-colors"
           >
@@ -89,8 +89,9 @@ const Settings = () => {
           </p>
 
         </div>
+        </div>
       </div>
-    </MobileLayout>
+    </div>
   );
 };
 

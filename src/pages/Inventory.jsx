@@ -202,10 +202,10 @@ const Inventory = () => {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <>
-      {/* Fixed full-bleed background */}
+    <div className="relative h-screen w-full overflow-hidden">
+      {/* Backgrounds — absolute so they're contained within the sized wrapper */}
       <div
-        className="fixed inset-0 z-0"
+        className="absolute inset-0 z-0"
         style={{
           backgroundImage: "url('/assets/bg-training-quiz.webp')",
           backgroundSize: 'cover',
@@ -213,11 +213,11 @@ const Inventory = () => {
           backgroundRepeat: 'no-repeat',
         }}
       />
-      <div className="fixed inset-0 bg-black/50 z-0" />
+      <div className="absolute inset-0 bg-black/50 z-0" />
 
-      {/* Scrollable content */}
-      <div className="relative z-10 h-screen overflow-y-auto flex justify-center">
-        <div className="w-full max-w-md flex flex-col px-5 pb-40">
+      {/* Scrollable content — h-full inherits from the sized wrapper */}
+      <div className="relative z-10 h-full overflow-y-auto">
+        <div className="w-full max-w-md mx-auto flex flex-col px-5 pb-40">
 
           {/* ── Header ── */}
           <div
@@ -548,7 +548,7 @@ const Inventory = () => {
               {/* Single CardBase + ×count badge */}
               <div className="relative mb-6 animate-in fade-in zoom-in-95 duration-500">
                 <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-3xl scale-110" />
-                <div className="relative" style={{ transform: 'scale(1.1)' }}>
+                <div className="relative" style={{ transform: 'scale(1.15)', transformOrigin: 'center' }}>
                   <CardBase type={bagReward.cardType} status="generic" />
                 </div>
                 <div className="absolute -top-2 -right-2 bg-yellow-500 text-black font-black font-mono text-[10px] px-2 py-0.5 rounded-md border border-black/20 shadow-lg z-30 flex items-center gap-0.5">
@@ -558,8 +558,8 @@ const Inventory = () => {
               </div>
 
               {/* Replacement text */}
-              <p className="text-zinc-300 text-sm text-center mb-8">
-                {bagReward.cardCount} {CARD_INFO[bagReward.cardType]?.label} card{bagReward.cardCount > 1 ? 's' : ''} added to your deck.
+              <p className="text-white text-base font-bold text-center mb-8">
+                🎴 {bagReward.cardCount} {CARD_INFO[bagReward.cardType]?.label} card{bagReward.cardCount > 1 ? 's' : ''} earned!
               </p>
 
               {/* Conditional: Joseba bubble OR Tap to continue */}
@@ -583,7 +583,7 @@ const Inventory = () => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 
