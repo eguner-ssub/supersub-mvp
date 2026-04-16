@@ -1,7 +1,4 @@
 {
-  "crons": [
-    { "path": "/api/cron?job=backfill-upcoming", "schedule": "0 * * * *" }
-  ],
   "functions": {
     "api/cron/index.js": { "maxDuration": 60 }
   },
