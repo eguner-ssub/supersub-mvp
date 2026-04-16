@@ -68,7 +68,8 @@ const Onboarding = () => {
         <div className={`absolute inset-0 bg-black transition-opacity duration-1000 ${hasSignedContract ? 'opacity-80' : 'opacity-40'}`}></div>
       </div>
 
-      <div className="relative z-10 h-full flex flex-col items-center justify-center p-6">
+      <div className="relative z-10 h-full overflow-y-auto">
+      <div className="min-h-full flex flex-col items-center justify-center p-6 pb-16">
         
         {!hasSignedContract ? (
           /* --- STATE 1: THE CONTRACT (Show only if NO club name) --- */
@@ -97,20 +98,7 @@ const Onboarding = () => {
                 </p>
               </div>
 
-              {/* Card type preview */}
-              <div className="flex justify-center gap-2 mt-6 mb-2">
-                {[
-                  { label: 'Result', color: 'bg-blue-500/15 border-blue-500/40 text-blue-300' },
-                  { label: 'Goals', color: 'bg-purple-500/15 border-purple-500/40 text-purple-300' },
-                  { label: 'Supersub', color: 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' },
-                ].map(({ label, color }) => (
-                  <span key={label} className={`px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest ${color}`}>
-                    {label}
-                  </span>
-                ))}
-              </div>
-
-              <div className="space-y-6 mt-4">
+              <div className="space-y-6 mt-6">
                 <div className="relative group">
                   <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-gray-500 mb-1 text-center">
                     Name your club
@@ -214,6 +202,7 @@ const Onboarding = () => {
             </div>
           </div>
         )}
+      </div>
       </div>
     </MobileLayout>
   );

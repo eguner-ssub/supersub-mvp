@@ -62,10 +62,13 @@ const Signup = () => {
       // Write compliance + funnel fields to profiles.
       // The profile row is created by a Supabase trigger on auth.users insert.
       // Use upsert so this is safe even if the trigger hasn't fired yet.
+      const username = data.user.email.split('@')[0];
       await supabase
         .from('profiles')
         .upsert({
           id: data.user.id,
+          email: data.user.email,
+          username,
           terms_accepted_at: new Date().toISOString(),
           is_age_verified: true,
           country_code: countryCode || null,

@@ -448,7 +448,8 @@ const Training = () => {
     <div className="relative min-h-screen">
       <GameHeader />
       <MobileLayout bgImage="/bg-training-quiz.webp">
-        <div className="flex flex-col h-full max-w-md mx-auto">
+        {/* min-h-screen fallback for browsers without dvh support; h-[100dvh] for modern mobile */}
+        <div className="flex flex-col min-h-screen h-[100dvh] max-w-md mx-auto">
 
           {/* Spacer for GameHeader (~72px) */}
           <div className="h-[72px] flex-shrink-0" />
@@ -481,13 +482,13 @@ const Training = () => {
           </div>
 
           {/* ── Content area ── */}
-          <div className="flex flex-col flex-1 px-4 pt-3 pb-4">
+          <div className="flex flex-col flex-1 px-4 pt-3 pb-4 min-h-0">
 
             {/* Score HUD */}
             <ScoreHUD score={score} currentQIndex={currentQIndex} />
 
             {/* Step indicators — correct/wrong/current/unanswered */}
-            <div className="flex items-center justify-center gap-2 mt-3">
+            <div className="flex items-center justify-center gap-2 mt-2">
               {Array.from({ length: 10 }).map((_, idx) => {
                 const isAnsweredDot = idx < answerResults.length;
                 const isCurrentDot  = idx === currentQIndex;
@@ -507,7 +508,7 @@ const Training = () => {
             </div>
 
             {/* Category + difficulty tags */}
-            <div className="flex gap-2 mb-3">
+            <div className="flex gap-2 mt-3 mb-2">
               <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-900/30 text-blue-300 border border-blue-500/30 uppercase tracking-wider">
                 {currentQuestion.category}
               </span>
@@ -519,12 +520,12 @@ const Training = () => {
             </div>
 
             {/* Question text */}
-            <h2 className="text-xl font-bold text-white mb-3 leading-snug drop-shadow-md">
+            <h2 className="text-xl font-bold text-white mb-4 leading-snug drop-shadow-md">
               {currentQuestion.text}
             </h2>
 
             {/* Answer options */}
-            <div className="grid gap-3 flex-1">
+            <div className="grid gap-2.5 flex-1">
               {currentQuestion.options.map((option, index) => {
                 let btnClass = 'bg-gray-800/80 border-gray-600/60 text-gray-200 hover:bg-gray-700/80 hover:border-gray-500';
                 let rightIcon = null;
