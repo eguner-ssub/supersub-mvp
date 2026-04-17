@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Trophy, BarChart2, Target, Users, Newspaper, TrendingUp } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
@@ -524,13 +525,14 @@ const NewsTab = () => {
         )}
       </div>
 
-      {/* ── In-app article overlay ── */}
-      {selectedArticle && (
+      {/* ── In-app article overlay — portalled to body to escape backdrop-filter containing block ── */}
+      {selectedArticle && createPortal(
         <div
           onClick={() => setSelectedArticle(null)}
           style={{
             position: 'fixed', inset: 0, zIndex: 200,
             background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
             display: 'flex', alignItems: 'flex-end',
           }}
         >
@@ -561,7 +563,7 @@ const NewsTab = () => {
                   background: `${sourceColor[selectedArticle.source] || C.grey}18`,
                   padding: '3px 8px', borderRadius: 4,
                 }}>
-                  {selectedArticle.source}
+                  {selectedArticle.source || 'Unknown source'}
                 </span>
                 <span style={{ fontFamily: FONT, fontSize: 10, color: C.grey }}>
                   {selectedArticle.published_at
@@ -572,13 +574,13 @@ const NewsTab = () => {
 
               {/* Title */}
               <div style={{ fontFamily: FONT, fontSize: 17, fontWeight: 800, color: C.white, lineHeight: 1.3, marginBottom: 14 }}>
-                {selectedArticle.title}
+                {selectedArticle.title || 'Untitled article'}
               </div>
 
               {/* Summary */}
-              {selectedArticle.summary && (
+              {(selectedArticle.summary || selectedArticle.description) && (
                 <div style={{ fontFamily: FONT, fontSize: 13, color: C.greyLight, lineHeight: 1.6, marginBottom: 24 }}>
-                  {selectedArticle.summary}
+                  {selectedArticle.summary || selectedArticle.description}
                 </div>
               )}
             </div>
@@ -596,23 +598,37 @@ const NewsTab = () => {
               >
                 Close
               </button>
-              <a
-                href={selectedArticle.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
+              {selectedArticle.url ? (
+                <a
+                  href={selectedArticle.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    flex: 2, padding: '13px 0',
+                    background: C.cyanDim, border: `1px solid ${C.cyan}50`,
+                    borderRadius: 12, color: C.cyan,
+                    fontFamily: FONT, fontSize: 13, fontWeight: 800,
+                    textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  Read on {selectedArticle.source || 'source'} ↗
+                </a>
+              ) : (
+                <div style={{
                   flex: 2, padding: '13px 0',
-                  background: C.cyanDim, border: `1px solid ${C.cyan}50`,
-                  borderRadius: 12, color: C.cyan,
-                  fontFamily: FONT, fontSize: 13, fontWeight: 800,
-                  textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}
-              >
-                Read on {selectedArticle.source} ↗
-              </a>
+                  background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
+                  borderRadius: 12, color: C.grey,
+                  fontFamily: FONT, fontSize: 13, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  No link available
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -684,7 +700,7 @@ const FplTab = () => {
             );
           })
       }
-      {!loading && players.length === 0 && <EmptyState msg="No FPL market data yet." />}
+      {!loading && players.length === 0 && <EmptyState msg="FPL market data updates during gameweeks. Check back closer to a matchday." />}
     </div>
   );
 };

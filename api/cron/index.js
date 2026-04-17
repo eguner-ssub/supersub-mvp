@@ -195,6 +195,36 @@ async function runBackfillUpcoming(supabase) {
   return await backfillUpcomingMatches(supabase, { daysAhead });
 }
 
+// ── Job: sync-fpl ────────────────────────────────────────────────────────────
+// Calls the Supabase Edge Function which fetches FPL bootstrap data and upserts
+// the top 50 most-transferred players into the fpl_transfers table.
+// Service-role key is a valid Supabase JWT so verify_jwt=true on the function
+// accepts it without any config change.
+async function runSyncFpl() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error(`Missing env vars – SUPABASE_URL: ${supabaseUrl ? '✓' : '✗'}, SUPABASE_SERVICE_ROLE_KEY: ${serviceKey ? '✓' : '✗'}`);
+  }
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/sync-fpl`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '(unreadable)');
+    throw new Error(`sync-fpl edge function failed: ${res.status} ${body}`);
+  }
+
+  const data = await res.json();
+  return { success: true, count: data.count ?? null, elapsed_ms: data.elapsed_ms ?? null };
+}
+
 // ── Job registry ─────────────────────────────────────────────────────────────
 const JOBS = {
   'settle':               runSettle,
@@ -203,6 +233,7 @@ const JOBS = {
   'sync-match-intel':     runSyncMatchIntel,
   'sync-news-intel':      runSyncNewsIntel,
   'backfill-upcoming':    runBackfillUpcoming,
+  'sync-fpl':             runSyncFpl,
 };
 
 /**
@@ -216,7 +247,7 @@ const JOBS = {
  * POST is kept for external triggers (cron-job.org, manual curl).
  *
  * Valid jobs: settle, sync-coaches, refresh-leaderboards, sync-match-intel,
- * sync-news-intel, backfill-upcoming
+ * sync-news-intel, backfill-upcoming, sync-fpl
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') {

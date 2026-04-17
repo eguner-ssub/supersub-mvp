@@ -435,7 +435,7 @@ const FPLMarket = () => {
                                     color: COLORS.grey,
                                 }}
                             >
-                                No market data yet. The next sync will populate this list.
+                                FPL market data updates during gameweeks. Check back closer to a matchday.
                             </div>
                         )}
                     </div>
