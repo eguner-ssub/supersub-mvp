@@ -482,7 +482,7 @@ const Training = () => {
           </div>
 
           {/* ── Content area ── */}
-          <div className="flex flex-col flex-1 px-4 pt-3 pb-4 min-h-0">
+          <div className="flex flex-col flex-1 px-4 pt-3 pb-4 min-h-0 overflow-y-auto">
 
             {/* Score HUD */}
             <ScoreHUD score={score} currentQIndex={currentQIndex} />
@@ -507,8 +507,8 @@ const Training = () => {
               })}
             </div>
 
-            {/* Category + difficulty tags */}
-            <div className="flex gap-2 mt-3 mb-2">
+            {/* Category + difficulty tags — hidden on short/narrow viewports */}
+            <div className="hidden sm:flex gap-2 mt-3 mb-2">
               <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-900/30 text-blue-300 border border-blue-500/30 uppercase tracking-wider">
                 {currentQuestion.category}
               </span>
@@ -520,12 +520,12 @@ const Training = () => {
             </div>
 
             {/* Question text */}
-            <h2 className="text-xl font-bold text-white mb-4 leading-snug drop-shadow-md">
+            <h2 className="text-lg md:text-xl font-bold text-white mb-3 leading-snug drop-shadow-md">
               {currentQuestion.text}
             </h2>
 
             {/* Answer options */}
-            <div className="grid gap-2.5 flex-1">
+            <div className="grid gap-2.5">
               {currentQuestion.options.map((option, index) => {
                 let btnClass = 'bg-gray-800/80 border-gray-600/60 text-gray-200 hover:bg-gray-700/80 hover:border-gray-500';
                 let rightIcon = null;
@@ -547,7 +547,7 @@ const Training = () => {
                     key={`q${currentQIndex}-opt${index}`}
                     onClick={() => handleOptionClick(index)}
                     disabled={isAnswered}
-                    className={`relative p-4 rounded-xl border-2 text-left transition-all duration-200 shadow-md active:scale-[0.98] ${btnClass}`}
+                    className={`relative p-3 md:p-4 rounded-xl border-2 text-left transition-all duration-200 shadow-md active:scale-[0.98] ${btnClass}`}
                   >
                     <div className="flex justify-between items-center gap-3">
                       <span className="text-sm leading-snug">{option}</span>

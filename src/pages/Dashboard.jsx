@@ -55,7 +55,10 @@ export default function Dashboard() {
     navigate('/leaderboard');
   };
 
-  const handleBagClick = () => navigate('/inventory/kit-bag');
+  const handleBagClick = () => {
+    console.log('[Dashboard] Kit bag tapped');
+    navigate('/inventory/kit-bag');
+  };
 
   // --- 3. HELPER: Bag Opening Logic ---
   // One representative card per type shown in the reward screen (with ×3 badge)
@@ -122,6 +125,7 @@ export default function Dashboard() {
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
       />
 
+      {imageLoaded && (
       <div className="relative aspect-[9/16] h-full max-h-[100dvh] w-auto overflow-hidden">
 
         {/* ============================================================ */}
@@ -129,6 +133,8 @@ export default function Dashboard() {
         {/* Positions are % of the 9:16 inner container — consistent     */}
         {/* across all screen sizes. Bottom hotspots end at ≤87% to     */}
         {/* stay clear of the NavigationShell nav bar (~bottom 10%).     */}
+        {/* touchAction: manipulation disables the 300ms tap delay on    */}
+        {/* mobile browsers.                                             */}
         {/* ============================================================ */}
 
         {/* A. WHITEBOARD (Bets) — center back wall */}
@@ -136,6 +142,7 @@ export default function Dashboard() {
           onClick={handleWhiteboardClick}
           className="absolute top-[28%] left-[23%] w-[57%] h-[20%] z-10 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-whiteboard"
+          style={{ touchAction: 'manipulation' }}
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
             <TrendingUp className="w-3.5 h-3.5 text-white" />
@@ -147,6 +154,7 @@ export default function Dashboard() {
           onClick={handleTabletClick}
           className="absolute top-[52%] left-[7%] w-[24%] h-[10%] z-10 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-tablet"
+          style={{ touchAction: 'manipulation' }}
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
             <TrendingUp className="w-3.5 h-3.5 text-green-400" />
@@ -158,6 +166,7 @@ export default function Dashboard() {
           onClick={() => navigate('/inventory/energy-drinks')}
           className="absolute top-[54%] left-[68%] w-[28%] h-[10%] z-10 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-drinks"
+          style={{ touchAction: 'manipulation' }}
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
             <Zap className={`w-3.5 h-3.5 ${userData.energy === 0 ? 'text-red-500' : 'text-blue-400'}`} />
@@ -173,8 +182,12 @@ export default function Dashboard() {
           onClick={handleBagClick}
           className="absolute top-[78%] left-[28%] w-[54%] h-[16%] z-20 cursor-pointer rounded-2xl active:scale-95 transition-transform duration-100"
           data-testid="hotspot-inventory"
+          style={{ touchAction: 'manipulation' }}
         >
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
+          <div
+            className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float"
+            style={{ pointerEvents: 'none' }}
+          >
             <ShoppingBag className="w-3.5 h-3.5 text-white" />
             {bagAvailableToday && (
               <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
@@ -187,6 +200,7 @@ export default function Dashboard() {
           onClick={() => navigate('/training')}
           className="absolute top-[67%] left-[0%] w-[28%] h-[18%] z-30 cursor-pointer active:scale-95 transition-transform"
           data-testid="hotspot-training"
+          style={{ touchAction: 'manipulation' }}
         >
           <div className="absolute -top-4 left-3 bg-black/80 backdrop-blur-md p-1.5 rounded-full border border-white/20 shadow-xl pointer-events-none animate-float">
             <Cone className="w-3.5 h-3.5 text-orange-400" />
@@ -298,6 +312,7 @@ export default function Dashboard() {
         )}
 
       </div>
+      )}
     </div>
   );
 }

@@ -180,7 +180,9 @@ const Onboarding = () => {
                       <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
                       <span className="text-gray-300 font-bold uppercase text-sm tracking-wider">Energy</span>
                     </div>
-                    <span className="text-blue-400 font-mono font-bold text-lg drop-shadow-md">+5</span>
+                    <span className="text-blue-400 font-mono font-bold text-lg drop-shadow-md">
+                      {userProfile?.max_energy ?? userProfile?.energy ?? 5}
+                    </span>
                   </div>
                 </div>
 

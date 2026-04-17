@@ -535,22 +535,22 @@ const Inventory = () => {
             {/* Drag handle */}
             <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mt-3 flex-shrink-0" />
 
-            {/* Content — vertically centred between drag handle and Joseba bubble */}
-            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8 flex flex-col items-center justify-center">
+            {/* Content — header anchored top, card centred in remaining space */}
+            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8 flex flex-col items-center">
 
-              {/* Header section */}
-              <div className="flex flex-col items-center">
+              {/* Header — anchored top */}
+              <div className="flex flex-col items-center mb-6">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-1 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">
                   Today's Training Bag
                 </p>
                 <p className="text-zinc-400 text-sm">
                   Day {currentStreak} · Tier {bagReward.tier}
                 </p>
-                <div className="w-16 h-px bg-white/10 mt-3 mb-8" />
+                <div className="w-16 h-px bg-white/10 mt-3" />
               </div>
 
-              {/* Card + caption */}
-              <div className="flex flex-col items-center">
+              {/* Card + caption — centred in remaining flex space */}
+              <div className="flex flex-col items-center my-auto">
                 <div className="relative mb-6 animate-in fade-in zoom-in-95 duration-500">
                   <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-3xl scale-110" />
                   <div className="relative" style={{ transform: 'scale(1.15)', transformOrigin: 'center' }}>
@@ -569,6 +569,9 @@ const Inventory = () => {
                   🎴 {bagReward.cardCount} {CARD_INFO[bagReward.cardType]?.label} card{bagReward.cardCount > 1 ? 's' : ''} earned!
                 </p>
               </div>
+
+              {/* Bottom spacer — reserves room so the Joseba bubble never overlaps the caption */}
+              <div className="h-32 flex-shrink-0" />
 
             </div>
 

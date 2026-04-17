@@ -1,6 +1,7 @@
 import React from 'react';
 import CardBase from '../../shared/ui/CardBase';
 import JosebaBubble from '../../shared/ui/JosebaBubble';
+import { useGame } from '../../shared/context/GameContext';
 
 const STARTER_CARDS = [
   { id: 'c_match_result', label: 'MATCH RESULT' },
@@ -13,6 +14,38 @@ const JOSEBA_MESSAGE =
   "Twelve cards. Three of each type. Match Result, Total Goals, Goalscorer — these close at kickoff. The Supersub card is different — you play it once the lineups are announced. Back the bench as a whole for 500 points, or pick one specific player for 2,500. That's the game.";
 
 const StarterPackReveal = ({ onComplete }) => {
+  const { updateInventory, supabase, userProfile } = useGame();
+
+  /**
+   * Credit 3 of each starter card (12 total) to the user's inventory, then stamp
+   * profiles.starter_pack_credited_at so we never double-credit on refresh.
+   * Any failure is logged but does not block the reveal from dismissing — the
+   * idempotency guard in OfficeOnboarding re-invokes this flow on next visit.
+   */
+  const handleCompleteWithCredit = async () => {
+    const cardsToCredit = STARTER_CARDS.flatMap(card => [card.id, card.id, card.id]);
+
+    try {
+      await updateInventory(cardsToCredit);
+    } catch (err) {
+      console.error('[StarterPackReveal] Failed to credit cards:', err);
+    }
+
+    if (userProfile?.id) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ starter_pack_credited_at: new Date().toISOString() })
+          .eq('id', userProfile.id);
+        if (error) console.error('[StarterPackReveal] Failed to stamp starter_pack_credited_at:', error);
+      } catch (err) {
+        console.error('[StarterPackReveal] Failed to stamp starter_pack_credited_at:', err);
+      }
+    }
+
+    onComplete();
+  };
+
   return (
     <div
       className="fixed inset-0 z-[200] bg-black flex flex-col overflow-hidden"
@@ -75,7 +108,7 @@ const StarterPackReveal = ({ onComplete }) => {
       <div className="flex-shrink-0">
         <JosebaBubble
           message={JOSEBA_MESSAGE}
-          onAdvance={onComplete}
+          onAdvance={handleCompleteWithCredit}
           variant="compact"
         />
       </div>

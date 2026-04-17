@@ -58,6 +58,15 @@ const OfficeOnboarding = ({ onComplete }) => {
     onComplete();
   };
 
+  /* Idempotency guard: if the user already received the starter pack (e.g. they
+     refreshed mid-flow after cards were credited but before onboarding_complete
+     was written), skip the reveal and just finalize onboarding. */
+  const alreadyCredited = phase === 'starter_pack' && userProfile?.starter_pack_credited_at != null;
+  useEffect(() => {
+    if (alreadyCredited) handleOnboardingDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alreadyCredited]);
+
   /* ── PHASES ─────────────────────────────────────────────── */
 
   if (phase === 'sim_match_hub') {
@@ -86,6 +95,9 @@ const OfficeOnboarding = ({ onComplete }) => {
   }
 
   if (phase === 'starter_pack') {
+    // Guard effect above handles the already-credited case by calling
+    // handleOnboardingDone; render nothing meanwhile to avoid flashing the reveal.
+    if (alreadyCredited) return null;
     return (
       <div className="fixed inset-0 z-[300]">
         <StarterPackReveal onComplete={handleOnboardingDone} />
