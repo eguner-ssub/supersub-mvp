@@ -12,6 +12,7 @@
 
 import { requireStatsGenToken } from '../../lib/statsGen/auth.js';
 
+import leagues          from '../../lib/statsGen/handlers/leagues.js';
 import matches          from '../../lib/statsGen/handlers/matches.js';
 import benchWatch       from '../../lib/statsGen/handlers/bench-watch.js';
 import lineups          from '../../lib/statsGen/handlers/lineups.js';
@@ -30,6 +31,7 @@ import fortress         from '../../lib/statsGen/handlers/fortress.js';
 
 // Map slug → handler. Slugs match what the frontend hits today.
 const HANDLERS = {
+  'leagues':           leagues,
   'matches':           matches,
   'bench-watch':       benchWatch,
   'lineups':           lineups,
