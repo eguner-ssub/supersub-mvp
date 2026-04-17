@@ -12,41 +12,65 @@
 
 import { requireStatsGenToken } from '../../lib/statsGen/auth.js';
 
+// ── Context endpoints ────────────────────────────────────────────────────────
 import leagues          from '../../lib/statsGen/handlers/leagues.js';
 import matches          from '../../lib/statsGen/handlers/matches.js';
+// ── Match-scoped content ─────────────────────────────────────────────────────
 import benchWatch       from '../../lib/statsGen/handlers/bench-watch.js';
 import lineups          from '../../lib/statsGen/handlers/lineups.js';
 import h2h              from '../../lib/statsGen/handlers/h2h.js';
 import banker           from '../../lib/statsGen/handlers/banker.js';
-import impactWindow     from '../../lib/statsGen/handlers/impact-window.js';
-import supersubOfWeek   from '../../lib/statsGen/handlers/supersub-of-week.js';
-import wastedBench      from '../../lib/statsGen/handlers/wasted-bench.js';
+import overUnder        from '../../lib/statsGen/handlers/over-under.js';
+import formTable        from '../../lib/statsGen/handlers/form-table.js';
 import refereeWatch     from '../../lib/statsGen/handlers/referee-watch.js';
+import wastedBench      from '../../lib/statsGen/handlers/wasted-bench.js';
+// ── League-scoped content ────────────────────────────────────────────────────
+import impactWindow     from '../../lib/statsGen/handlers/impact-window.js';
 import goalsPerGround   from '../../lib/statsGen/handlers/goals-per-ground.js';
 import goalGlut         from '../../lib/statsGen/handlers/goal-glut.js';
 import firstBlood       from '../../lib/statsGen/handlers/first-blood.js';
-import overUnder        from '../../lib/statsGen/handlers/over-under.js';
-import formTable        from '../../lib/statsGen/handlers/form-table.js';
 import fortress         from '../../lib/statsGen/handlers/fortress.js';
+// ── Wrapper / composite endpoints ────────────────────────────────────────────
+import analytics        from '../../lib/statsGen/handlers/analytics.js';
+import playerSpotlight  from '../../lib/statsGen/handlers/player-spotlight.js';
+import benchContribution from '../../lib/statsGen/handlers/bench-contribution.js';
+import supersubStats    from '../../lib/statsGen/handlers/supersub-stats.js';
+import benchVsStarter   from '../../lib/statsGen/handlers/bench-vs-starter.js';
+import gwBenchToWatch   from '../../lib/statsGen/handlers/gw-bench-to-watch.js';
+import comebackBench    from '../../lib/statsGen/handlers/comeback-bench.js';
+import supersubOfWeek   from '../../lib/statsGen/handlers/supersub-of-week.js';
+import fplWatch         from '../../lib/statsGen/handlers/fpl-watch.js';
 
-// Map slug → handler. Slugs match what the frontend hits today.
+// Map slug → handler (24 total + 2 context = 26 endpoints, 1 Vercel function).
 const HANDLERS = {
-  'leagues':           leagues,
-  'matches':           matches,
-  'bench-watch':       benchWatch,
-  'lineups':           lineups,
-  'h2h':               h2h,
-  'banker':            banker,
-  'impact-window':     impactWindow,
-  'supersub-of-week':  supersubOfWeek,
-  'wasted-bench':      wastedBench,
-  'referee-watch':     refereeWatch,
-  'goals-per-ground':  goalsPerGround,
-  'goal-glut':         goalGlut,
-  'first-blood':       firstBlood,
-  'over-under':        overUnder,
-  'form-table':        formTable,
-  'fortress':          fortress,
+  // Context
+  'leagues':             leagues,
+  'matches':             matches,
+  // Match-scoped
+  'bench-watch':         benchWatch,
+  'lineups':             lineups,
+  'h2h':                 h2h,
+  'banker':              banker,
+  'over-under':          overUnder,
+  'form-table':          formTable,
+  'referee-watch':       refereeWatch,
+  'wasted-bench':        wastedBench,
+  // League-scoped
+  'impact-window':       impactWindow,
+  'goals-per-ground':    goalsPerGround,
+  'goal-glut':           goalGlut,
+  'first-blood':         firstBlood,
+  'fortress':            fortress,
+  // Wrapper / composite
+  'analytics':           analytics,
+  'player-spotlight':    playerSpotlight,
+  'bench-contribution':  benchContribution,
+  'supersub-stats':      supersubStats,
+  'bench-vs-starter':    benchVsStarter,
+  'gw-bench-to-watch':   gwBenchToWatch,
+  'comeback-bench':      comebackBench,
+  'supersub-of-week':    supersubOfWeek,
+  'fpl-watch':           fplWatch,
 };
 
 export default async function handler(req, res) {
