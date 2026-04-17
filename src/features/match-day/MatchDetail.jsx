@@ -415,11 +415,12 @@ const SubstitutesTab = ({ match, onStageSupersub, onStagePlayerSupersub, supersu
 
   const events = Array.isArray(match?.events) ? match.events : [];
 
-  // Players who have already been subbed ON (incoming player = assist.id or player_id on sub event)
+  // Players who have already been subbed ON
+  // Sportmonks v3: player_id = incoming player on sub events (type_id 18)
   const subbedOnIds = new Set(
     events
       .filter(e => e.type_id === 18 || e.type === 'subst')
-      .map(e => e.assist?.id ?? e.player_id)
+      .map(e => e.player_id)
       .filter(Boolean)
       .map(Number)
   );

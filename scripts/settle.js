@@ -53,9 +53,14 @@ const POINTS_MULTIPLIER = {
  *   - Team-level (bet.player_id is null): 500 points
  *   - Player-level (bet.player_id is set): 2500 points — ONLY if that specific player scored/assisted
  *
- * Data shape (from events array):
- *   subst event: { type: 'subst', team: { id }, player: { id } (coming OFF), assist: { id } (coming ON), time: { elapsed } }
- *   goal event:  { type: 'Goal',  team: { id }, player: { id } (scorer), assist: { id } (assister), detail, time: { elapsed } }
+ * Data shape (Sportmonks v3 events array):
+ *   subst event: { type_id: 18, player_id (coming ON), related_player_id (going OFF), participant_id (team), minute }
+ *   goal event:  { type_id: 14|97, player_id (scorer), assist: { id } (assister), participant_id (team), minute }
+ *
+ * NOTE: Sportmonks v3 does NOT populate event.assist on substitution events.
+ * The incoming player is always event.player_id. The related_player_id is the
+ * player going OFF. This differs from the API-Football convention where
+ * assist.id was the incoming player.
  *
  * Requires: bet.team_id (integer) — the team the user backed.
  */
@@ -74,7 +79,8 @@ export const settleSupersub = (bet, events) => {
     for (const event of events) {
         const isSub = event.type_id === 18 || event.type === 'subst';
         const isBackedTeam = event.participant_id === teamId || event.team?.id === teamId;
-        const incomingPlayerId = event.player_id || event.assist?.id;
+        // Sportmonks v3: player_id = player coming ON; assist is undefined on sub events
+        const incomingPlayerId = event.player_id;
 
         if (isSub && isBackedTeam && incomingPlayerId != null) {
             const minute = event.minute || event.time?.elapsed || 0;

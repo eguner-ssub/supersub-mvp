@@ -31,7 +31,8 @@ function settleSupersub(bet: any, events: any[]): { status: string; points: numb
   for (const event of events) {
     const isSub           = event.type_id === 18 || event.type === 'subst';
     const isBackedTeam    = event.participant_id === teamId || event.team?.id === teamId;
-    const incomingPlayerId = event.player_id || event.assist?.id;
+    // Sportmonks v3: player_id = player coming ON; assist is undefined on sub events
+    const incomingPlayerId = event.player_id;
 
     if (isSub && isBackedTeam && incomingPlayerId != null) {
       subsOnMap.set(incomingPlayerId, event.minute || event.time?.elapsed || 0);

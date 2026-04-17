@@ -153,7 +153,8 @@ export const calculateBetResult = (cardType, selection, matchData) => {
             for (const event of events) {
                 const isSub = event.type_id === 18 || event.type === 'subst';
                 const isBackedTeam = event.participant_id === backedTeamId || event.team?.id === backedTeamId;
-                const incomingPlayerId = event.player_id || event.assist?.id;
+                // Sportmonks v3: player_id = player coming ON; assist is undefined on sub events
+                const incomingPlayerId = event.player_id;
 
                 if (isSub && isBackedTeam && incomingPlayerId != null) {
                     const minute = event.minute || event.time?.elapsed || 0;
