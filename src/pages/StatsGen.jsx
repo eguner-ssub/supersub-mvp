@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// Match-scoped previews
 import { BenchWatchPreview } from './stats-gen/previews/BenchWatchPreview';
 import { LineupsPreview } from './stats-gen/previews/LineupsPreview';
 import { H2HPreview } from './stats-gen/previews/H2HPreview';
@@ -7,32 +8,67 @@ import { OverUnderPreview } from './stats-gen/previews/OverUnderPreview';
 import { FormTablePreview } from './stats-gen/previews/FormTablePreview';
 import { RefereeWatchPreview } from './stats-gen/previews/RefereeWatchPreview';
 import { WastedBenchPreview } from './stats-gen/previews/WastedBenchPreview';
+// League-scoped previews
+import { AnalyticsPreview } from './stats-gen/previews/AnalyticsPreview';
+import { PlayerSpotlightPreview } from './stats-gen/previews/PlayerSpotlightPreview';
+import { BenchContributionPreview } from './stats-gen/previews/BenchContributionPreview';
+import { SupersubStatsPreview } from './stats-gen/previews/SupersubStatsPreview';
+import { ImpactWindowPreview } from './stats-gen/previews/ImpactWindowPreview';
+import { GoalsPerGroundPreview } from './stats-gen/previews/GoalsPerGroundPreview';
+import { GoalGlutPreview } from './stats-gen/previews/GoalGlutPreview';
+import { FirstBloodPreview } from './stats-gen/previews/FirstBloodPreview';
+import { FortressPreview } from './stats-gen/previews/FortressPreview';
+// Wrapper previews
+import { BenchVsStarterPreview } from './stats-gen/previews/BenchVsStarterPreview';
+import { GWBenchToWatchPreview } from './stats-gen/previews/GWBenchToWatchPreview';
+import { ComebackBenchPreview } from './stats-gen/previews/ComebackBenchPreview';
+import { SupersubOfWeekPreview } from './stats-gen/previews/SupersubOfWeekPreview';
+import { FPLWatchPreview } from './stats-gen/previews/FPLWatchPreview';
 
 const STORAGE_KEY = 'stats_gen_password';
 
-// ─── Preview router ──────────────────────────────────────────────────────────
+// ─── Preview router (all 22 content types) ───────────────────────────────────
+const PREVIEW_MAP = {
+  // Match-scoped
+  'bench-watch':       BenchWatchPreview,
+  'lineups':           LineupsPreview,
+  'h2h':               H2HPreview,
+  'banker':            BankerPreview,
+  'over-under':        OverUnderPreview,
+  'form-table':        FormTablePreview,
+  'referee-watch':     RefereeWatchPreview,
+  'wasted-bench':      WastedBenchPreview,
+  // League-scoped
+  'analytics':         AnalyticsPreview,
+  'player-spotlight':  PlayerSpotlightPreview,
+  'bench-contribution': BenchContributionPreview,
+  'supersub-stats':    SupersubStatsPreview,
+  'impact-window':     ImpactWindowPreview,
+  'goals-per-ground':  GoalsPerGroundPreview,
+  'goal-glut':         GoalGlutPreview,
+  'first-blood':       FirstBloodPreview,
+  'fortress':          FortressPreview,
+  // Wrappers
+  'bench-vs-starter':  BenchVsStarterPreview,
+  'gw-bench-to-watch': GWBenchToWatchPreview,
+  'comeback-bench':    ComebackBenchPreview,
+  'supersub-of-week':  SupersubOfWeekPreview,
+  'fpl-watch':         FPLWatchPreview,
+};
+
 function renderPreview(contentType, data) {
   if (!data) return null;
-  switch (contentType) {
-    case 'bench-watch':    return <BenchWatchPreview data={data} />;
-    case 'lineups':        return <LineupsPreview data={data} />;
-    case 'h2h':            return <H2HPreview data={data} />;
-    case 'banker':         return <BankerPreview data={data} />;
-    case 'over-under':     return <OverUnderPreview data={data} />;
-    case 'form-table':     return <FormTablePreview data={data} />;
-    case 'referee-watch':  return <RefereeWatchPreview data={data} />;
-    case 'wasted-bench':   return <WastedBenchPreview data={data} />;
-    default:
-      // Fallback: raw JSON for unsupported types
-      return (
-        <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-6">
-          <p className="text-cyan-400 text-[10px] font-black uppercase tracking-widest mb-4">{contentType}</p>
-          <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap break-words">
-            {JSON.stringify(data, null, 2)}
-          </pre>
-        </div>
-      );
-  }
+  const Preview = PREVIEW_MAP[contentType];
+  if (Preview) return <Preview data={data} />;
+  // Fallback: raw JSON for any future types without a preview
+  return (
+    <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-6">
+      <p className="text-cyan-400 text-[10px] font-black uppercase tracking-widest mb-4">{contentType}</p>
+      <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap break-words">
+        {JSON.stringify(data, null, 2)}
+      </pre>
+    </div>
+  );
 }
 
 // ─── Content type definitions ────────────────────────────────────────────────
