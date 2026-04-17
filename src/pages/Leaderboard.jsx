@@ -8,7 +8,7 @@ export default function Leaderboard() {
   const navigate = useNavigate();
 
   return (
-    <div className="h-screen w-full flex flex-col bg-[#0a0a0a] overflow-hidden font-sans select-none md:max-w-[480px] md:mx-auto">
+    <div className="h-[100dvh] w-full flex flex-col bg-[#0a0a0a] overflow-hidden font-sans select-none md:max-w-[480px] md:mx-auto">
 
       {/* Header */}
       <div className="flex items-center justify-between p-4 pt-6 bg-black/60 backdrop-blur-md border-b border-white/10 z-50">

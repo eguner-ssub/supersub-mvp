@@ -19,9 +19,9 @@ const Settings = () => {
   };
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-black text-white font-sans">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white font-sans">
       <div className="relative z-10 h-full overflow-y-auto">
-        <div className="w-full max-w-md mx-auto flex flex-col pb-12">
+        <div className="w-full max-w-md mx-auto flex flex-col pb-[max(3rem,env(safe-area-inset-bottom))]">
 
         {/* Header */}
         <div className="p-4 pt-6 flex items-center gap-4 border-b border-gray-800 bg-gray-900">

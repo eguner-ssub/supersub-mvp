@@ -108,7 +108,7 @@ const Signup = () => {
   }
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-black text-white">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
       <div
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/assets/bg-clubroom.webp')" }}
@@ -116,7 +116,7 @@ const Signup = () => {
       <div className="absolute inset-0 bg-black/50 z-0" />
 
       <div className="relative z-10 h-full overflow-y-auto">
-      <div className="max-w-md w-full mx-auto space-y-8 p-6 pb-12">
+      <div className="max-w-md w-full mx-auto space-y-8 p-6 pb-[max(3rem,env(safe-area-inset-bottom))]">
         <Link to="/" className="text-gray-500 hover:text-white flex items-center gap-2 mb-4 transition-colors font-black text-[10px] uppercase tracking-[0.2em]">
           <ArrowLeft className="w-3 h-3" /> Back
         </Link>

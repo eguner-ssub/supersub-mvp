@@ -202,7 +202,7 @@ const Inventory = () => {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="relative h-screen w-full overflow-hidden">
+    <div className="relative h-[100dvh] w-full overflow-hidden">
       {/* Backgrounds — absolute so they're contained within the sized wrapper */}
       <div
         className="absolute inset-0 z-0"

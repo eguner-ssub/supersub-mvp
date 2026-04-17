@@ -55,7 +55,7 @@ const LockerRoom = () => {
 
     return (
         <MobileLayout>
-            <div className="h-screen w-full flex flex-col bg-[#0D0D0D] overflow-hidden">
+            <div className="h-[100dvh] w-full flex flex-col bg-[#0D0D0D] overflow-hidden">
                 {/* Fixed top header */}
                 <div className="fixed top-0 left-0 right-0 z-50 h-14 bg-black/80 backdrop-blur-md border-b border-white/10 flex items-center px-4">
                     <button

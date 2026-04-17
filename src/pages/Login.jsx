@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // Bring back useNavigate
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Loader2, ArrowLeft, Mail, Key, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -12,30 +12,24 @@ const Login = () => {
   const navigate = useNavigate();
 
   // --- DELETE THE USEEFFECT THAT CLEARS SESSION HERE ---
-  // We do NOT want to sign out automatically. 
+  // We do NOT want to sign out automatically.
   // If the user is redirected here by mistake, we want to keep their session alive.
-
-  const carbonStyle = {
-    background: `radial-gradient(circle, #333 1px, transparent 1px), radial-gradient(circle, #333 1px, transparent 1px), #1a1a1a`,
-    backgroundSize: '4px 4px',
-    backgroundPosition: '0 0, 2px 2px',
-  };
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     if (loading) return;
-  
+
     setLoading(true);
     setMessage(null);
-  
+
     console.log("LOGIN_START: ", email);
-  
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password,
       });
-  
+
       if (error) {
         console.error("Login Error:", error);
         setMessage({ type: 'error', text: error.message });
@@ -54,7 +48,7 @@ const Login = () => {
 
   const handleMagicLink = async () => {
     if (!email) {
-      setMessage({ type: 'error', text: 'Terminal ID required.' });
+      setMessage({ type: 'error', text: 'Email required.' });
       return;
     }
     setLoading(true);
@@ -63,104 +57,130 @@ const Login = () => {
       options: { emailRedirectTo: 'https://supersub.mobi' },
     });
     if (error) setMessage({ type: 'error', text: error.message });
-    else setMessage({ type: 'success', text: 'Authentication link dispatched.' });
+    else setMessage({ type: 'success', text: 'Magic link sent. Check your email.' });
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col justify-center relative">
-      <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-500/5 blur-[120px] rounded-full"></div>
+    <div className="relative h-[100dvh] w-full overflow-hidden">
+      {/* Background image */}
+      <img
+        src="/assets/bg-dressing-room.webp"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-cover z-0"
+      />
 
-      <div className="max-w-md w-full mx-auto space-y-8 relative z-10 p-6 py-12">
-        <Link to="/" className="text-gray-500 hover:text-white flex items-center gap-2 mb-4 transition-colors font-black text-[10px] uppercase tracking-[0.2em]">
-          <ArrowLeft className="w-3 h-3" /> Gate
-        </Link>
+      {/* Softer gradient — preserves image visibility in upper half */}
+      <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/40 via-black/30 to-black/90" />
 
-        <div>
-          <h2 className="text-4xl font-black italic mb-2 tracking-tighter uppercase">Welcome Back</h2>
-          <p className="text-gray-500 text-sm font-medium">Resume match intelligence operations.</p>
-        </div>
+      {/* Scroll container */}
+      <div className="relative z-20 h-full w-full overflow-y-auto">
+        <div className="min-h-full flex flex-col">
 
-        <form onSubmit={handlePasswordLogin} className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Terminal ID</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#0f0f0f] border border-white/5 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500/40 transition-all placeholder:text-gray-700"
-                placeholder="USER@STADIUM.MOBI"
-              />
-            </div>
+          {/* Back button — top-left, fixed at top */}
+          <div className="flex-shrink-0 p-6">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 text-white/70 hover:text-white text-[10px] font-black uppercase tracking-[0.2em] transition-colors"
+            >
+              <ArrowLeft className="w-3 h-3" /> Back
+            </button>
+          </div>
 
-            <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-[0.2em] ml-1">Security Key</label>
-              <div className="relative">
+          {/* Logo — sits in the dark zone above the dressing room lights */}
+          <div className="flex-shrink-0 flex justify-center pt-4 pb-8">
+            <img
+              src="/assets/supersub_icon.webp"
+              alt="Supersub"
+              className="h-32 w-auto opacity-90"
+            />
+          </div>
+
+          {/* Flex spacer pushes form to lower area */}
+          <div className="flex-1 min-h-[5vh]" />
+
+          {/* Form content — sits in middle/lower area */}
+          <div className="flex-shrink-0 px-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
+            <div className="max-w-sm w-full mx-auto">
+
+              {/* Heading — matches app's Signup/Onboarding style */}
+              <h1 className="font-black italic text-2xl tracking-tight text-white uppercase mb-8">
+                Welcome Back
+              </h1>
+
+              {/* Form */}
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+
+                {/* Email */}
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type="email"
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#0f0f0f] border border-white/5 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500/40 transition-all pr-12 placeholder:text-gray-700"
-                  placeholder="••••••••"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all"
+                  placeholder="Email"
+                  autoComplete="email"
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-4 text-gray-600 hover:text-white">
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-          </div>
 
-          {message && (
-            <div className={`p-4 rounded-xl text-xs font-bold uppercase tracking-wider border ${message.type === 'error' ? 'bg-red-500/5 border-red-500/20 text-red-400' : 'bg-green-500/5 border-green-500/20 text-green-400'}`}>
-              {message.text}
-            </div>
-          )}
+                {/* Password */}
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 pr-12 text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all"
+                    placeholder="Password"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-4 text-white/40 hover:text-white/70 transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
 
-          <div className="space-y-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full h-[64px] rounded-full p-[2px] transition-all active:scale-95 shadow-[0_0_20px_rgba(245,197,70,0.2)] overflow-hidden"
-              style={{ background: 'linear-gradient(180deg, #D4AF37 0%, #1a1a1a 100%)' }}
-            >
-              <div 
-                className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[1px] border-yellow-500/30 relative z-10" 
-                style={carbonStyle}
-              >
-                {loading ? (
-                  <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
-                ) : (
-                  <>
-                    <Key className="w-4 h-4 text-yellow-500" />
-                    <span className="text-white font-black text-lg tracking-widest italic uppercase">Access Profile</span>
-                  </>
+                {/* Message — single line, red for error, green for success */}
+                {message && (
+                  <p className={`text-sm ${message.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+                    {message.text}
+                  </p>
                 )}
-              </div>
-            </button>
 
-            <div className="relative flex py-2 items-center">
-              <div className="flex-grow border-t border-white/5"></div>
-              <span className="flex-shrink mx-4 text-gray-700 text-[10px] font-black tracking-widest">AUXILIARY</span>
-              <div className="flex-grow border-t border-white/5"></div>
+                {/* Sign In button — flat white */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-white text-black font-semibold py-3.5 rounded-xl hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2"
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <span>Sign in</span>
+                  )}
+                </button>
+
+                {/* Magic link — text link, secondary action */}
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={handleMagicLink}
+                    disabled={loading}
+                    className="text-white/50 hover:text-white/80 text-sm transition-colors disabled:opacity-50"
+                  >
+                    Or use a magic link
+                  </button>
+                </div>
+
+              </form>
             </div>
-
-            <button
-              type="button"
-              onClick={handleMagicLink}
-              disabled={loading}
-              className="group relative w-full h-[60px] rounded-full p-[2px] transition-all active:scale-95"
-              style={{ background: 'linear-gradient(180deg, #444 0%, #111 100%)' }}
-            >
-              <div className="w-full h-full rounded-full flex items-center justify-center gap-3 border-[1px] border-white/5" style={carbonStyle}>
-                <Mail className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
-                <span className="text-gray-500 group-hover:text-white font-black text-xs tracking-widest italic uppercase transition-colors">Dispatch Magic Link</span>
-              </div>
-            </button>
           </div>
-        </form>
+
+        </div>
       </div>
     </div>
   );
