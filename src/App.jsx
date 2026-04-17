@@ -41,6 +41,7 @@ const LeagueHub = lazy(() => import('./features/league-hub/LeagueHub'));
 const APIDebugger = lazy(() => import('./features/debug/APIDebugger'));
 const ManagerOffice = lazy(() => import('./features/office/ManagerOffice'));
 const PublicShareView = lazy(() => import('./pages/PublicShareView'));
+const StatsGen = lazy(() => import('./pages/StatsGen'));
 
 // --- THE BOUNCER (Security Guard) ---
 const ProtectedRoute = ({ children, requireOnboarding = true }) => {
@@ -151,6 +152,7 @@ export const AppRoutes = () => {
       <Route path="/lab" element={<CardLab />} />
       <Route path="/lab/generic" element={<GenericLab />} />
       <Route path="/debug" element={<APIDebugger />} />
+      <Route path="/stats-gen" element={<StatsGen />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

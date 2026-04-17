@@ -38,6 +38,7 @@
     { "source": "/leaderboard",     "destination": "/index.html" },
     { "source": "/scouting",        "destination": "/index.html" },
     { "source": "/stats",           "destination": "/index.html" },
+    { "source": "/stats-gen",       "destination": "/index.html" },
     { "source": "/history",         "destination": "/index.html" },
     { "source": "/inbox",           "destination": "/index.html" },
     { "source": "/terms",           "destination": "/index.html" },
