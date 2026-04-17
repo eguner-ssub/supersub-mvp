@@ -5,7 +5,7 @@
   "crons": [
     {
       "path": "/api/cron?job=sync-fpl",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 6 * * *"
     }
   ],
   "headers": [
