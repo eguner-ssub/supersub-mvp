@@ -1,6 +1,39 @@
 import React, { useState, useEffect } from 'react';
+import { BenchWatchPreview } from './stats-gen/previews/BenchWatchPreview';
+import { LineupsPreview } from './stats-gen/previews/LineupsPreview';
+import { H2HPreview } from './stats-gen/previews/H2HPreview';
+import { BankerPreview } from './stats-gen/previews/BankerPreview';
+import { OverUnderPreview } from './stats-gen/previews/OverUnderPreview';
+import { FormTablePreview } from './stats-gen/previews/FormTablePreview';
+import { RefereeWatchPreview } from './stats-gen/previews/RefereeWatchPreview';
+import { WastedBenchPreview } from './stats-gen/previews/WastedBenchPreview';
 
 const STORAGE_KEY = 'stats_gen_password';
+
+// ─── Preview router ──────────────────────────────────────────────────────────
+function renderPreview(contentType, data) {
+  if (!data) return null;
+  switch (contentType) {
+    case 'bench-watch':    return <BenchWatchPreview data={data} />;
+    case 'lineups':        return <LineupsPreview data={data} />;
+    case 'h2h':            return <H2HPreview data={data} />;
+    case 'banker':         return <BankerPreview data={data} />;
+    case 'over-under':     return <OverUnderPreview data={data} />;
+    case 'form-table':     return <FormTablePreview data={data} />;
+    case 'referee-watch':  return <RefereeWatchPreview data={data} />;
+    case 'wasted-bench':   return <WastedBenchPreview data={data} />;
+    default:
+      // Fallback: raw JSON for unsupported types
+      return (
+        <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-6">
+          <p className="text-cyan-400 text-[10px] font-black uppercase tracking-widest mb-4">{contentType}</p>
+          <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap break-words">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </div>
+      );
+  }
+}
 
 // ─── Content type definitions ────────────────────────────────────────────────
 const CONTENT_TYPES = {
@@ -534,9 +567,7 @@ export default function StatsGen() {
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-[960px] mx-auto p-6">
           {previewData ? (
-            <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap break-words bg-zinc-900/50 rounded-xl p-6 border border-zinc-800">
-              {JSON.stringify(previewData, null, 2)}
-            </pre>
+            renderPreview(previewData._contentType, previewData)
           ) : (
             <div className="h-[80vh] flex items-center justify-center">
               <p className="text-zinc-600 text-sm">
