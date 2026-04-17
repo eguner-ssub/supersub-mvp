@@ -17,6 +17,14 @@ WHERE id IN (
   WHERE rn > 1
 );
 
--- Step 2: enforce uniqueness from now on.
-ALTER TABLE profiles
-  ADD CONSTRAINT profiles_club_name_key UNIQUE (club_name);
+-- Step 2: enforce uniqueness from now on (idempotent — constraint may already exist).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'profiles_club_name_key'
+      AND table_name      = 'profiles'
+  ) THEN
+    ALTER TABLE profiles ADD CONSTRAINT profiles_club_name_key UNIQUE (club_name);
+  END IF;
+END $$;
