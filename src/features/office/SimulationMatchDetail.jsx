@@ -913,26 +913,28 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
         </>
       )}
 
-      {/* ── GOAL CELEBRATION ── viewport-centred, above settlement layer ── */}
+      {/* ── GOAL CELEBRATION ── viewport-centred, above all UI layers ── */}
       {goalPopup && (
-        <>
-          {/* Backdrop dim — sits just below the card */}
-          <div className="fixed inset-0 z-[149] bg-black/40 pointer-events-none" />
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 pointer-events-none">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 pointer-events-auto" />
 
-          {/* Card */}
-          <div className="fixed inset-0 z-[150] flex items-center justify-center pointer-events-none">
-            <div className="bg-zinc-900/95 backdrop-blur-md border border-emerald-500/40 rounded-2xl p-8 shadow-2xl max-w-xs w-[85%] animate-in zoom-in-95 duration-300 text-center">
-              <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center mb-4">
-                <span className="text-4xl">⚽</span>
-              </div>
-              <h2 className="text-white text-3xl font-black tracking-tight mb-1">GOAL!</h2>
-              <p className="text-emerald-400 font-bold uppercase tracking-widest text-sm mb-3">Liverpool</p>
-              <p className="text-zinc-400 text-sm">
-                Scored by <span className="text-white font-bold">{goalPopup.scorer}</span> · {goalPopup.minute}
-              </p>
+          {/* Popup content */}
+          <div className="relative z-10 bg-zinc-900 border border-emerald-500/40 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center">
+              <span className="text-4xl">⚽</span>
             </div>
+            <h2 className="text-white text-3xl font-black uppercase tracking-tight mb-2">
+              Goal!
+            </h2>
+            <p className="text-emerald-400 text-lg font-bold uppercase tracking-widest mb-2">
+              Liverpool
+            </p>
+            <p className="text-zinc-400 text-sm">
+              Scored by <span className="text-white font-bold">{goalPopup.scorer}</span> · {goalPopup.minute}
+            </p>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -68,8 +68,8 @@ const Onboarding = () => {
         <div className={`absolute inset-0 bg-black transition-opacity duration-1000 ${hasSignedContract ? 'opacity-80' : 'opacity-40'}`}></div>
       </div>
 
-      <div className="relative z-10 h-full overflow-y-auto">
-      <div className="min-h-full flex flex-col items-center justify-center p-6 pb-16">
+      <div className="relative z-10 h-[100dvh] overflow-y-auto">
+      <div className="min-h-full flex flex-col items-center justify-start p-6 pt-8 md:pt-20 pb-[max(4rem,env(safe-area-inset-bottom))]">
         
         {!hasSignedContract ? (
           /* --- STATE 1: THE CONTRACT (Show only if NO club name) --- */

@@ -162,7 +162,7 @@ const JosebaBubble = ({
           <span className={`block text-[8px] font-black uppercase tracking-widest mb-1 ${isWarm ? 'text-emerald-700' : 'text-emerald-400'}`}>
             {label}
           </span>
-          <p className={`text-xs font-bold leading-relaxed ${isWarm ? 'text-zinc-800' : 'text-white/90'}`}>
+          <p className={`text-xs font-bold leading-relaxed max-h-[35vh] overflow-y-auto ${isWarm ? 'text-zinc-800' : 'text-white/90'}`}>
             {message}
           </p>
         </div>

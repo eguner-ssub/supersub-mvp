@@ -25,21 +25,21 @@ const SimulationMatchHub = ({ onMatchSelect, onBack }) => {
     <div className="h-[100dvh] w-full flex flex-col text-white font-sans select-none overflow-hidden relative bg-[url('/assets/bg-stadium.webp')] bg-cover bg-center">
 
       {/* HEADER */}
-      <div className="flex-none bg-black/80 backdrop-blur-md border-b border-white/10 z-50">
-        <div className="relative flex justify-between items-center px-4 pt-12 pb-3">
-          <button
-            onClick={onBack}
-            className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center active:scale-95 transition-all"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h1 className="absolute left-1/2 -translate-x-1/2 text-base font-black uppercase tracking-widest text-emerald-400">
-            Match Hub
-          </h1>
-          {/* Empty right side — no points display in simulation */}
-          <div className="w-9" />
-        </div>
+      <div className="fixed top-0 left-0 right-0 z-50 h-14 bg-black/80 backdrop-blur-md border-b border-white/10 flex items-center px-4">
+        <button
+          onClick={onBack}
+          className="w-9 h-9 flex-shrink-0 bg-white/10 border border-white/20 rounded-full flex items-center justify-center text-white active:scale-95"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="flex-1 text-center text-[11px] font-black uppercase tracking-widest text-emerald-400">
+          Match Hub
+        </span>
+        {/* Spacer to balance the back button and truly centre the title */}
+        <div className="w-9 h-9 flex-shrink-0" />
       </div>
+      {/* Push content below fixed header */}
+      <div className="h-14 flex-shrink-0" />
 
       {/* MATCH LIST */}
       <div className="flex-1 overflow-y-auto p-4 pb-48 space-y-3 scrollbar-hide">

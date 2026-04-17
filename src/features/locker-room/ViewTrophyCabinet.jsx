@@ -173,12 +173,12 @@ const WonContent = ({ wonPredictions, unseenIdsOnEntry }) => {
     }, [sortedGroups]);
 
     return (
-        <div className="relative flex-1 overflow-y-auto scrollbar-hide">
+        <div className="relative">
             {/* Background */}
             <img
                 src="/assets/bg-trophy-cabinet.webp"
                 alt=""
-                className="fixed inset-0 w-full h-full object-cover z-0"
+                className="absolute inset-0 w-full h-full object-cover z-0"
             />
 
             {/* Empty state */}
@@ -286,9 +286,9 @@ const ViewTrophyCabinet = () => {
     }
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full relative">
             {/* Sub-tab bar */}
-            <div className="flex border-b border-white/10 flex-shrink-0 sticky top-0 z-20 bg-black/80 backdrop-blur-md">
+            <div className="flex border-b border-white/10 flex-shrink-0 sticky top-0 z-[45] bg-black/90 backdrop-blur-md">
                 <button
                     onClick={() => setActiveSubTab('won')}
                     className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-colors ${
