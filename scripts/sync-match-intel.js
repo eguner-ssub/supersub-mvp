@@ -14,7 +14,12 @@ import { resolveSeasonSmId } from '../lib/statsGen/resolveSeason.js';
 
 const PREFIX = '[sync-match-intel]';
 const { SYNC_DAYS_AHEAD, MIN_DAYS_BEFORE_KICKOFF, STALE_AFTER_HOURS } = INTEL_CONFIG;
-const MAX_PER_RUN = 8; // Prevent Vercel 10s function timeout
+// vercel.json sets maxDuration: 60s for api/cron/index.js. At ~2s/match
+// typical (SM predictions + H2H cache check + internal DB reads + upsert)
+// and ~3.5s worst-case (H2H cache miss + cold standings lookup), 20 matches
+// gives ~40-60s typical, ~70s worst-case. 20 is the safe ceiling — leaves
+// margin for occasional cold starts without timing out the function.
+const MAX_PER_RUN = 20;
 const H2H_STALE_HOURS = 72;
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
@@ -226,7 +231,9 @@ export async function syncMatchIntel(supabaseOverride) {
 
   console.log(`${PREFIX} Fetching matches between ${minDate.toISOString().slice(0, 10)} and ${maxDate.toISOString().slice(0, 10)} ...`);
 
-  // Get matches in window
+  // Get matches in window, ordered by kickoff_time ascending so matches
+  // closest to kickoff get processed first. This prevents far-future
+  // fixtures from crowding out imminent ones when MAX_PER_RUN applies.
   const { data: matches, error } = await supabase
     .from('matches')
     .select(`
@@ -234,7 +241,8 @@ export async function syncMatchIntel(supabaseOverride) {
       home_coach_id, away_coach_id, kickoff_time, season, league_id
     `)
     .gte('kickoff_time', minDate.toISOString())
-    .lte('kickoff_time', maxDate.toISOString());
+    .lte('kickoff_time', maxDate.toISOString())
+    .order('kickoff_time', { ascending: true });
 
   if (error) throw new Error(`Failed to fetch matches: ${error.message}`);
   if (!matches?.length) {
@@ -255,9 +263,13 @@ export async function syncMatchIntel(supabaseOverride) {
       .map(i => i.match_id)
   );
 
+  // allStale is already ordered by kickoff_time ascending (from the query)
   const allStale = matches.filter(m => !freshSet.has(m.id));
   const staleMatches = allStale.slice(0, MAX_PER_RUN);
-  console.log(`${PREFIX} ${matches.length} matches in window, ${allStale.length} need refresh (processing ${staleMatches.length})`);
+
+  // Observability: how many stale matches are within the next 48h?
+  const in48h = allStale.filter(m => new Date(m.kickoff_time) <= new Date(now.getTime() + 48 * 60 * 60 * 1000)).length;
+  console.log(`${PREFIX} ${matches.length} matches in window, ${allStale.length} need refresh (${in48h} within 48h), processing ${staleMatches.length}`);
 
   let success = 0;
   let failed = 0;
