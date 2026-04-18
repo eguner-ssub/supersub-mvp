@@ -7,6 +7,8 @@ import TacticalHUD from '../../shared/ui/TacticalHUD';
 import MatchTerminationTerminal from '../../shared/ui/MatchTerminationTerminal';
 import MatchLineup from './MatchLineup';
 import { normalizeMatch } from '../../shared/utils/normalizeMatch';
+import { getLineupStatus } from '../../shared/utils/matchLineupStatus';
+import { formatTeamName } from '../../shared/utils/formatTeamName';
 import PostPredictionSheet from './PostPredictionSheet';
 
 /* ─────────────────────────────────────────────────────────────
@@ -1158,7 +1160,6 @@ const MatchDetail = () => {
             fetch(`/api/intel?match_id=${fixtureId}`)
               .then(r => r.ok ? r.json() : null)
               .then(d => {
-                console.log('[MatchDetail] Intel response:', d);
                 if (d?.available && d?.analysis) {
                   setAnalysisData(d.analysis);
                 }
@@ -1213,6 +1214,32 @@ const MatchDetail = () => {
     };
     fetchMatchDetail();
   }, [id]);
+
+  // Poll for match updates every 60s during PRE and LIVE phases.
+  // Catches lineup_confirmed flip (~1h pre-KO) and live score updates.
+  // Stops once the match reaches POST (finished / cancelled).
+  useEffect(() => {
+    if (!id || !matchPhase || matchPhase === 'POST') return;
+
+    const refetchMatch = async () => {
+      try {
+        const res = await fetch(`/api/matches?id=${id}`);
+        const data = await res.json();
+        if (!data.response?.length) return;
+        const updated = normalizeMatch(data.response[0]);
+        setMatch(updated);
+
+        const status = updated.fixture?.status?.short;
+        const IN_PLAY = ['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'];
+        const FINISHED = ['FT', 'AET', 'FT_PEN', 'POSTPONED', 'CANCELLED', 'ABANDONED', 'AWARDED', 'WO', 'DELETED'];
+        if (IN_PLAY.includes(status)) setMatchPhase('LIVE');
+        else if (FINISHED.includes(status)) setMatchPhase('POST');
+      } catch { /* silent — retry on next interval */ }
+    };
+
+    const interval = setInterval(refetchMatch, 60_000);
+    return () => clearInterval(interval);
+  }, [id, matchPhase]);
 
   const dismissBanner = () => {
     if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
@@ -1378,12 +1405,12 @@ const MatchDetail = () => {
       {match && (
         <div className="absolute top-0 w-full z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
           {/* Row 1: Back + League + Points */}
-          <div className="flex items-center justify-between px-4 pt-6 pb-2 gap-3">
+          <div className="flex items-center justify-between px-4 py-4 gap-3">
             <button onClick={() => navigate('/match-hub')} className="w-9 h-9 flex-shrink-0 bg-white/10 border border-white/20 rounded-full flex items-center justify-center text-white active:scale-95">
               <ArrowLeft className="w-4 h-4" />
             </button>
             {match.league?.name
-              ? <span className="flex-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-400 truncate">{match.league.name}</span>
+              ? <span className="flex-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-400 px-3 truncate">{match.league.name}</span>
               : <span className="flex-1" />
             }
             <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
@@ -1397,7 +1424,7 @@ const MatchDetail = () => {
             {/* Home */}
             <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
               <img src={match.teams.home.logo} className="w-9 h-9 object-contain" alt="Home" />
-              <span className="text-[9px] font-bold text-white uppercase truncate w-full text-center">{match.teams.home.name}</span>
+              <span className="text-[9px] font-bold text-white uppercase truncate w-full text-center">{formatTeamName(match.teams.home.name, match.teams.home.short_code)}</span>
             </div>
 
             {/* Score + status */}
@@ -1421,7 +1448,7 @@ const MatchDetail = () => {
             {/* Away */}
             <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
               <img src={match.teams.away.logo} className="w-9 h-9 object-contain" alt="Away" />
-              <span className="text-[9px] font-bold text-white uppercase truncate w-full text-center">{match.teams.away.name}</span>
+              <span className="text-[9px] font-bold text-white uppercase truncate w-full text-center">{formatTeamName(match.teams.away.name, match.teams.away.short_code)}</span>
             </div>
           </div>
         </div>
@@ -1601,7 +1628,7 @@ const MatchDetail = () => {
                 fixtureDate={match.fixture?.date}
                 activeTab={activeTab}
                 odds={odds}
-                lineupConfirmed={match.lineup_confirmed}
+                lineupStatus={getLineupStatus(match)}
               />
             )}
 
@@ -1668,7 +1695,7 @@ const MatchDetail = () => {
                 fixtureDate={match.fixture?.date}
                 activeTab={activeTab}
                 odds={odds}
-                lineupConfirmed={match.lineup_confirmed}
+                lineupStatus={getLineupStatus(match)}
               />
             )}
 
@@ -1718,6 +1745,9 @@ const MatchDetail = () => {
               const inventoryDisabled = count === 0;
               const tapDisabled = inventoryDisabled || oddsDisabled || (needsOdds && oddsLoading);
               const isSelectedForConfirm = card.id === selectedCardForConfirm;
+              const isPickingThisCard = flowState === 'selection' && selectedCard === card.id;
+              const isSelected = isSelectedForConfirm || isPickingThisCard;
+              const overlayOpen = flowState === 'staging' || flowState === 'selection';
               return (
                 <button
                   key={card.id}
@@ -1733,19 +1763,17 @@ const MatchDetail = () => {
                   }}
                   disabled={tapDisabled}
                   className={`relative transition-all duration-300 ${
-                    flowState === 'staging' && isSelectedForConfirm
-                      ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
-                      : inventoryDisabled
-                        ? 'opacity-40 grayscale'
-                        : oddsDisabled
-                          ? 'opacity-50 saturate-50 cursor-not-allowed'
-                          : (needsOdds && oddsLoading)
-                            ? 'opacity-70 cursor-wait'
-                            : flowState === 'staging'
-                              ? 'opacity-30'
-                              : selectedCard === card.id
-                                ? 'translate-y-[-24px] ring-2 ring-yellow-400 shadow-xl'
-                                : 'hover:translate-y-[-8px]'
+                    inventoryDisabled
+                      ? 'opacity-40 grayscale'
+                      : oddsDisabled
+                        ? 'opacity-50 saturate-50 cursor-not-allowed'
+                        : (needsOdds && oddsLoading)
+                          ? 'opacity-70 cursor-wait'
+                          : overlayOpen && !isSelected
+                            ? 'opacity-30'
+                            : overlayOpen
+                              ? ''
+                              : 'hover:translate-y-[-8px]'
                     }`}
                 >
                   <div className="w-[5rem] h-[7.5rem] relative">
@@ -1865,14 +1893,14 @@ const MatchDetail = () => {
                       className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl border transition-all ${selectedScorerTeam === 'home' ? 'bg-white/10 border-emerald-500/50' : 'bg-white/5 border-transparent hover:bg-white/[0.07]'}`}
                     >
                       <img src={match.teams.home.logo} className="w-10 h-10 object-contain" alt="" />
-                      <span className={`text-[11px] font-black uppercase text-center leading-tight ${selectedScorerTeam === 'home' ? 'text-white' : 'text-zinc-400'}`}>{match.teams.home.name}</span>
+                      <span className={`text-[11px] font-black uppercase text-center leading-tight ${selectedScorerTeam === 'home' ? 'text-white' : 'text-zinc-400'}`}>{formatTeamName(match.teams.home.name, match.teams.home.short_code)}</span>
                     </button>
                     <button
                       onClick={() => setSelectedScorerTeam('away')}
                       className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl border transition-all ${selectedScorerTeam === 'away' ? 'bg-white/10 border-emerald-500/50' : 'bg-white/5 border-transparent hover:bg-white/[0.07]'}`}
                     >
                       <img src={match.teams.away.logo} className="w-10 h-10 object-contain" alt="" />
-                      <span className={`text-[11px] font-black uppercase text-center leading-tight ${selectedScorerTeam === 'away' ? 'text-white' : 'text-zinc-400'}`}>{match.teams.away.name}</span>
+                      <span className={`text-[11px] font-black uppercase text-center leading-tight ${selectedScorerTeam === 'away' ? 'text-white' : 'text-zinc-400'}`}>{formatTeamName(match.teams.away.name, match.teams.away.short_code)}</span>
                     </button>
                   </div>
 
@@ -1951,20 +1979,18 @@ const MatchDetail = () => {
       )}
 
       {showLockedIn && (
-        <div
-          className="fixed inset-x-0 z-[150] cursor-pointer"
-          style={{ bottom: '12rem' }}
-          onClick={dismissBanner}
-        >
-          <div className="bg-emerald-500/95 backdrop-blur-md border-t border-emerald-400/60 shadow-[0_-4px_20px_rgba(16,185,129,0.4)] animate-in slide-in-from-bottom duration-300">
-            <div className="max-w-md mx-auto px-4 py-3 flex items-center gap-3">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                <Check className="w-5 h-5 text-white" strokeWidth={3} />
+        <div className="fixed top-4 inset-x-4 z-[150] flex justify-center pointer-events-none">
+          <div
+            onClick={dismissBanner}
+            className="pointer-events-auto bg-emerald-500/95 backdrop-blur-md border border-emerald-400/60 shadow-[0_8px_32px_rgba(16,185,129,0.4)] rounded-2xl animate-in slide-in-from-top duration-300 cursor-pointer max-w-sm w-full"
+          >
+            <div className="px-4 py-3 flex items-center gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <Check className="w-4 h-4 text-white" strokeWidth={3} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-[11px] font-black uppercase tracking-widest">Prediction Made</p>
-                <p className="text-white/90 text-xs">Stamped on your tactical board.</p>
-                <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Tap to dismiss</p>
+                <p className="text-white/90 text-xs">Stamped on your tactical board</p>
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); navigate('/predictions?tab=whiteboard'); }}

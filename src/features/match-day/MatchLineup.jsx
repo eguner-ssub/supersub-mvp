@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { formatPlayerName } from '../../shared/utils/formatPlayerName';
 
 /* ─────────────────────────────────────────────────────────────
    FORMATION GRID ENGINE
@@ -145,7 +146,7 @@ const PlayerNode = ({ player }) => (
                 whiteSpace: 'nowrap',
             }}
         >
-            {player.name}
+            {formatPlayerName(player.name)}
         </span>
     </div>
 );
@@ -324,9 +325,9 @@ const PreMatchPlaceholder = ({ odds }) => (
     </div>
 );
 
-const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP', odds = null, lineupConfirmed = false }) => {
+const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP', odds = null, lineupStatus = 'predicted' }) => {
     const [lineups, setLineups] = useState(null);
-    const [lineupStatus, setLineupStatus] = useState(null); // 'probable' | 'confirmed'
+    // lineupStatus now comes as a prop from getLineupStatus(match)
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -342,22 +343,8 @@ const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP',
                 if (data.response && data.response.length >= 2) {
                     setLineups(data.response);
 
-                    // Determine probable vs confirmed
-                    const hasGridData = data.response[0]?.startXI?.some(
-                        (p) => p.player?.grid
-                    );
-                    const kickoff = new Date(fixtureDate);
-                    const now = new Date();
-                    const msUntilKickoff = kickoff - now;
-                    const oneHourMs = 60 * 60 * 1000;
-
-                    if (hasGridData && msUntilKickoff <= oneHourMs) {
-                        setLineupStatus('confirmed');
-                    } else if (data.response[0]?.startXI?.length > 0) {
-                        setLineupStatus('probable');
-                    } else {
-                        setLineupStatus('probable');
-                    }
+                    // lineupStatus is now derived from the prop (via getLineupStatus
+                    // in MatchDetail), so we don't need to re-derive it here.
                 } else {
                     setError('no_data');
                 }
@@ -395,21 +382,21 @@ const MatchLineup = ({ fixtureId, matchPhase, fixtureDate, activeTab = 'LINEUP',
     return (
         <div style={{ padding: '0 12px', marginBottom: '16px' }}>
             {/* ── LINEUP STATUS BADGE ──
-                lineupConfirmed comes from matches.lineup_confirmed, set by
-                backfill-matches-full.js when Sportmonks metadata flips the
-                LINEUP_CONFIRMED flag (~1h pre-kickoff). Until then the
-                lineups Sportmonks gives us are predicted/probable. */}
-            <div className="flex justify-center mb-3">
-                {lineupConfirmed ? (
-                    <span className="bg-emerald-500 text-black font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full">
-                        ✓ Confirmed XI
+                Three states: predicted (pre-kickoff, unconfirmed), confirmed
+                (Sportmonks LINEUP_CONFIRMED ~1h pre-KO), hidden (live/finished).
+                Once the match is live or done, the pill is redundant — the
+                timer/score makes it obvious. */}
+            {(lineupStatus === 'predicted' || lineupStatus === 'confirmed') && (
+                <div className="flex justify-center mb-3">
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
+                        lineupStatus === 'confirmed'
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                            : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                    }`}>
+                        {lineupStatus === 'confirmed' ? '✓ Confirmed XI' : 'Predicted XI'}
                     </span>
-                ) : (
-                    <span className="bg-zinc-700 text-zinc-200 font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full">
-                        ⟳ Predicted XI
-                    </span>
-                )}
-            </div>
+                </div>
+            )}
 
             {/* ── PITCH ── */}
             <div style={pitchContainerStyle}>
