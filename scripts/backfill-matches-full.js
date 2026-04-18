@@ -152,8 +152,14 @@ function buildRowFromFixture(f, now) {
   // Supabase preserves whatever is already stored — avoids clobbering a
   // previously-confirmed value back to false on a re-sync that drops
   // metadata for any reason.
+  // Sportmonks returns LINEUP_CONFIRMED metadata as either a flat
+  // `developer_name` (default `include=metadata`) or a nested
+  // `type.developer_name` (when `include=metadata.type`). Tolerate both so
+  // this stays in lockstep with supabase/functions/sync-scores/index.ts —
+  // both parsers MUST accept both shapes or they drift back into a state
+  // where one pipeline silently no-ops.
   const lineupMeta = (f.metadata || []).find(
-    (m) => m.developer_name === 'LINEUP_CONFIRMED'
+    (m) => (m?.type?.developer_name ?? m?.developer_name) === 'LINEUP_CONFIRMED'
   );
 
   const row = {

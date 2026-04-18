@@ -1978,30 +1978,36 @@ const MatchDetail = () => {
         </>
       )}
 
-      {showLockedIn && (
-        <div className="fixed top-4 inset-x-4 z-[150] flex justify-center pointer-events-none">
-          <div
-            onClick={dismissBanner}
-            className="pointer-events-auto bg-emerald-500/95 backdrop-blur-md border border-emerald-400/60 shadow-[0_8px_32px_rgba(16,185,129,0.4)] rounded-2xl animate-in slide-in-from-top duration-300 cursor-pointer max-w-sm w-full"
-          >
-            <div className="px-4 py-3 flex items-center gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                <Check className="w-4 h-4 text-white" strokeWidth={3} />
+      {showLockedIn && (() => {
+        const LIVE_STATES = ['INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF', 'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK'];
+        const isMatchLive = LIVE_STATES.includes(match?.fixture?.status?.short);
+        const bannerSubtitle = isMatchLive ? 'Follow it in your tablet' : 'Stamped on your tactical board';
+        const viewTab = isMatchLive ? 'tablet' : 'whiteboard';
+        return (
+          <div className="fixed top-4 inset-x-4 z-[150] flex justify-center pointer-events-none">
+            <div
+              onClick={dismissBanner}
+              className="pointer-events-auto bg-emerald-500/95 backdrop-blur-md border border-emerald-400/60 shadow-[0_8px_32px_rgba(16,185,129,0.4)] rounded-2xl animate-in slide-in-from-top duration-300 cursor-pointer max-w-sm w-full"
+            >
+              <div className="px-4 py-3 flex items-center gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                  <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-[11px] font-black uppercase tracking-widest">Prediction Made</p>
+                  <p className="text-white/90 text-xs">{bannerSubtitle}</p>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate(`/predictions?tab=${viewTab}`); }}
+                  className="flex-shrink-0 bg-white text-emerald-700 font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg active:scale-95"
+                >
+                  View
+                </button>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-[11px] font-black uppercase tracking-widest">Prediction Made</p>
-                <p className="text-white/90 text-xs">Stamped on your tactical board</p>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); navigate('/predictions?tab=whiteboard'); }}
-                className="flex-shrink-0 bg-white text-emerald-700 font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg active:scale-95"
-              >
-                View
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Post-prediction affiliate sheet ──────────────────────────────────
           Renders above the "Locked In!" overlay (z-[130] > z-[120]).

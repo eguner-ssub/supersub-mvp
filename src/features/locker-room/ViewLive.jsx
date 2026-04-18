@@ -3,6 +3,7 @@ import { usePredictions } from '../../shared/hooks/usePredictions';
 import { useGame } from '../../shared/context/GameContext';
 import { Activity } from 'lucide-react';
 import CardBase from '../../shared/ui/CardBase';
+import { formatTeamName } from '../../shared/utils/formatTeamName';
 
 // Copied exactly from ViewPendingGrid.jsx
 const FAN_SLOTS = [
@@ -97,8 +98,8 @@ const ViewLive = () => {
 
                     // Team identifiers — prefer polled data, fall back to match_title parse
                     const titleParts = firstBet.match_title?.split(' vs ') ?? ['', ''];
-                    const homeName = md?.home_team ?? titleParts[0] ?? '?';
-                    const awayName = md?.away_team ?? titleParts[1] ?? '?';
+                    const homeName = formatTeamName(md?.home_team ?? titleParts[0], md?.home_team_short_code) || '?';
+                    const awayName = formatTeamName(md?.away_team ?? titleParts[1], md?.away_team_short_code) || '?';
                     const homeLogo = md?.home_logo;
                     const awayLogo = md?.away_logo;
 

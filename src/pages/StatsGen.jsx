@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 // Match-scoped previews
 import { BenchWatchPreview } from './stats-gen/previews/BenchWatchPreview';
 import { LineupsPreview } from './stats-gen/previews/LineupsPreview';
@@ -30,6 +30,64 @@ const STORAGE_KEY = 'stats_gen_password';
 // ─── Consistent league ordering (matches coverage.js config) ─────────────────
 const LEAGUE_ORDER = [8, 301, 82, 564, 384];
 
+// ─── Match status classification ─────────────────────────────────────────────
+const LIVE_STATUS = [
+  'INPLAY_1ST_HALF', 'INPLAY_2ND_HALF', 'INPLAY_ET', 'INPLAY_ET_SECOND_HALF',
+  'INPLAY_PENALTIES', 'HT', 'BREAK', 'EXTRA_TIME_BREAK',
+  '1H', '2H', 'ET', 'BT', 'P',
+];
+
+const FINISHED_STATUS = [
+  'FT', 'FT_PEN', 'AET', 'PEN', 'FINISHED', 'AWARDED', 'ENDED',
+];
+
+function classifyMatchStatus(match) {
+  const status = match?.status;
+  if (LIVE_STATUS.includes(status)) return 'live';
+  if (FINISHED_STATUS.includes(status)) return 'finished';
+  return 'upcoming';
+}
+
+// ─── Filter configs ──────────────────────────────────────────────────────────
+// League IDs sourced from src/shared/config/coverage.js — coverage is EPL,
+// Ligue 1, Bundesliga, La Liga, Serie A (no Championship in the current set).
+const LEAGUE_FILTERS = [
+  { id: 'epl',        label: 'EPL',        sportmonks_id: 8   },
+  { id: 'ligue_1',    label: 'Ligue 1',    sportmonks_id: 301 },
+  { id: 'bundesliga', label: 'Bundesliga', sportmonks_id: 82  },
+  { id: 'la_liga',    label: 'La Liga',    sportmonks_id: 564 },
+  { id: 'serie_a',    label: 'Serie A',    sportmonks_id: 384 },
+  { id: 'all',        label: 'All',        sportmonks_id: null },
+];
+
+const STATUS_FILTERS = [
+  { id: 'upcoming', label: 'Upcoming' },
+  { id: 'live',     label: 'Live' },
+  { id: 'finished', label: 'Finished' },
+];
+
+// Stale-data threshold for the sidebar refresh indicator
+const STALE_MS = 30 * 60 * 1000; // 30 minutes
+
+// Pill styling tokens
+const PILL_BASE_CLS = 'px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+const PILL_ACTIVE_CLS = 'bg-cyan-500/15 border border-cyan-500/50 text-cyan-400';
+const PILL_INACTIVE_CLS = 'bg-transparent border border-zinc-700 text-zinc-500 hover:border-zinc-600 hover:text-zinc-400';
+
+// ─── Date formatter for match dropdown options ───────────────────────────────
+function formatMatchDate(match, statusFilter) {
+  if (statusFilter === 'live') return 'LIVE';
+  const raw = match.kickoff_time || match.date;
+  if (!raw) return '';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
 // ─── Preview router (all 22 content types) ───────────────────────────────────
 const PREVIEW_MAP = {
   'bench-watch': BenchWatchPreview, 'lineups': LineupsPreview, 'h2h': H2HPreview,
@@ -40,7 +98,10 @@ const PREVIEW_MAP = {
   'impact-window': ImpactWindowPreview, 'goals-per-ground': GoalsPerGroundPreview,
   'goal-glut': GoalGlutPreview, 'first-blood': FirstBloodPreview, 'fortress': FortressPreview,
   'bench-vs-starter': BenchVsStarterPreview, 'gw-bench-to-watch': GWBenchToWatchPreview,
-  'comeback-bench': ComebackBenchPreview, 'supersub-of-week': SupersubOfWeekPreview,
+  'comeback-bench-match':  ComebackBenchPreview,
+  'comeback-bench-gw':     ComebackBenchPreview,
+  'comeback-bench-season': ComebackBenchPreview,
+  'supersub-of-week': SupersubOfWeekPreview,
   'fpl-watch': FPLWatchPreview,
 };
 
@@ -71,7 +132,9 @@ const CONTENT_TYPES = {
       { id: 'fpl-watch', label: 'FPL Watch', selectors: ['gameweek'] },
       { id: 'supersub-stats', label: 'Supersub Stats', selectors: ['league', 'team-optional'] },
       { id: 'impact-window', label: 'Impact Window', selectors: ['league'] },
-      { id: 'comeback-bench', label: 'Comeback Bench', selectors: ['match-or-league-gw'] },
+      { id: 'comeback-bench-match',  label: 'Comeback Bench · by Match',    selectors: ['match'] },
+      { id: 'comeback-bench-gw',     label: 'Comeback Bench · by Gameweek', selectors: ['league', 'gameweek'] },
+      { id: 'comeback-bench-season', label: 'Comeback Bench · by Season',   selectors: ['league'] },
       { id: 'supersub-of-week', label: 'Supersub of the Week', selectors: ['league', 'gameweek'] },
       { id: 'bench-vs-starter', label: 'Bench vs Starter', selectors: ['league'] },
       { id: 'gw-bench-to-watch', label: 'GW Bench to Watch', selectors: ['league', 'gameweek'] },
@@ -109,26 +172,29 @@ function hasSel(type, ...checks) {
   return checks.some((c) => (type.selectors || []).includes(c));
 }
 
-const needsMatch = (t) => hasSel(t, 'match', 'match-or-league-gw');
-const needsLeague = (t) => hasSel(t, 'league', 'match-or-league-gw', 'team-optional');
-const needsGameweek = (t) => hasSel(t, 'gameweek', 'gameweek-optional', 'match-or-league-gw');
+const needsMatch = (t) => hasSel(t, 'match');
+const needsLeague = (t) => hasSel(t, 'league', 'team-optional');
+const needsGameweek = (t) => hasSel(t, 'gameweek', 'gameweek-optional');
 const isGameweekOptional = (t) => hasSel(t, 'gameweek-optional');
 const needsTeam = (t) => hasSel(t, 'team', 'team-optional');
 const isTeamOptional = (t) => hasSel(t, 'team-optional');
 
-function groupedByLeague(matches) {
-  // Group + sort by LEAGUE_ORDER, then by kickoff_time within each league
+function groupedByLeagueWithSort(matches, statusFilter) {
+  // Group by league_id, sort within each league by kickoff_time, then order
+  // groups per LEAGUE_ORDER with any extras appended.
   const map = new Map();
   for (const m of matches) {
     const key = m.league_id;
     if (!map.has(key)) map.set(key, { name: m.league_name || `League ${key}`, matches: [] });
     map.get(key).matches.push(m);
   }
-  // Sort matches within each league by kickoff_time ascending
+  // Finished matches read better most-recent-first; upcoming/live read soonest-first.
+  const direction = statusFilter === 'finished' ? -1 : 1;
   for (const group of map.values()) {
-    group.matches.sort((a, b) => new Date(a.kickoff_time) - new Date(b.kickoff_time));
+    group.matches.sort(
+      (a, b) => direction * (new Date(a.kickoff_time) - new Date(b.kickoff_time))
+    );
   }
-  // Return groups in LEAGUE_ORDER, then any extras
   const ordered = [];
   for (const lid of LEAGUE_ORDER) {
     const g = map.get(lid);
@@ -144,16 +210,22 @@ function buildEndpointUrl(type, { selectedMatch, selectedLeague, selectedGamewee
   const params = new URLSearchParams();
   const sels = type?.selectors || [];
 
-  if (sels.includes('match') && selectedMatch) params.set('fixture_id', selectedMatch.id);
-  if ((sels.includes('league') || sels.includes('team-optional')) && selectedLeague) params.set('league_id', selectedLeague.id);
-
-  if (sels.includes('match-or-league-gw')) {
-    if (selectedMatch) params.set('fixture_id', selectedMatch.id);
-    else if (selectedLeague) {
+  // Comeback Bench — three variants all hit the same endpoint with different params.
+  if (type?.id?.startsWith('comeback-bench')) {
+    if (type.id === 'comeback-bench-match' && selectedMatch) {
+      params.set('fixture_id', selectedMatch.id);
+    } else if (type.id === 'comeback-bench-gw' && selectedLeague) {
       params.set('league_id', selectedLeague.id);
       if (selectedGameweek) params.set('gameweek', selectedGameweek);
+    } else if (type.id === 'comeback-bench-season' && selectedLeague) {
+      params.set('league_id', selectedLeague.id);
+      params.set('scope', 'season');
     }
+    return `/api/stats-gen/comeback-bench?${params.toString()}`;
   }
+
+  if (sels.includes('match') && selectedMatch) params.set('fixture_id', selectedMatch.id);
+  if ((sels.includes('league') || sels.includes('team-optional')) && selectedLeague) params.set('league_id', selectedLeague.id);
 
   if ((sels.includes('gameweek') || sels.includes('gameweek-optional')) && selectedGameweek) {
     params.set('gameweek', selectedGameweek);
@@ -175,7 +247,6 @@ function hasRequiredSelectors(type, state) {
       case 'league': if (!state.selectedLeague) return false; break;
       case 'gameweek': if (!state.selectedGameweek) return false; break;
       case 'team': if (!state.selectedTeam) return false; break;
-      case 'match-or-league-gw': if (!state.selectedMatch && !state.selectedLeague) return false; break;
     }
   }
   return true;
@@ -235,6 +306,8 @@ function ControlsPanel({
   selectedMatch, setSelectedMatch, selectedLeague, setSelectedLeague,
   selectedGameweek, setSelectedGameweek, selectedTeam, setSelectedTeam,
   loading, previewData, onLoadData, onCopyJson, onLogout,
+  leagueFilter, onLeagueFilterChange,
+  statusFilter, onStatusFilterChange,
 }) {
   const typeConfig = findContentType(contentType);
 
@@ -249,6 +322,22 @@ function ControlsPanel({
   const ready = hasRequiredSelectors(typeConfig, {
     selectedMatch, selectedLeague, selectedGameweek, selectedTeam,
   });
+
+  // Filter matches by the currently-selected pills, then sort.
+  const filteredMatches = useMemo(() => {
+    let result = matches.filter((m) => classifyMatchStatus(m) === statusFilter);
+    if (leagueFilter !== 'all') {
+      const leagueConfig = LEAGUE_FILTERS.find((l) => l.id === leagueFilter);
+      if (leagueConfig?.sportmonks_id != null) {
+        result = result.filter((m) => m.league_id === leagueConfig.sportmonks_id);
+      }
+    }
+    const direction = statusFilter === 'finished' ? -1 : 1;
+    result.sort((a, b) => direction * (new Date(a.kickoff_time) - new Date(b.kickoff_time)));
+    return result;
+  }, [matches, leagueFilter, statusFilter]);
+
+  const showOptgroups = leagueFilter === 'all';
 
   return (
     <div className="flex flex-col h-full">
@@ -276,28 +365,79 @@ function ControlsPanel({
         {needsMatch(typeConfig) && (
           <section className="mb-5">
             <label className={LABEL_CLS}>Match</label>
+
+            {/* League filter pills — wraps onto two rows on narrow sidebars */}
+            <div className="flex flex-wrap gap-1.5 mb-3" aria-label="League filter">
+              {LEAGUE_FILTERS.map((league) => (
+                <button
+                  key={league.id}
+                  type="button"
+                  onClick={() => onLeagueFilterChange(league.id)}
+                  className={`${PILL_BASE_CLS} ${leagueFilter === league.id ? PILL_ACTIVE_CLS : PILL_INACTIVE_CLS}`}
+                >
+                  {league.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Status filter pills — single row */}
+            <div className="flex gap-1.5 mb-3" aria-label="Match status filter">
+              {STATUS_FILTERS.map((status) => (
+                <button
+                  key={status.id}
+                  type="button"
+                  onClick={() => onStatusFilterChange(status.id)}
+                  className={`${PILL_BASE_CLS} ${statusFilter === status.id ? PILL_ACTIVE_CLS : PILL_INACTIVE_CLS}`}
+                >
+                  {status.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Match dropdown — filtered + sorted by the pills above */}
             <select
               value={selectedMatch?.id || ''}
-              onChange={(e) => setSelectedMatch(matches.find((m) => m.id === parseInt(e.target.value)) || null)}
+              onChange={(e) => setSelectedMatch(filteredMatches.find((m) => m.id === parseInt(e.target.value)) || null)}
+              disabled={filteredMatches.length === 0}
               className={SELECT_CLS}
             >
-              <option value="">Select match…</option>
-              {groupedByLeague(matches).map(([leagueName, leagueMatches]) => (
-                <optgroup key={leagueName} label={leagueName}>
-                  {leagueMatches.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.home_team} vs {m.away_team}
-                      {m.round_name ? ` — ${m.round_name}` : ''}
-                      {m.date ? ` — ${m.date}` : ''}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
+              {filteredMatches.length === 0 ? (
+                <option value="">
+                  No {statusFilter} matches in {leagueFilter === 'all' ? 'any league' : LEAGUE_FILTERS.find((l) => l.id === leagueFilter)?.label}
+                </option>
+              ) : (
+                <>
+                  <option value="">Select match…</option>
+                  {showOptgroups ? (
+                    groupedByLeagueWithSort(filteredMatches, statusFilter).map(([leagueName, leagueMatches]) => (
+                      <optgroup key={leagueName} label={leagueName}>
+                        {leagueMatches.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.home_team} vs {m.away_team}
+                            {m.round_name ? ` — ${m.round_name}` : ''}
+                            {` — ${formatMatchDate(m, statusFilter)}`}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  ) : (
+                    filteredMatches.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.home_team} vs {m.away_team}
+                        {m.round_name ? ` — ${m.round_name}` : ''}
+                        {` — ${formatMatchDate(m, statusFilter)}`}
+                      </option>
+                    ))
+                  )}
+                </>
+              )}
             </select>
           </section>
         )}
 
-        {needsLeague(typeConfig) && (
+        {/* Standalone League dropdown — hidden when the match pills are driving
+            the selection (the match itself resolves the league). */}
+        {needsLeague(typeConfig) && !needsMatch(typeConfig) && (
           <section className="mb-5">
             <label className={LABEL_CLS}>League</label>
             <select
@@ -403,6 +543,18 @@ export default function StatsGen() {
   const [matches, setMatches] = useState([]);
   const [leagues, setLeagues] = useState([]);
 
+  // League / status filter pills (persisted in sessionStorage across reloads)
+  const [leagueFilter, setLeagueFilter] = useState(
+    () => sessionStorage.getItem('stats_gen_league_filter') || 'epl'
+  );
+  const [statusFilter, setStatusFilter] = useState(
+    () => sessionStorage.getItem('stats_gen_status_filter') || 'upcoming'
+  );
+
+  // Stale-data detection for the sidebar footer
+  const [lastFetchAt, setLastFetchAt] = useState(() => Date.now());
+  const [isStale, setIsStale] = useState(false);
+
   // Viewport resize
   useEffect(() => {
     const handleResize = () => setViewportOk(window.innerWidth >= 768);
@@ -428,6 +580,8 @@ export default function StatsGen() {
       const [m, l] = await Promise.all([mRes.json(), lRes.json()]);
       setMatches(m.matches || []);
       setLeagues(l.leagues || []);
+      setLastFetchAt(Date.now());
+      setIsStale(false);
     }).catch(() => {
       // Network error on initial load — clear password to allow retry
       sessionStorage.removeItem(STORAGE_KEY);
@@ -474,6 +628,55 @@ export default function StatsGen() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [handleLoadData]);
+
+  // Filter pill handlers — persist to sessionStorage and clear the currently
+  // selected match if it falls outside the new filter combo.
+  const clearSelectedMatchIfInvalid = useCallback((match, league, status) => {
+    if (!match) return;
+    const leagueConfig = LEAGUE_FILTERS.find((l) => l.id === league);
+    const leagueValid = league === 'all' || match.league_id === leagueConfig?.sportmonks_id;
+    const statusValid = classifyMatchStatus(match) === status;
+    if (!leagueValid || !statusValid) setSelectedMatch(null);
+  }, []);
+
+  const handleLeagueFilterChange = useCallback((newLeague) => {
+    setLeagueFilter(newLeague);
+    sessionStorage.setItem('stats_gen_league_filter', newLeague);
+    clearSelectedMatchIfInvalid(selectedMatch, newLeague, statusFilter);
+  }, [clearSelectedMatchIfInvalid, selectedMatch, statusFilter]);
+
+  const handleStatusFilterChange = useCallback((newStatus) => {
+    setStatusFilter(newStatus);
+    sessionStorage.setItem('stats_gen_status_filter', newStatus);
+    clearSelectedMatchIfInvalid(selectedMatch, leagueFilter, newStatus);
+  }, [clearSelectedMatchIfInvalid, selectedMatch, leagueFilter]);
+
+  // Stale-data watcher — flips the footer indicator after STALE_MS of inactivity.
+  useEffect(() => {
+    const check = setInterval(() => {
+      if (Date.now() - lastFetchAt > STALE_MS) setIsStale(true);
+    }, 60 * 1000);
+    return () => clearInterval(check);
+  }, [lastFetchAt]);
+
+  const handleRefresh = useCallback(async () => {
+    const pw = sessionStorage.getItem(STORAGE_KEY);
+    if (!pw) return;
+    try {
+      const [mRes, lRes] = await Promise.all([
+        fetch('/api/stats-gen/matches', { headers: { 'x-stats-gen-password': pw } }),
+        fetch('/api/stats-gen/leagues', { headers: { 'x-stats-gen-password': pw } }),
+      ]);
+      if (!mRes.ok || !lRes.ok) return;
+      const [m, l] = await Promise.all([mRes.json(), lRes.json()]);
+      setMatches(m.matches || []);
+      setLeagues(l.leagues || []);
+      setLastFetchAt(Date.now());
+      setIsStale(false);
+    } catch (err) {
+      console.error('[StatsGen] Refresh failed:', err);
+    }
+  }, []);
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
@@ -584,7 +787,25 @@ export default function StatsGen() {
           selectedTeam={selectedTeam} setSelectedTeam={setSelectedTeam}
           loading={loading} previewData={previewData}
           onLoadData={handleLoadData} onCopyJson={handleCopyJson} onLogout={handleLogout}
+          leagueFilter={leagueFilter} onLeagueFilterChange={handleLeagueFilterChange}
+          statusFilter={statusFilter} onStatusFilterChange={handleStatusFilterChange}
         />
+
+        {/* Stale-data footer — pinned to sidebar bottom; only shows after
+            STALE_MS of inactivity. */}
+        {isStale && (
+          <div className="mt-auto pt-4 border-t border-zinc-800 flex-shrink-0">
+            <p className="text-amber-400/70 text-[10px] uppercase tracking-widest mb-2">
+              Data may be stale
+            </p>
+            <button
+              onClick={handleRefresh}
+              className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs uppercase tracking-widest rounded-lg transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* Right preview panel — scrolls independently */}

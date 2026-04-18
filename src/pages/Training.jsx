@@ -10,7 +10,7 @@ import CardBase from '../shared/ui/CardBase';
 import gameData from '../data/gameData.json';
 
 const TIMER_SECONDS = 10;
-const SESSION_CAP   = 4;
+export const SESSION_CAP = 4;
 
 // Joseba's in-quiz reactions, keyed on the running correct-answer count.
 const JOSEBA_REACTIONS = {

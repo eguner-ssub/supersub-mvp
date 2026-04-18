@@ -48,11 +48,13 @@ export function normalizeMatch(raw) {
                 id: raw.home_team_id ?? null,
                 name: raw.home_team || 'Home',
                 logo: raw.home_logo || null,
+                short_code: raw.home_team_short_code ?? null,
             },
             away: {
                 id: raw.away_team_id ?? null,
                 name: raw.away_team || 'Away',
                 logo: raw.away_logo || null,
+                short_code: raw.away_team_short_code ?? null,
             },
         },
 

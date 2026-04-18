@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Dumbbell, Loader2, Star } from 'lucide-react';
 import { useGame } from '../../shared/context/GameContext';
+import { formatTeamName } from '../../shared/utils/formatTeamName';
 
 const FILTERS = ['All', 'Live', 'Upcoming', 'Finished'];
 
@@ -152,8 +153,8 @@ const MatchHub = () => {
 
             const homeLogo = match.home_logo;
             const awayLogo = match.away_logo;
-            const homeName = match.home_team || 'Home';
-            const awayName = match.away_team || 'Away';
+            const homeName = formatTeamName(match.home_team, match.home_team_short_code) || 'Home';
+            const awayName = formatTeamName(match.away_team, match.away_team_short_code) || 'Away';
             const leagueName = match.league_name || '';
             const homeScore = match.home_score ?? 0;
             const awayScore = match.away_score ?? 0;

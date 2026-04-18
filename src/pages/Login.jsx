@@ -81,7 +81,7 @@ const Login = () => {
           {/* Back button — top-left, fixed at top */}
           <div className="flex-shrink-0 p-6">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/')}
               className="flex items-center gap-2 text-white/70 hover:text-white text-[10px] font-black uppercase tracking-[0.2em] transition-colors"
             >
               <ArrowLeft className="w-3 h-3" /> Back

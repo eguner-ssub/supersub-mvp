@@ -208,7 +208,6 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
 
   // Staging + locked-in state (replaces pendingX vars)
   const [simStaged, setSimStaged] = useState(null); // { label, reward }
-  const [selectedCardForConfirm, setSelectedCardForConfirm] = useState(null);
   const [showLockedIn, setShowLockedIn] = useState(false);
   const pendingAdvanceRef = useRef(null);
   const bannerNextStepRef = useRef(null); // captures {nextStep, nextCard} for tap-dismiss
@@ -291,7 +290,6 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
   /* Card tile tap — opens sheet directly */
   const handleCardTap = (cardId) => {
     if (cardId !== activeCard) return;
-    setSelectedCardForConfirm(cardId);
     switch (cardId) {
       case 'c_match_result': setOpenSheet('match_result'); break;
       case 'c_total_goals': setOpenSheet('total_goals'); break;
@@ -574,9 +572,11 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
           <div className="absolute inset-0 flex justify-center items-end gap-1 pb-10 px-1 z-20">
             {CARD_TYPES.map(card => {
               const isActive = activeCard === card.id;
-              const isSelectedForConfirm = card.id === selectedCardForConfirm;
               const showConfirm = !!(simStaged && openSheet);
-              const shouldDim = showConfirm ? !isSelectedForConfirm : !isActive;
+              // activeCard stays set to the card being confirmed throughout the
+              // picker → confirm flow, so the same `!isActive` dim rule works
+              // in both phases: only the tapped card is at full opacity.
+              const shouldDim = !isActive;
               return (
                 <button
                   key={card.id}
@@ -801,25 +801,22 @@ const SimulationMatchDetail = ({ onComplete, onBack }) => {
         </>
       )}
 
-      {/* ── PREDICTION BANNER — anchored above the card strip, tap to dismiss ── */}
+      {/* ── PREDICTION TOAST — floats at top, tap to dismiss ── */}
       {showLockedIn && (
-        <div
-          className="fixed inset-x-0 z-[150] cursor-pointer"
-          style={{ bottom: '12rem' }}
-          onClick={dismissBanner}
-        >
-          <div className="bg-emerald-500/95 backdrop-blur-md border-t border-emerald-400/60 shadow-[0_-4px_20px_rgba(16,185,129,0.4)] animate-in slide-in-from-bottom duration-300">
-            <div className="max-w-md mx-auto px-4 py-3 flex items-center gap-3">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                <Check className="w-5 h-5 text-white" strokeWidth={3} />
+        <div className="fixed top-4 inset-x-4 z-[150] flex justify-center pointer-events-none">
+          <div
+            onClick={dismissBanner}
+            className="pointer-events-auto bg-emerald-500/95 backdrop-blur-md border border-emerald-400/60 shadow-[0_8px_32px_rgba(16,185,129,0.4)] rounded-2xl animate-in slide-in-from-top duration-300 cursor-pointer max-w-sm w-full"
+          >
+            <div className="px-4 py-3 flex items-center gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <Check className="w-4 h-4 text-white" strokeWidth={3} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-[11px] font-black uppercase tracking-widest">Prediction Made</p>
-                <p className="text-white/90 text-xs">Stamped on your tactical board.</p>
-                <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Tap to dismiss</p>
+                <p className="text-white/90 text-xs">Stamped on your tactical board</p>
               </div>
-              {/* No View CTA during simulation — tap-to-dismiss advances narrative */}
-              <div className="flex-shrink-0 w-2" />
+              {/* No View CTA during simulation — tap advances the narrative */}
             </div>
           </div>
         </div>

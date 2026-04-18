@@ -488,10 +488,15 @@ export const GameProvider = ({ children }) => {
    * Guards against double-incrementing the same day via last_streak_date.
    * Milestone: grants 1 energy drink on day 7.
    */
-  const incrementStreak = async () => {
+  /**
+   * `effectiveLastDate` — optional override used by saveStreakWithDrink so
+   * the drink-patched "yesterday" value is seen here despite React closure
+   * capturing the stale userProfile.last_streak_date from render time.
+   */
+  const incrementStreak = async ({ effectiveLastDate } = {}) => {
     if (!userProfile) return;
     const today     = new Date().toISOString().split('T')[0];
-    const lastDate  = userProfile.last_streak_date;
+    const lastDate  = effectiveLastDate ?? userProfile.last_streak_date;
     if (lastDate === today) return; // already incremented today
 
     const yesterday  = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
@@ -531,14 +536,15 @@ export const GameProvider = ({ children }) => {
    * Calls incrementStreak() which writes last_streak_date = today (preventing re-claim).
    * Returns { cardCount, cardType, tier } on success, or null if already claimed.
    */
-  const claimTrainingBag = async () => {
+  const claimTrainingBag = async ({ effectiveLastDate } = {}) => {
     if (!userProfile) return null;
     const today = new Date().toISOString().split('T')[0];
-    if (userProfile.last_streak_date === today) return null; // already claimed
+    const lastDate = effectiveLastDate ?? userProfile.last_streak_date;
+    if (lastDate === today) return null; // already claimed
 
     // Compute the new streak value (same logic as incrementStreak) to determine tier
     const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
-    const newStreak = userProfile.last_streak_date === yesterday
+    const newStreak = lastDate === yesterday
       ? (userProfile.current_streak ?? 0) + 1
       : 1;
 
@@ -566,8 +572,9 @@ export const GameProvider = ({ children }) => {
       inventoryMap: { ...prev.inventoryMap, [cardType]: currentCount + cardCount },
     } : prev);
 
-    // Increment streak — this also writes last_streak_date = today (claim guard)
-    await incrementStreak();
+    // Increment streak — this also writes last_streak_date = today (claim guard).
+    // Forward the override so the drink-patched "yesterday" is honoured here too.
+    await incrementStreak({ effectiveLastDate });
 
     return { cardCount, cardType, tier };
   };
@@ -590,11 +597,14 @@ export const GameProvider = ({ children }) => {
     // Backdate last_streak_date to yesterday so claimTrainingBag → incrementStreak()
     // sees the gap as exactly one day and increments instead of resetting to 1.
     // (Without this, missing 2+ days fails the lastDate === yesterday check.)
+    // State + DB writes are defensive for partial-failure recovery; the actual
+    // read path into the call chain below uses the `effectiveLastDate` override
+    // because the closure-captured userProfile is still stale at this point.
     const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
     setUserProfile(prev => prev ? { ...prev, last_streak_date: yesterday } : prev);
     await supabase.from('profiles').update({ last_streak_date: yesterday }).eq('id', userProfile.id);
 
-    return claimTrainingBag();
+    return claimTrainingBag({ effectiveLastDate: yesterday });
   };
 
   /**

@@ -283,9 +283,15 @@ function buildPayload(
   // entry (values.confirmed: boolean) once the team sheets are released
   // ~1h pre-kickoff. Only set the field when we have an explicit boolean so
   // upsert doesn't stomp on a previously-confirmed row with a stale default.
+  // Sportmonks returns LINEUP_CONFIRMED metadata as either a flat
+  // `developer_name` (default `include=metadata`) or a nested
+  // `type.developer_name` (when `include=metadata.type`). Tolerate both so
+  // this stays in lockstep with scripts/backfill-matches-full.js — both
+  // parsers MUST accept both shapes or they drift back into a state where
+  // one pipeline silently no-ops.
   if (Array.isArray(fixture.metadata)) {
     const lc = fixture.metadata.find(
-      (m: any) => m?.type?.developer_name === 'LINEUP_CONFIRMED'
+      (m: any) => (m?.type?.developer_name ?? m?.developer_name) === 'LINEUP_CONFIRMED'
     );
     if (lc?.values && typeof lc.values.confirmed === 'boolean') {
       payload.lineup_confirmed = lc.values.confirmed;
