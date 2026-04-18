@@ -10,6 +10,7 @@ import { normalizeMatch } from '../../shared/utils/normalizeMatch';
 import { getLineupStatus } from '../../shared/utils/matchLineupStatus';
 import { formatTeamName } from '../../shared/utils/formatTeamName';
 import PostPredictionSheet from './PostPredictionSheet';
+import MatchBriefingSheet from './MatchBriefingSheet';
 
 /* ─────────────────────────────────────────────────────────────
    TAB DEFINITIONS
@@ -19,8 +20,24 @@ const TABS = ['LINEUP', 'SUBS', 'EVENTS', 'STATS'];
 /* ─────────────────────────────────────────────────────────────
    ASSISTANT DIALOGUE — shared across all tabs
    ───────────────────────────────────────────────────────────── */
+/**
+ * Returns the correct Joseba message for the LINEUP tab based on whether
+ * lineups are predicted, confirmed, or not yet available.
+ */
+function getLineupGreeting({ homeTeamName = '', awayTeamName = '', greetingContext = 'no_lineups' } = {}) {
+  if (greetingContext === 'predicted_xi') {
+    return `Hi Boss. Below are the predicted lineups for ${homeTeamName} – ${awayTeamName}. I've also got a pre-match briefing ready for you.`;
+  }
+  if (greetingContext === 'confirmed_xi') {
+    return "Hi Boss. Lineups are confirmed. Take a look at the latest briefing before you commit.";
+  }
+  // 'no_lineups' fallback — PRE_NO_LINEUPS routes to PrematchAnalysisPanel, not here,
+  // but keep as a safety net in case analysisData is absent.
+  return 'Hi Boss. Here is the tactical setup. Home team looks strong today.';
+}
+
 const ASSISTANT_GREETINGS = {
-  LINEUP: 'Hi Boss. Here is the tactical setup. Home team looks strong today.',
+  LINEUP: getLineupGreeting(), // 'no_lineups' fallback — overridden by showBriefingCta when analysisData is ready
   SUBS: 'Hi Boss. The bench is deep today. If you\'re going to use the card, now\'s the time.',
   EVENTS: 'Hi Boss. It\'s getting heated out there. Hopefully the ref keeps his cards in his pocket.',
   STATS: 'Hi Boss. The numbers don\'t lie. Let\'s see what the data says.',
@@ -1114,6 +1131,7 @@ const MatchDetail = () => {
   const [affiliateSheetData, setAffiliateSheetData] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(true);
+  const [briefingOpen, setBriefingOpen] = useState(false);
   const [liveInsights, setLiveInsights] = useState(null);
   const [activeTab, setActiveTab] = useState('LINEUP');
   const [selectedScorerTeam, setSelectedScorerTeam] = useState('home');
@@ -1614,11 +1632,90 @@ const MatchDetail = () => {
                     activeTab === 'EVENTS' ? (Array.isArray(match?.events) && match.events.length > 0) :
                       activeTab === 'STATS' ? (Array.isArray(match?.statistics) && match.statistics.length >= 2) :
                         false;
-              return hasTabData ? (
+              if (!hasTabData) return null;
+
+              // PRE_LINEUPS + LINEUP tab: replace the generic tactical-expert
+              // bubble with a briefing-aware one that hands off to the sheet.
+              // Gated on analysisData availability so we never surface a
+              // button for intel that can't render (e.g. lineups_phase
+              // response, or a sync that never completed).
+              const showBriefingCta =
+                activeTab === 'LINEUP'
+                && matchPhase === 'PRE'
+                && analysisData
+                && Array.isArray(analysisData.sections)
+                && analysisData.sections.length > 0;
+
+              // Gate: suppress the bubble on LINEUP+PRE until /api/intel resolves with a
+              // greetingContext. Prevents a flash of stale fallback copy while the fetch is
+              // in-flight.
+              // Fetch-failure choice — Option B (indefinite suppression): if /api/intel errors,
+              // analysisData stays null and the bubble stays hidden. Acceptable because failures
+              // are rare and the pitch below renders correctly without it.
+              const lineupBubbleReady =
+                activeTab !== 'LINEUP' ||
+                matchPhase !== 'PRE' ||
+                (analysisData != null && !!analysisData.greetingContext);
+
+              if (!lineupBubbleReady) {
+                // Reserve the bubble's height (44px avatar + 20px padding + 14px margin = ~78px)
+                // so the pitch position doesn't jump when the bubble materialises.
+                return (
+                  <div style={{ minHeight: '78px' }} aria-hidden="true" />
+                );
+              }
+
+              if (showBriefingCta) {
+                return (
+                  <div style={{ padding: '0 12px', marginBottom: '0' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'flex-start', gap: '10px',
+                      marginBottom: '10px', padding: '10px 14px',
+                      background: '#f5f0e8', borderRadius: '14px',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
+                    }}>
+                      <img
+                        src="/assets/assistant-head.png"
+                        alt="Tactical Expert"
+                        style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)' }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                          Tactical Expert
+                        </span>
+                        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
+                          {getLineupGreeting({
+                            homeTeamName: match.teams.home.name,
+                            awayTeamName: match.teams.away.name,
+                            greetingContext: analysisData.greetingContext,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBriefingOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.99] transition-all mb-3"
+                      style={{
+                        fontFamily: "'Montserrat', sans-serif",
+                        fontWeight: 800, fontSize: '11px',
+                        color: '#FFFFFF',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1.5px',
+                      }}
+                    >
+                      View Pre-Match Briefing
+                      <span aria-hidden="true" style={{ color: '#00e5ff' }}>›</span>
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
                 <div style={{ padding: '0 12px', marginBottom: '0' }}>
                   <AssistantDialogue activeTab={activeTab} />
                 </div>
-              ) : null;
+              );
             })()}
 
             {activeTab === 'LINEUP' && (
@@ -1681,11 +1778,90 @@ const MatchDetail = () => {
                     activeTab === 'EVENTS' ? (Array.isArray(match?.events) && match.events.length > 0) :
                       activeTab === 'STATS' ? (Array.isArray(match?.statistics) && match.statistics.length >= 2) :
                         false;
-              return hasTabData ? (
+              if (!hasTabData) return null;
+
+              // PRE_LINEUPS + LINEUP tab: replace the generic tactical-expert
+              // bubble with a briefing-aware one that hands off to the sheet.
+              // Gated on analysisData availability so we never surface a
+              // button for intel that can't render (e.g. lineups_phase
+              // response, or a sync that never completed).
+              const showBriefingCta =
+                activeTab === 'LINEUP'
+                && matchPhase === 'PRE'
+                && analysisData
+                && Array.isArray(analysisData.sections)
+                && analysisData.sections.length > 0;
+
+              // Gate: suppress the bubble on LINEUP+PRE until /api/intel resolves with a
+              // greetingContext. Prevents a flash of stale fallback copy while the fetch is
+              // in-flight.
+              // Fetch-failure choice — Option B (indefinite suppression): if /api/intel errors,
+              // analysisData stays null and the bubble stays hidden. Acceptable because failures
+              // are rare and the pitch below renders correctly without it.
+              const lineupBubbleReady =
+                activeTab !== 'LINEUP' ||
+                matchPhase !== 'PRE' ||
+                (analysisData != null && !!analysisData.greetingContext);
+
+              if (!lineupBubbleReady) {
+                // Reserve the bubble's height (44px avatar + 20px padding + 14px margin = ~78px)
+                // so the pitch position doesn't jump when the bubble materialises.
+                return (
+                  <div style={{ minHeight: '78px' }} aria-hidden="true" />
+                );
+              }
+
+              if (showBriefingCta) {
+                return (
+                  <div style={{ padding: '0 12px', marginBottom: '0' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'flex-start', gap: '10px',
+                      marginBottom: '10px', padding: '10px 14px',
+                      background: '#f5f0e8', borderRadius: '14px',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
+                    }}>
+                      <img
+                        src="/assets/assistant-head.png"
+                        alt="Tactical Expert"
+                        style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(0,0,0,0.08)' }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                          Tactical Expert
+                        </span>
+                        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
+                          {getLineupGreeting({
+                            homeTeamName: match.teams.home.name,
+                            awayTeamName: match.teams.away.name,
+                            greetingContext: analysisData.greetingContext,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBriefingOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.99] transition-all mb-3"
+                      style={{
+                        fontFamily: "'Montserrat', sans-serif",
+                        fontWeight: 800, fontSize: '11px',
+                        color: '#FFFFFF',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1.5px',
+                      }}
+                    >
+                      View Pre-Match Briefing
+                      <span aria-hidden="true" style={{ color: '#00e5ff' }}>›</span>
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
                 <div style={{ padding: '0 12px', marginBottom: '0' }}>
                   <AssistantDialogue activeTab={activeTab} />
                 </div>
-              ) : null;
+              );
             })()}
 
             {activeTab === 'LINEUP' && (
@@ -2020,6 +2196,13 @@ const MatchDetail = () => {
           onDismiss={() => setAffiliateSheetData(null)}
         />
       )}
+
+      {/* Pre-match briefing — only mounts once the CTA is tapped in PRE phase. */}
+      <MatchBriefingSheet
+        open={briefingOpen && matchPhase === 'PRE' && !!analysisData}
+        analysisData={analysisData}
+        onClose={() => setBriefingOpen(false)}
+      />
     </div>
   );
 };

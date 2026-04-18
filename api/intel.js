@@ -2,12 +2,15 @@ import { createClient } from '@supabase/supabase-js';
 import { INTEL_CONFIG } from '../config/intel.js';
 import { generateProse } from '../lib/intel/templates.js';
 
-function toFrontendFormat(prose) {
+function toFrontendFormat(prose, extras) {
   const p = prose || {};
+  const e = extras || {};
   return {
     greeting: p.summary
       ? `Hi Boss. ${p.summary}`
       : `Hi Boss. I've been studying the opposition. Here's what I've found.`,
+    greetingContext: e.greetingContext ?? 'no_lineups',
+    supersubWatch: e.supersubWatch ?? { available: false, items: [] },
     sections: [
       {
         title: 'Form Guide',
@@ -23,7 +26,7 @@ function toFrontendFormat(prose) {
       },
       {
         title: 'Prediction',
-        content: [p.scoreboardForecast, p.benchWatch].filter(Boolean).join(' ') || 'Prediction unavailable.',
+        content: p.scoreboardForecast || 'Prediction unavailable.',
       },
     ],
   };
@@ -43,17 +46,72 @@ function getSupabaseClient() {
 
 const { LINEUPS_PHASE_MINUTES } = INTEL_CONFIG;
 
+// ── Shared supersub helpers ───────────────────────────────────────────────────
+
+/**
+ * Build a supersubWatch payload from the bench players in match.lineups.
+ * Returns { available: boolean, items: [...] }.
+ * topN controls how many items to surface per team.
+ */
+async function buildSupersubWatchFromBench(supabase, match, topN = 2) {
+  const homeId = match.home_team_id;
+  const awayId = match.away_team_id;
+  const lineups = match.lineups || [];
+
+  const homeBench = lineups.filter(e => e.team_id === homeId && e.type_id === 12);
+  const awayBench = lineups.filter(e => e.team_id === awayId && e.type_id === 12);
+  const benchPlayerIds = [...homeBench, ...awayBench].map(p => p.player_id).filter(Boolean);
+
+  if (benchPlayerIds.length === 0) return { available: false, items: [] };
+
+  const { data: supersubStats } = await supabase
+    .from('player_supersub_stats')
+    .select('player_id, team_id, goals_as_sub, minutes_as_sub')
+    .in('player_id', benchPlayerIds)
+    .gt('goals_as_sub', 0);
+
+  const statsById = Object.fromEntries((supersubStats || []).map(s => [s.player_id, s]));
+
+  const toItems = (bench, side, teamName) => bench
+    .map(p => ({ ...p, stats: statsById[p.player_id] }))
+    .filter(p => p.stats?.goals_as_sub > 0)
+    .sort((a, b) => b.stats.goals_as_sub - a.stats.goals_as_sub)
+    .slice(0, topN)
+    .map(p => ({
+      team: side,
+      teamName,
+      playerName: p.player_name,
+      goalsAsSub: p.stats.goals_as_sub,
+      goalsPer90AsSub: p.stats.minutes_as_sub > 0
+        ? parseFloat(((p.stats.goals_as_sub / p.stats.minutes_as_sub) * 90).toFixed(1))
+        : 0,
+    }));
+
+  const items = [
+    ...toItems(homeBench, 'home', match.home_team),
+    ...toItems(awayBench, 'away', match.away_team),
+  ];
+  return { available: items.length > 0, items };
+}
+
+/**
+ * Determine whether confirmed XIs are available from lineups data.
+ * Returns 'confirmed_xi' | 'predicted_xi' | 'no_lineups'.
+ */
+function getGreetingContext(lineups, homeId, awayId) {
+  if (!lineups || lineups.length === 0) return 'no_lineups';
+  const hasHomeBench = lineups.some(e => e.team_id === homeId && e.type_id === 12);
+  const hasAwayBench = lineups.some(e => e.team_id === awayId && e.type_id === 12);
+  if (hasHomeBench && hasAwayBench) return 'confirmed_xi';
+  return 'predicted_xi';
+}
+
 // ── Live insights generator ───────────────────────────────────────────────────
 async function buildLiveInsights(supabase, match) {
   const homeId = match.home_team_id;
   const awayId = match.away_team_id;
   const homeTeam = match.home_team;
   const awayTeam = match.away_team;
-
-  // Extract bench players (type_id=12) from stored lineups
-  const lineups = match.lineups || [];
-  const homeBench = lineups.filter(e => e.team_id === homeId && e.type_id === 12);
-  const awayBench = lineups.filter(e => e.team_id === awayId && e.type_id === 12);
 
   // Extract substitution events (type_id=18) to count subs used and when first was made
   const events = match.events || [];
@@ -67,35 +125,16 @@ async function buildLiveInsights(supabase, match) {
     ? Math.min(...awaySubEvents.map(e => e.minute || e.result || 999))
     : null;
 
-  // Load supersub stats for bench players
-  const benchPlayerIds = [...homeBench, ...awayBench].map(p => p.player_id).filter(Boolean);
-  const { data: supersubStats } = benchPlayerIds.length > 0
-    ? await supabase
-        .from('player_supersub_stats')
-        .select('player_id, team_id, goals_as_sub, minutes_as_sub')
-        .in('player_id', benchPlayerIds)
-        .gt('goals_as_sub', 0)
-    : { data: [] };
-
-  const statsById = Object.fromEntries((supersubStats || []).map(s => [s.player_id, s]));
-
-  // Find most dangerous bench player per team
-  const findDangerousBench = (bench, teamName) => {
-    const threats = bench
-      .map(p => ({ ...p, stats: statsById[p.player_id] }))
-      .filter(p => p.stats?.goals_as_sub > 0)
-      .sort((a, b) => b.stats.goals_as_sub - a.stats.goals_as_sub);
-
-    if (!threats.length) return null;
-    const top = threats[0];
-    const per90 = top.stats.minutes_as_sub > 0
-      ? ((top.stats.goals_as_sub / top.stats.minutes_as_sub) * 90).toFixed(1)
-      : '?';
-    return `${teamName}'s ${top.player_name} has ${top.stats.goals_as_sub} goal${top.stats.goals_as_sub > 1 ? 's' : ''} as a substitute this season (${per90} per 90).`;
-  };
-
-  const homeThreat = findDangerousBench(homeBench, homeTeam);
-  const awayThreat = findDangerousBench(awayBench, awayTeam);
+  // Load supersub threats via shared helper (topN=1 for live — one per team is enough)
+  const benchWatch = await buildSupersubWatchFromBench(supabase, match, 1);
+  const homeItem = benchWatch.items.find(i => i.team === 'home');
+  const awayItem = benchWatch.items.find(i => i.team === 'away');
+  const homeThreat = homeItem
+    ? `${homeItem.teamName}'s ${homeItem.playerName} has ${homeItem.goalsAsSub} goal${homeItem.goalsAsSub > 1 ? 's' : ''} as a substitute this season (${homeItem.goalsPer90AsSub} per 90).`
+    : null;
+  const awayThreat = awayItem
+    ? `${awayItem.teamName}'s ${awayItem.playerName} has ${awayItem.goalsAsSub} goal${awayItem.goalsAsSub > 1 ? 's' : ''} as a substitute this season (${awayItem.goalsPer90AsSub} per 90).`
+    : null;
 
   // Resolve coach IDs — use match columns if set, otherwise look up from coaches table
   let homeCoachId = match.home_coach_id;
@@ -209,7 +248,7 @@ export default async function handler(req, res) {
     // ── PRE phase (default) ───────────────────────────────────────────────────
     const { data: match, error: matchError } = await supabase
       .from('matches')
-      .select('id, home_team, away_team, home_team_id, away_team_id, kickoff_time, league_id, season')
+      .select('id, home_team, away_team, home_team_id, away_team_id, kickoff_time, league_id, season, lineups')
       .eq('id', matchId)
       .single();
 
@@ -253,7 +292,10 @@ export default async function handler(req, res) {
         sections: {},
         prose: fallbackProse,
         proseMethod: 'fallback',
-        analysis: toFrontendFormat(fallbackProse),
+        analysis: toFrontendFormat(fallbackProse, {
+          supersubWatch: { available: false, items: [] },
+          greetingContext: getGreetingContext(match.lineups, match.home_team_id, match.away_team_id),
+        }),
         match: {
           id: match.id,
           homeTeam: match.home_team,
@@ -325,6 +367,34 @@ export default async function handler(req, res) {
       ? generateProse(sectionsToUse, match.home_team, match.away_team)
       : intel.prose;
 
+    // Build greetingContext and supersubWatch for the pre-match analysis response
+    const greetingContext = getGreetingContext(match.lineups, match.home_team_id, match.away_team_id);
+    let supersubWatch;
+    if (greetingContext === 'confirmed_xi') {
+      // Lineups are confirmed — pull live bench data (topN=2 per team)
+      supersubWatch = await buildSupersubWatchFromBench(supabase, match, 2);
+    } else {
+      // Lineups not yet confirmed — use cached top supersubs from match_intel
+      const homeTop = intel.home_top_supersubs?.[0];
+      const awayTop = intel.away_top_supersubs?.[0];
+      const items = [];
+      if (homeTop) items.push({
+        team: 'home',
+        teamName: match.home_team,
+        playerName: homeTop.player_name ?? homeTop.name,
+        goalsAsSub: homeTop.goals_as_sub ?? homeTop.goalsAsSub,
+        goalsPer90AsSub: homeTop.goals_per_90_as_sub ?? homeTop.goalsPer90AsSub ?? 0,
+      });
+      if (awayTop) items.push({
+        team: 'away',
+        teamName: match.away_team,
+        playerName: awayTop.player_name ?? awayTop.name,
+        goalsAsSub: awayTop.goals_as_sub ?? awayTop.goalsAsSub,
+        goalsPer90AsSub: awayTop.goals_per_90_as_sub ?? awayTop.goalsPer90AsSub ?? 0,
+      });
+      supersubWatch = { available: items.length > 0, items };
+    }
+
     return res.json({
       available: true,
       match: {
@@ -340,7 +410,7 @@ export default async function handler(req, res) {
       prose: freshProse,
       generatedAt: intel.generated_at,
       proseMethod: intel.prose_method,
-      analysis: toFrontendFormat(freshProse),
+      analysis: toFrontendFormat(freshProse, { supersubWatch, greetingContext }),
     });
   } catch (err) {
     console.error('[api/intel] Error:', err.message);
