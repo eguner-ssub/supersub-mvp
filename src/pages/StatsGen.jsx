@@ -308,6 +308,7 @@ function ControlsPanel({
   loading, previewData, onLoadData, onCopyJson, onLogout,
   leagueFilter, onLeagueFilterChange,
   statusFilter, onStatusFilterChange,
+  isLoadingMatches,
 }) {
   const typeConfig = findContentType(contentType);
 
@@ -398,10 +399,12 @@ function ControlsPanel({
             <select
               value={selectedMatch?.id || ''}
               onChange={(e) => setSelectedMatch(filteredMatches.find((m) => m.id === parseInt(e.target.value)) || null)}
-              disabled={filteredMatches.length === 0}
+              disabled={isLoadingMatches || filteredMatches.length === 0}
               className={SELECT_CLS}
             >
-              {filteredMatches.length === 0 ? (
+              {isLoadingMatches ? (
+                <option value="">Loading matches…</option>
+              ) : filteredMatches.length === 0 ? (
                 <option value="">
                   No {statusFilter} matches in {leagueFilter === 'all' ? 'any league' : LEAGUE_FILTERS.find((l) => l.id === leagueFilter)?.label}
                 </option>
@@ -542,6 +545,7 @@ export default function StatsGen() {
   const [previewError, setPreviewError] = useState(null);
   const [matches, setMatches] = useState([]);
   const [leagues, setLeagues] = useState([]);
+  const [isLoadingMatches, setIsLoadingMatches] = useState(false);
 
   // League / status filter pills (persisted in sessionStorage across reloads)
   const [leagueFilter, setLeagueFilter] = useState(
@@ -562,32 +566,64 @@ export default function StatsGen() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Fetch matches + leagues on auth (with 401 fallback)
+  // Leagues fetch — one-shot on auth. The league set is stable; no need to
+  // refetch when filters change.
   useEffect(() => {
     const pw = sessionStorage.getItem(STORAGE_KEY);
     if (!pw) return;
 
-    Promise.all([
-      fetch('/api/stats-gen/matches', { headers: { 'x-stats-gen-password': pw } }),
-      fetch('/api/stats-gen/leagues', { headers: { 'x-stats-gen-password': pw } }),
-    ]).then(async ([mRes, lRes]) => {
-      // If stored password is stale (env var rotated), clear and show gate
-      if (mRes.status === 401 || lRes.status === 401) {
+    fetch('/api/stats-gen/leagues', { headers: { 'x-stats-gen-password': pw } })
+      .then(async (lRes) => {
+        if (lRes.status === 401) {
+          sessionStorage.removeItem(STORAGE_KEY);
+          setPassword(null);
+          return;
+        }
+        const l = await lRes.json();
+        setLeagues(l.leagues || []);
+      })
+      .catch(() => {
         sessionStorage.removeItem(STORAGE_KEY);
         setPassword(null);
-        return;
-      }
-      const [m, l] = await Promise.all([mRes.json(), lRes.json()]);
-      setMatches(m.matches || []);
-      setLeagues(l.leagues || []);
-      setLastFetchAt(Date.now());
-      setIsStale(false);
-    }).catch(() => {
-      // Network error on initial load — clear password to allow retry
-      sessionStorage.removeItem(STORAGE_KEY);
-      setPassword(null);
-    });
+      });
   }, [password]);
+
+  // Matches fetch — re-runs whenever the status pill changes so each filter
+  // gets a correctly-scoped result set from the status-aware endpoint.
+  useEffect(() => {
+    const pw = sessionStorage.getItem(STORAGE_KEY);
+    if (!pw) return;
+
+    let cancelled = false;
+    setIsLoadingMatches(true);
+
+    fetch(`/api/stats-gen/matches?status=${encodeURIComponent(statusFilter)}`, {
+      headers: { 'x-stats-gen-password': pw },
+    })
+      .then(async (mRes) => {
+        if (cancelled) return;
+        if (mRes.status === 401) {
+          sessionStorage.removeItem(STORAGE_KEY);
+          setPassword(null);
+          return;
+        }
+        const m = await mRes.json();
+        if (cancelled) return;
+        setMatches(m.matches || []);
+        setLastFetchAt(Date.now());
+        setIsStale(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Soft-fail: leave existing matches in place, just clear the loading
+        // state. The stale-data indicator will flag this to the user.
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingMatches(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [password, statusFilter]);
 
   // Keyboard shortcut: Cmd/Ctrl+Enter → Load Data
   const handleLoadData = useCallback(async () => {
@@ -662,9 +698,12 @@ export default function StatsGen() {
   const handleRefresh = useCallback(async () => {
     const pw = sessionStorage.getItem(STORAGE_KEY);
     if (!pw) return;
+    setIsLoadingMatches(true);
     try {
       const [mRes, lRes] = await Promise.all([
-        fetch('/api/stats-gen/matches', { headers: { 'x-stats-gen-password': pw } }),
+        fetch(`/api/stats-gen/matches?status=${encodeURIComponent(statusFilter)}`, {
+          headers: { 'x-stats-gen-password': pw },
+        }),
         fetch('/api/stats-gen/leagues', { headers: { 'x-stats-gen-password': pw } }),
       ]);
       if (!mRes.ok || !lRes.ok) return;
@@ -675,8 +714,10 @@ export default function StatsGen() {
       setIsStale(false);
     } catch (err) {
       console.error('[StatsGen] Refresh failed:', err);
+    } finally {
+      setIsLoadingMatches(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
@@ -789,6 +830,7 @@ export default function StatsGen() {
           onLoadData={handleLoadData} onCopyJson={handleCopyJson} onLogout={handleLogout}
           leagueFilter={leagueFilter} onLeagueFilterChange={handleLeagueFilterChange}
           statusFilter={statusFilter} onStatusFilterChange={handleStatusFilterChange}
+          isLoadingMatches={isLoadingMatches}
         />
 
         {/* Stale-data footer — pinned to sidebar bottom; only shows after
