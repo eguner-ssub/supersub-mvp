@@ -145,21 +145,26 @@ function buildRowFromFixture(f, now) {
 
   if (!homeTeam || !awayTeam) return null;
 
-  // Sportmonks LINEUP_CONFIRMED metadata flips ~1h pre-kickoff once team
-  // sheets are released. When the entry is missing entirely (older fixtures
-  // pulled before metadata was included, or matches still in the
-  // far-future window) we OMIT the column from the upsert payload so
-  // Supabase preserves whatever is already stored — avoids clobbering a
-  // previously-confirmed value back to false on a re-sync that drops
+  // Sportmonks LINEUP_CONFIRMED metadata (type_id=572) flips ~1h pre-kickoff
+  // once team sheets are released. When the entry is missing entirely
+  // (older fixtures pulled before metadata was included, or matches still
+  // in the far-future window) we OMIT the column from the upsert payload
+  // so Supabase preserves whatever is already stored — avoids clobbering
+  // a previously-confirmed value back to false on a re-sync that drops
   // metadata for any reason.
-  // Sportmonks returns LINEUP_CONFIRMED metadata as either a flat
-  // `developer_name` (default `include=metadata`) or a nested
-  // `type.developer_name` (when `include=metadata.type`). Tolerate both so
-  // this stays in lockstep with supabase/functions/sync-scores/index.ts —
-  // both parsers MUST accept both shapes or they drift back into a state
-  // where one pipeline silently no-ops.
-  const lineupMeta = (f.metadata || []).find(
-    (m) => (m?.type?.developer_name ?? m?.developer_name) === 'LINEUP_CONFIRMED'
+  //
+  // Sportmonks shape reality (verified against live API):
+  //   include=metadata       → entries carry `type_id` only. No `type`
+  //                            object, no `developer_name` anywhere.
+  //   include=metadata.type  → entries carry `type: { developer_name, ... }`
+  //                            nested as well.
+  // We match on type_id=572 as the primary check (stable numeric ID from
+  // /v3/core/types) so the parser works on BOTH include shapes and on
+  // already-stored raw_data. developer_name is kept as a compatibility
+  // fallback. Must stay in lockstep with supabase/functions/sync-scores.
+  const lineupMeta = (f.metadata || []).find((m) =>
+    m?.type_id === 572 ||
+    (m?.type?.developer_name ?? m?.developer_name) === 'LINEUP_CONFIRMED'
   );
 
   const row = {

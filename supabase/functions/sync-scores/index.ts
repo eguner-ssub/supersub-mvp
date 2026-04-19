@@ -280,18 +280,24 @@ function buildPayload(
   }
 
   // Lineup confirmed flag — Sportmonks metadata carries a LINEUP_CONFIRMED
-  // entry (values.confirmed: boolean) once the team sheets are released
-  // ~1h pre-kickoff. Only set the field when we have an explicit boolean so
-  // upsert doesn't stomp on a previously-confirmed row with a stale default.
-  // Sportmonks returns LINEUP_CONFIRMED metadata as either a flat
-  // `developer_name` (default `include=metadata`) or a nested
-  // `type.developer_name` (when `include=metadata.type`). Tolerate both so
-  // this stays in lockstep with scripts/backfill-matches-full.js — both
-  // parsers MUST accept both shapes or they drift back into a state where
-  // one pipeline silently no-ops.
+  // entry (type_id=572, values.confirmed: boolean) once the team sheets are
+  // released ~1h pre-kickoff. Only set the field when we have an explicit
+  // boolean so upsert doesn't stomp on a previously-confirmed row with a
+  // stale default.
+  //
+  // Sportmonks shape reality (verified against live API):
+  //   include=metadata       → entries carry `type_id` only. No `type`
+  //                            object, no `developer_name` anywhere.
+  //   include=metadata.type  → entries carry `type: { developer_name, ... }`
+  //                            nested as well.
+  // We match on type_id=572 as the primary check (stable numeric ID from
+  // /v3/core/types) so the parser works on BOTH include shapes and on
+  // already-stored raw_data. developer_name is kept as a compatibility
+  // fallback. Must stay in lockstep with scripts/backfill-matches-full.js.
   if (Array.isArray(fixture.metadata)) {
-    const lc = fixture.metadata.find(
-      (m: any) => (m?.type?.developer_name ?? m?.developer_name) === 'LINEUP_CONFIRMED'
+    const lc = fixture.metadata.find((m: any) =>
+      m?.type_id === 572 ||
+      (m?.type?.developer_name ?? m?.developer_name) === 'LINEUP_CONFIRMED'
     );
     if (lc?.values && typeof lc.values.confirmed === 'boolean') {
       payload.lineup_confirmed = lc.values.confirmed;
@@ -680,9 +686,11 @@ async function liveScoresService(
           try {
             result.apiCalls++;
             const json = await smRequest(`/fixtures/${m.id}`, {
-              // metadata → LINEUP_CONFIRMED flag (see buildPayload); referees
-              // → surfaced via raw_data for /api/stats-gen/referee-watch.
-              include: 'scores;state;participants;lineups;metadata;referees',
+              // metadata.type → LINEUP_CONFIRMED flag (type_id=572); the
+              // nested type expansion is purely for observability — the
+              // parser matches on type_id regardless. referees → surfaced
+              // via raw_data for /api/stats-gen/referee-watch.
+              include: 'scores;state;participants;lineups;metadata.type;referees',
             });
             if (json.data) plFixtures.push(json.data);
           } catch (err) {
@@ -788,7 +796,7 @@ async function liveScoresService(
             const suppJson = await smRequest(`/fixtures/${fId}`, {
               // Same enrichment as the pre-live path so the same parsers
               // (lineup_confirmed, raw_data.referees) fire during lineup supplements.
-              include: 'scores;state;participants;lineups;metadata;referees',
+              include: 'scores;state;participants;lineups;metadata.type;referees',
             });
             if (suppJson.data) suppFixtures.push(suppJson.data);
           } catch (suppErr) {
