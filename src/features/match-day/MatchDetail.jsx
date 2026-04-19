@@ -36,6 +36,19 @@ function getLineupGreeting({ homeTeamName = '', awayTeamName = '', greetingConte
   return 'Hi Boss. Here is the tactical setup. Home team looks strong today.';
 }
 
+/**
+ * Greeting for when no real briefing content is available — no match_intel row,
+ * all sections returned placeholder text, or /api/intel errored.
+ * Does NOT reference a briefing so we never promise content that isn't there.
+ * isConfirmed is derived from greetingContext (preferred) or getLineupStatus(match).
+ */
+function getLineupGreetingNoBriefing({ homeTeamName = '', awayTeamName = '', isConfirmed = false } = {}) {
+  if (isConfirmed) {
+    return "Hi Boss. Lineups are confirmed. Take a look before you commit.";
+  }
+  return `Hi Boss. Below are the predicted lineups for ${homeTeamName} – ${awayTeamName}.`;
+}
+
 const ASSISTANT_GREETINGS = {
   LINEUP: getLineupGreeting(), // 'no_lineups' fallback — overridden by showBriefingCta when analysisData is ready
   SUBS: 'Hi Boss. The bench is deep today. If you\'re going to use the card, now\'s the time.',
@@ -1634,43 +1647,59 @@ const MatchDetail = () => {
                         false;
               if (!hasTabData) return null;
 
-              // PRE_LINEUPS + LINEUP tab: replace the generic tactical-expert
-              // bubble with a briefing-aware one that hands off to the sheet.
-              // Gated on analysisData availability so we never surface a
-              // button for intel that can't render (e.g. lineups_phase
-              // response, or a sync that never completed).
-              const showBriefingCta =
-                activeTab === 'LINEUP'
-                && matchPhase === 'PRE'
-                && analysisData
-                && Array.isArray(analysisData.sections)
-                && analysisData.sections.length > 0;
-
-              // Gate: suppress the bubble on LINEUP+PRE until /api/intel resolves with a
-              // greetingContext. Prevents a flash of stale fallback copy while the fetch is
-              // in-flight.
-              // Fetch-failure choice — Option B (indefinite suppression): if /api/intel errors,
-              // analysisData stays null and the bubble stays hidden. Acceptable because failures
-              // are rare and the pitch below renders correctly without it.
+              // Suppress bubble only while /api/intel is in-flight on initial load.
+              // Once the fetch resolves — success, no-intel fallback, or error — render
+              // the bubble immediately so there's no dead space below the tab bar.
               const lineupBubbleReady =
                 activeTab !== 'LINEUP' ||
                 matchPhase !== 'PRE' ||
-                (analysisData != null && !!analysisData.greetingContext);
+                !analysisLoading;
 
               if (!lineupBubbleReady) {
-                // Reserve the bubble's height (44px avatar + 20px padding + 14px margin = ~78px)
-                // so the pitch position doesn't jump when the bubble materialises.
+                // Reserve the bubble's height so the pitch doesn't jump when it materialises.
                 return (
                   <div style={{ minHeight: '78px' }} aria-hidden="true" />
                 );
               }
 
-              if (showBriefingCta) {
+              // CTA: show only when greetingContext is resolved AND the briefing has real
+              // content to display. Sections that all contain the "unavailable" placeholder
+              // (returned when match_intel row is absent) don't warrant the sheet.
+              const hasBriefingContent =
+                (Array.isArray(analysisData?.sections) &&
+                  analysisData.sections.some(s => s.content && !s.content.toLowerCase().includes('unavailable')))
+                || analysisData?.supersubWatch?.available === true;
+              const showBriefingCta =
+                activeTab === 'LINEUP'
+                && matchPhase === 'PRE'
+                && !!analysisData?.greetingContext
+                && hasBriefingContent;
+
+              // LINEUP + PRE: bubble always renders once fetch resolves.
+              // Copy and CTA depend on whether real briefing content is available.
+              if (activeTab === 'LINEUP' && matchPhase === 'PRE') {
+                // Derive confirmed/predicted from greetingContext (preferred) or
+                // fall back to the frontend getLineupStatus util when intel errored.
+                const isConfirmed = analysisData?.greetingContext
+                  ? analysisData.greetingContext === 'confirmed_xi'
+                  : getLineupStatus(match) === 'confirmed';
+                const bubbleMessage = showBriefingCta
+                  ? getLineupGreeting({
+                      homeTeamName: match.teams.home.name,
+                      awayTeamName: match.teams.away.name,
+                      greetingContext: analysisData.greetingContext,
+                    })
+                  : getLineupGreetingNoBriefing({
+                      homeTeamName: match.teams.home.name,
+                      awayTeamName: match.teams.away.name,
+                      isConfirmed,
+                    });
                 return (
                   <div style={{ padding: '0 12px', marginBottom: '0' }}>
                     <div style={{
                       display: 'flex', alignItems: 'flex-start', gap: '10px',
-                      marginBottom: '10px', padding: '10px 14px',
+                      marginBottom: showBriefingCta ? '10px' : '14px',
+                      padding: '10px 14px',
                       background: '#f5f0e8', borderRadius: '14px',
                       boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
                     }}>
@@ -1684,29 +1713,27 @@ const MatchDetail = () => {
                           Tactical Expert
                         </span>
                         <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
-                          {getLineupGreeting({
-                            homeTeamName: match.teams.home.name,
-                            awayTeamName: match.teams.away.name,
-                            greetingContext: analysisData.greetingContext,
-                          })}
+                          {bubbleMessage}
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setBriefingOpen(true)}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.99] transition-all mb-3"
-                      style={{
-                        fontFamily: "'Montserrat', sans-serif",
-                        fontWeight: 800, fontSize: '11px',
-                        color: '#FFFFFF',
-                        textTransform: 'uppercase',
-                        letterSpacing: '1.5px',
-                      }}
-                    >
-                      View Pre-Match Briefing
-                      <span aria-hidden="true" style={{ color: '#00e5ff' }}>›</span>
-                    </button>
+                    {showBriefingCta && (
+                      <button
+                        type="button"
+                        onClick={() => setBriefingOpen(true)}
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.99] transition-all mb-3"
+                        style={{
+                          fontFamily: "'Montserrat', sans-serif",
+                          fontWeight: 800, fontSize: '11px',
+                          color: '#FFFFFF',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1.5px',
+                        }}
+                      >
+                        View Pre-Match Briefing
+                        <span aria-hidden="true" style={{ color: '#00e5ff' }}>›</span>
+                      </button>
+                    )}
                   </div>
                 );
               }
@@ -1780,43 +1807,59 @@ const MatchDetail = () => {
                         false;
               if (!hasTabData) return null;
 
-              // PRE_LINEUPS + LINEUP tab: replace the generic tactical-expert
-              // bubble with a briefing-aware one that hands off to the sheet.
-              // Gated on analysisData availability so we never surface a
-              // button for intel that can't render (e.g. lineups_phase
-              // response, or a sync that never completed).
-              const showBriefingCta =
-                activeTab === 'LINEUP'
-                && matchPhase === 'PRE'
-                && analysisData
-                && Array.isArray(analysisData.sections)
-                && analysisData.sections.length > 0;
-
-              // Gate: suppress the bubble on LINEUP+PRE until /api/intel resolves with a
-              // greetingContext. Prevents a flash of stale fallback copy while the fetch is
-              // in-flight.
-              // Fetch-failure choice — Option B (indefinite suppression): if /api/intel errors,
-              // analysisData stays null and the bubble stays hidden. Acceptable because failures
-              // are rare and the pitch below renders correctly without it.
+              // Suppress bubble only while /api/intel is in-flight on initial load.
+              // Once the fetch resolves — success, no-intel fallback, or error — render
+              // the bubble immediately so there's no dead space below the tab bar.
               const lineupBubbleReady =
                 activeTab !== 'LINEUP' ||
                 matchPhase !== 'PRE' ||
-                (analysisData != null && !!analysisData.greetingContext);
+                !analysisLoading;
 
               if (!lineupBubbleReady) {
-                // Reserve the bubble's height (44px avatar + 20px padding + 14px margin = ~78px)
-                // so the pitch position doesn't jump when the bubble materialises.
+                // Reserve the bubble's height so the pitch doesn't jump when it materialises.
                 return (
                   <div style={{ minHeight: '78px' }} aria-hidden="true" />
                 );
               }
 
-              if (showBriefingCta) {
+              // CTA: show only when greetingContext is resolved AND the briefing has real
+              // content to display. Sections that all contain the "unavailable" placeholder
+              // (returned when match_intel row is absent) don't warrant the sheet.
+              const hasBriefingContent =
+                (Array.isArray(analysisData?.sections) &&
+                  analysisData.sections.some(s => s.content && !s.content.toLowerCase().includes('unavailable')))
+                || analysisData?.supersubWatch?.available === true;
+              const showBriefingCta =
+                activeTab === 'LINEUP'
+                && matchPhase === 'PRE'
+                && !!analysisData?.greetingContext
+                && hasBriefingContent;
+
+              // LINEUP + PRE: bubble always renders once fetch resolves.
+              // Copy and CTA depend on whether real briefing content is available.
+              if (activeTab === 'LINEUP' && matchPhase === 'PRE') {
+                // Derive confirmed/predicted from greetingContext (preferred) or
+                // fall back to the frontend getLineupStatus util when intel errored.
+                const isConfirmed = analysisData?.greetingContext
+                  ? analysisData.greetingContext === 'confirmed_xi'
+                  : getLineupStatus(match) === 'confirmed';
+                const bubbleMessage = showBriefingCta
+                  ? getLineupGreeting({
+                      homeTeamName: match.teams.home.name,
+                      awayTeamName: match.teams.away.name,
+                      greetingContext: analysisData.greetingContext,
+                    })
+                  : getLineupGreetingNoBriefing({
+                      homeTeamName: match.teams.home.name,
+                      awayTeamName: match.teams.away.name,
+                      isConfirmed,
+                    });
                 return (
                   <div style={{ padding: '0 12px', marginBottom: '0' }}>
                     <div style={{
                       display: 'flex', alignItems: 'flex-start', gap: '10px',
-                      marginBottom: '10px', padding: '10px 14px',
+                      marginBottom: showBriefingCta ? '10px' : '14px',
+                      padding: '10px 14px',
                       background: '#f5f0e8', borderRadius: '14px',
                       boxShadow: '0 4px 16px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)',
                     }}>
@@ -1830,29 +1873,27 @@ const MatchDetail = () => {
                           Tactical Expert
                         </span>
                         <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '12px', color: '#121212', margin: '3px 0 0', lineHeight: 1.35 }}>
-                          {getLineupGreeting({
-                            homeTeamName: match.teams.home.name,
-                            awayTeamName: match.teams.away.name,
-                            greetingContext: analysisData.greetingContext,
-                          })}
+                          {bubbleMessage}
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setBriefingOpen(true)}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.99] transition-all mb-3"
-                      style={{
-                        fontFamily: "'Montserrat', sans-serif",
-                        fontWeight: 800, fontSize: '11px',
-                        color: '#FFFFFF',
-                        textTransform: 'uppercase',
-                        letterSpacing: '1.5px',
-                      }}
-                    >
-                      View Pre-Match Briefing
-                      <span aria-hidden="true" style={{ color: '#00e5ff' }}>›</span>
-                    </button>
+                    {showBriefingCta && (
+                      <button
+                        type="button"
+                        onClick={() => setBriefingOpen(true)}
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.99] transition-all mb-3"
+                        style={{
+                          fontFamily: "'Montserrat', sans-serif",
+                          fontWeight: 800, fontSize: '11px',
+                          color: '#FFFFFF',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1.5px',
+                        }}
+                      >
+                        View Pre-Match Briefing
+                        <span aria-hidden="true" style={{ color: '#00e5ff' }}>›</span>
+                      </button>
+                    )}
                   </div>
                 );
               }
