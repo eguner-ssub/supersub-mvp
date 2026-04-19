@@ -40,6 +40,12 @@ import gwBenchToWatch   from '../../lib/statsGen/handlers/gw-bench-to-watch.js';
 import comebackBench    from '../../lib/statsGen/handlers/comeback-bench.js';
 import supersubOfWeek   from '../../lib/statsGen/handlers/supersub-of-week.js';
 import fplWatch         from '../../lib/statsGen/handlers/fpl-watch.js';
+// ── Intel-sourced endpoints (wrap /api/intel) ────────────────────────────────
+import intelFormGuide      from '../../lib/statsGen/handlers/intelFormGuide.js';
+import intelKeyMatchup     from '../../lib/statsGen/handlers/intelKeyMatchup.js';
+import intelGoalsMarket    from '../../lib/statsGen/handlers/intelGoalsMarket.js';
+import intelPrediction     from '../../lib/statsGen/handlers/intelPrediction.js';
+import intelSupersubWatch  from '../../lib/statsGen/handlers/intelSupersubWatch.js';
 
 // Map slug → handler (24 total + 2 context = 26 endpoints, 1 Vercel function).
 const HANDLERS = {
@@ -71,6 +77,12 @@ const HANDLERS = {
   'comeback-bench':      comebackBench,
   'supersub-of-week':    supersubOfWeek,
   'fpl-watch':           fplWatch,
+  // Intel-sourced (wrap /api/intel)
+  'intel-form-guide':      intelFormGuide,
+  'intel-key-matchup':     intelKeyMatchup,
+  'intel-goals-market':    intelGoalsMarket,
+  'intel-prediction':      intelPrediction,
+  'intel-supersub-watch':  intelSupersubWatch,
 };
 
 export default async function handler(req, res) {

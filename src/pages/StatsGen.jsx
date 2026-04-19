@@ -24,6 +24,12 @@ import { GWBenchToWatchPreview } from './stats-gen/previews/GWBenchToWatchPrevie
 import { ComebackBenchPreview } from './stats-gen/previews/ComebackBenchPreview';
 import { SupersubOfWeekPreview } from './stats-gen/previews/SupersubOfWeekPreview';
 import { FPLWatchPreview } from './stats-gen/previews/FPLWatchPreview';
+// Intel-sourced previews
+import { IntelFormGuidePreview } from './stats-gen/previews/IntelFormGuidePreview';
+import { IntelKeyMatchupPreview } from './stats-gen/previews/IntelKeyMatchupPreview';
+import { IntelGoalsMarketPreview } from './stats-gen/previews/IntelGoalsMarketPreview';
+import { IntelPredictionPreview } from './stats-gen/previews/IntelPredictionPreview';
+import { IntelSupersubWatchPreview } from './stats-gen/previews/IntelSupersubWatchPreview';
 
 const STORAGE_KEY = 'stats_gen_password';
 
@@ -103,6 +109,12 @@ const PREVIEW_MAP = {
   'comeback-bench-season': ComebackBenchPreview,
   'supersub-of-week': SupersubOfWeekPreview,
   'fpl-watch': FPLWatchPreview,
+  // Intel-sourced
+  'intel-form-guide':     IntelFormGuidePreview,
+  'intel-key-matchup':    IntelKeyMatchupPreview,
+  'intel-goals-market':   IntelGoalsMarketPreview,
+  'intel-prediction':     IntelPredictionPreview,
+  'intel-supersub-watch': IntelSupersubWatchPreview,
 };
 
 function renderPreview(contentType, data) {
@@ -121,6 +133,16 @@ function renderPreview(contentType, data) {
 
 // ─── Content type definitions ────────────────────────────────────────────────
 const CONTENT_TYPES = {
+  'intel': {
+    label: 'Pre-Match Intel (Joseba)',
+    types: [
+      { id: 'intel-form-guide',     label: 'Form Guide (Intel)',     selectors: ['match'], requiresUpcomingMatch: true },
+      { id: 'intel-key-matchup',    label: 'Key Matchup (Intel)',    selectors: ['match'], requiresUpcomingMatch: true },
+      { id: 'intel-goals-market',   label: 'Goals Market (Intel)',   selectors: ['match'], requiresUpcomingMatch: true },
+      { id: 'intel-prediction',     label: 'Prediction (Intel)',     selectors: ['match'], requiresUpcomingMatch: true },
+      { id: 'intel-supersub-watch', label: 'Supersub Watch (Intel)', selectors: ['match'], requiresUpcomingMatch: true },
+    ],
+  },
   'supersub-focused': {
     label: 'Supersub Focused',
     types: [
@@ -308,6 +330,7 @@ function ControlsPanel({
   loading, previewData, onLoadData, onCopyJson, onLogout,
   leagueFilter, onLeagueFilterChange,
   statusFilter, onStatusFilterChange,
+  effectiveStatusFilter, isStatusFilterLocked,
   isLoadingMatches,
 }) {
   const typeConfig = findContentType(contentType);
@@ -325,18 +348,21 @@ function ControlsPanel({
   });
 
   // Filter matches by the currently-selected pills, then sort.
+  // Uses effectiveStatusFilter so intel content types (which force
+  // 'upcoming') always see upcoming matches regardless of the
+  // user's persisted status preference.
   const filteredMatches = useMemo(() => {
-    let result = matches.filter((m) => classifyMatchStatus(m) === statusFilter);
+    let result = matches.filter((m) => classifyMatchStatus(m) === effectiveStatusFilter);
     if (leagueFilter !== 'all') {
       const leagueConfig = LEAGUE_FILTERS.find((l) => l.id === leagueFilter);
       if (leagueConfig?.sportmonks_id != null) {
         result = result.filter((m) => m.league_id === leagueConfig.sportmonks_id);
       }
     }
-    const direction = statusFilter === 'finished' ? -1 : 1;
+    const direction = effectiveStatusFilter === 'finished' ? -1 : 1;
     result.sort((a, b) => direction * (new Date(a.kickoff_time) - new Date(b.kickoff_time)));
     return result;
-  }, [matches, leagueFilter, statusFilter]);
+  }, [matches, leagueFilter, effectiveStatusFilter]);
 
   const showOptgroups = leagueFilter === 'all';
 
@@ -381,19 +407,36 @@ function ControlsPanel({
               ))}
             </div>
 
-            {/* Status filter pills — single row */}
-            <div className="flex gap-1.5 mb-3" aria-label="Match status filter">
-              {STATUS_FILTERS.map((status) => (
-                <button
-                  key={status.id}
-                  type="button"
-                  onClick={() => onStatusFilterChange(status.id)}
-                  className={`${PILL_BASE_CLS} ${statusFilter === status.id ? PILL_ACTIVE_CLS : PILL_INACTIVE_CLS}`}
-                >
-                  {status.label}
-                </button>
-              ))}
+            {/* Status filter pills — single row.
+                When the content type requires upcoming matches (intel types),
+                non-upcoming pills are disabled; the cyan active pill always
+                reflects the *effective* filter, not the persisted one. */}
+            <div className="flex gap-1.5 mb-2" aria-label="Match status filter">
+              {STATUS_FILTERS.map((status) => {
+                const isDisabled = isStatusFilterLocked && status.id !== 'upcoming';
+                const isActive = effectiveStatusFilter === status.id;
+                const disabledCls = 'bg-transparent border border-zinc-900 text-zinc-700 cursor-not-allowed';
+                return (
+                  <button
+                    key={status.id}
+                    type="button"
+                    onClick={() => { if (!isDisabled) onStatusFilterChange(status.id); }}
+                    disabled={isDisabled}
+                    aria-disabled={isDisabled}
+                    className={`${PILL_BASE_CLS} ${
+                      isDisabled ? disabledCls : (isActive ? PILL_ACTIVE_CLS : PILL_INACTIVE_CLS)
+                    }`}
+                  >
+                    {status.label}
+                  </button>
+                );
+              })}
             </div>
+            {isStatusFilterLocked && (
+              <p className="text-zinc-500 text-[10px] mb-3 italic">
+                Intel content is only available for upcoming matches.
+              </p>
+            )}
 
             {/* Match dropdown — filtered + sorted by the pills above */}
             <select
@@ -406,19 +449,19 @@ function ControlsPanel({
                 <option value="">Loading matches…</option>
               ) : filteredMatches.length === 0 ? (
                 <option value="">
-                  No {statusFilter} matches in {leagueFilter === 'all' ? 'any league' : LEAGUE_FILTERS.find((l) => l.id === leagueFilter)?.label}
+                  No {effectiveStatusFilter} matches in {leagueFilter === 'all' ? 'any league' : LEAGUE_FILTERS.find((l) => l.id === leagueFilter)?.label}
                 </option>
               ) : (
                 <>
                   <option value="">Select match…</option>
                   {showOptgroups ? (
-                    groupedByLeagueWithSort(filteredMatches, statusFilter).map(([leagueName, leagueMatches]) => (
+                    groupedByLeagueWithSort(filteredMatches, effectiveStatusFilter).map(([leagueName, leagueMatches]) => (
                       <optgroup key={leagueName} label={leagueName}>
                         {leagueMatches.map((m) => (
                           <option key={m.id} value={m.id}>
                             {m.home_team} vs {m.away_team}
                             {m.round_name ? ` — ${m.round_name}` : ''}
-                            {` — ${formatMatchDate(m, statusFilter)}`}
+                            {` — ${formatMatchDate(m, effectiveStatusFilter)}`}
                           </option>
                         ))}
                       </optgroup>
@@ -428,7 +471,7 @@ function ControlsPanel({
                       <option key={m.id} value={m.id}>
                         {m.home_team} vs {m.away_team}
                         {m.round_name ? ` — ${m.round_name}` : ''}
-                        {` — ${formatMatchDate(m, statusFilter)}`}
+                        {` — ${formatMatchDate(m, effectiveStatusFilter)}`}
                       </option>
                     ))
                   )}
@@ -559,6 +602,14 @@ export default function StatsGen() {
   const [lastFetchAt, setLastFetchAt] = useState(() => Date.now());
   const [isStale, setIsStale] = useState(false);
 
+  // Intel content types force the status filter to 'upcoming' — match_intel
+  // rows only exist for upcoming matches. The lock is a derived/effective
+  // state; the user's own sessionStorage-persisted `statusFilter` stays
+  // untouched so it's restored when they switch back to a non-intel type.
+  const currentType = findContentType(contentType);
+  const isStatusFilterLocked = currentType?.requiresUpcomingMatch === true;
+  const effectiveStatusFilter = isStatusFilterLocked ? 'upcoming' : statusFilter;
+
   // Viewport resize
   useEffect(() => {
     const handleResize = () => setViewportOk(window.innerWidth >= 768);
@@ -597,7 +648,7 @@ export default function StatsGen() {
     let cancelled = false;
     setIsLoadingMatches(true);
 
-    fetch(`/api/stats-gen/matches?status=${encodeURIComponent(statusFilter)}`, {
+    fetch(`/api/stats-gen/matches?status=${encodeURIComponent(effectiveStatusFilter)}`, {
       headers: { 'x-stats-gen-password': pw },
     })
       .then(async (mRes) => {
@@ -623,7 +674,7 @@ export default function StatsGen() {
       });
 
     return () => { cancelled = true; };
-  }, [password, statusFilter]);
+  }, [password, effectiveStatusFilter]);
 
   // Keyboard shortcut: Cmd/Ctrl+Enter → Load Data
   const handleLoadData = useCallback(async () => {
@@ -701,7 +752,7 @@ export default function StatsGen() {
     setIsLoadingMatches(true);
     try {
       const [mRes, lRes] = await Promise.all([
-        fetch(`/api/stats-gen/matches?status=${encodeURIComponent(statusFilter)}`, {
+        fetch(`/api/stats-gen/matches?status=${encodeURIComponent(effectiveStatusFilter)}`, {
           headers: { 'x-stats-gen-password': pw },
         }),
         fetch('/api/stats-gen/leagues', { headers: { 'x-stats-gen-password': pw } }),
@@ -717,7 +768,7 @@ export default function StatsGen() {
     } finally {
       setIsLoadingMatches(false);
     }
-  }, [statusFilter]);
+  }, [effectiveStatusFilter]);
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
@@ -830,6 +881,8 @@ export default function StatsGen() {
           onLoadData={handleLoadData} onCopyJson={handleCopyJson} onLogout={handleLogout}
           leagueFilter={leagueFilter} onLeagueFilterChange={handleLeagueFilterChange}
           statusFilter={statusFilter} onStatusFilterChange={handleStatusFilterChange}
+          effectiveStatusFilter={effectiveStatusFilter}
+          isStatusFilterLocked={isStatusFilterLocked}
           isLoadingMatches={isLoadingMatches}
         />
 
