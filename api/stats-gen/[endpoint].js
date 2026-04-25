@@ -46,6 +46,11 @@ import intelKeyMatchup     from '../../lib/statsGen/handlers/intelKeyMatchup.js'
 import intelGoalsMarket    from '../../lib/statsGen/handlers/intelGoalsMarket.js';
 import intelPrediction     from '../../lib/statsGen/handlers/intelPrediction.js';
 import intelSupersubWatch  from '../../lib/statsGen/handlers/intelSupersubWatch.js';
+// ── Simulation-backed (Phase 1: sportmonks_baseline Monte Carlo) ─────────────
+import todaysFixtures        from '../../lib/statsGen/handlers/todays-fixtures.js';
+import matchProbabilities    from '../../lib/statsGen/handlers/match-probabilities.js';
+import titleProbabilities    from '../../lib/statsGen/handlers/title-probabilities.js';
+import relegationProbabilities from '../../lib/statsGen/handlers/relegation-probabilities.js';
 
 // Map slug → handler (24 total + 2 context = 26 endpoints, 1 Vercel function).
 const HANDLERS = {
@@ -83,6 +88,11 @@ const HANDLERS = {
   'intel-goals-market':    intelGoalsMarket,
   'intel-prediction':      intelPrediction,
   'intel-supersub-watch':  intelSupersubWatch,
+  // Simulation-backed
+  'todays-fixtures':           todaysFixtures,
+  'match-probabilities':       matchProbabilities,
+  'title-probabilities':       titleProbabilities,
+  'relegation-probabilities':  relegationProbabilities,
 };
 
 export default async function handler(req, res) {

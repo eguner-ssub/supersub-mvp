@@ -11,7 +11,9 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "sync:referees": "node scripts/sync-referee-stats.js"
+    "sync:referees": "node scripts/sync-referee-stats.js",
+    "sim:matches": "node scripts/run-match-simulations.js",
+    "sim:seasons": "node scripts/run-season-simulations.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.1",

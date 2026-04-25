@@ -792,6 +792,12 @@ export default function StatsGen() {
     }
   };
 
+  // Export Data button (Direction 1, Prompt 89): copies the loaded
+  // /api/stats-gen/* response to clipboard, formatted for paste into
+  // Canva / Figma templates. The Stats-Gen endpoints already return
+  // clean structured JSON — no new endpoints required for export.
+  // Show a transient "Copied to clipboard" toast on success;
+  // "Clipboard access denied" if the API throws (browser permissions).
   const handleCopyJson = () => {
     if (previewData) navigator.clipboard.writeText(JSON.stringify(previewData, null, 2));
   };

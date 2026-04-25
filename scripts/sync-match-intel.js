@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { processMatchIntel } from '../lib/intel/processor.js';
 import { INTEL_CONFIG } from '../config/intel.js';
 import { resolveSeasonSmId } from '../lib/statsGen/resolveSeason.js';
+import { simulateOne } from './run-match-simulations.js';
 
 const PREFIX = '[sync-match-intel]';
 const { SYNC_DAYS_AHEAD, MIN_DAYS_BEFORE_KICKOFF, STALE_AFTER_HOURS } = INTEL_CONFIG;
@@ -322,8 +323,24 @@ export async function syncMatchIntel(supabaseOverride) {
 
       if (upsertError) throw upsertError;
 
+      // Post-hook: refresh the per-match Monte Carlo simulation in lockstep
+      // with the intel write so /api/stats-gen/match-probabilities never
+      // serves stale W/D/L estimates after an intel refresh. Failures here
+      // do NOT abort the intel sync — the daily sim:matches cron will
+      // catch any misses on its next run.
+      try {
+        const simIntel = { report_sections: sections };
+        const simResult = await simulateOne(supabase, match, simIntel);
+        if (simResult.ok) {
+          console.log(`${PREFIX}   ✓ ${match.home_team} vs ${match.away_team} (SM: ${sportmonksAvailable ? 'yes' : 'no'}, sim: ✓)`);
+        } else {
+          console.log(`${PREFIX}   ✓ ${match.home_team} vs ${match.away_team} (SM: ${sportmonksAvailable ? 'yes' : 'no'}, sim: ${simResult.reason})`);
+        }
+      } catch (simErr) {
+        console.warn(`${PREFIX}   ✓ ${match.home_team} vs ${match.away_team} (SM: ${sportmonksAvailable ? 'yes' : 'no'}, sim: error: ${simErr.message})`);
+      }
+
       success++;
-      console.log(`${PREFIX}   ✓ ${match.home_team} vs ${match.away_team} (SM: ${sportmonksAvailable ? 'yes' : 'no'})`);
     } catch (err) {
       console.error(`${PREFIX}   ✗ ${match.home_team} vs ${match.away_team}: ${err.message}`);
       failed++;
