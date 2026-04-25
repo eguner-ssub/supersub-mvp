@@ -30,6 +30,11 @@ import { IntelKeyMatchupPreview } from './stats-gen/previews/IntelKeyMatchupPrev
 import { IntelGoalsMarketPreview } from './stats-gen/previews/IntelGoalsMarketPreview';
 import { IntelPredictionPreview } from './stats-gen/previews/IntelPredictionPreview';
 import { IntelSupersubWatchPreview } from './stats-gen/previews/IntelSupersubWatchPreview';
+// Simulation-backed previews (Phase 1: sportmonks_baseline Monte Carlo)
+import { TodaysFixturesPreview } from './stats-gen/previews/TodaysFixturesPreview';
+import { MatchProbabilitiesPreview } from './stats-gen/previews/MatchProbabilitiesPreview';
+import { TitleRacePreview } from './stats-gen/previews/TitleRacePreview';
+import { RelegationRacePreview } from './stats-gen/previews/RelegationRacePreview';
 
 const STORAGE_KEY = 'stats_gen_password';
 
@@ -115,6 +120,11 @@ const PREVIEW_MAP = {
   'intel-goals-market':   IntelGoalsMarketPreview,
   'intel-prediction':     IntelPredictionPreview,
   'intel-supersub-watch': IntelSupersubWatchPreview,
+  // Simulation-backed
+  'todays-fixtures':           TodaysFixturesPreview,
+  'match-probabilities':       MatchProbabilitiesPreview,
+  'title-probabilities':       TitleRacePreview,
+  'relegation-probabilities':  RelegationRacePreview,
 };
 
 function renderPreview(contentType, data) {
@@ -143,12 +153,26 @@ const CONTENT_TYPES = {
       { id: 'intel-supersub-watch', label: 'Supersub Watch (Intel)', selectors: ['match'], requiresUpcomingMatch: true },
     ],
   },
+  'league-season': {
+    label: 'League & Season',
+    types: [
+      { id: 'todays-fixtures',          label: "Today's Fixtures",  selectors: ['league'] },
+      { id: 'title-probabilities',      label: 'Title Race',        selectors: ['league'] },
+      { id: 'relegation-probabilities', label: 'Relegation Race',   selectors: ['league'] },
+    ],
+  },
   'supersub-focused': {
     label: 'Supersub Focused',
     types: [
       { id: 'bench-watch', label: 'Bench Watch', selectors: ['match'] },
       { id: 'analytics', label: 'Analytics (League)', selectors: ['league'] },
-      { id: 'lineups', label: 'Lineups', selectors: ['match'] },
+      // Lineups exposes a 3-mode view selector (probable/confirmed/auto). The
+      // viewModes array is read by ControlsPanel to render the radio.
+      { id: 'lineups', label: 'Lineups', selectors: ['match'], viewModes: [
+        { id: 'auto',      label: 'Auto'      },
+        { id: 'probable',  label: 'Probable'  },
+        { id: 'confirmed', label: 'Confirmed' },
+      ] },
       { id: 'player-spotlight', label: 'Player Spotlight', selectors: ['league'] },
       { id: 'bench-contribution', label: 'Bench Contribution', selectors: ['league'] },
       { id: 'fpl-watch', label: 'FPL Watch', selectors: ['gameweek'] },
@@ -170,6 +194,7 @@ const CONTENT_TYPES = {
       { id: 'fortress', label: 'The Fortress', selectors: ['league'] },
       { id: 'h2h', label: 'Head to Head', selectors: ['match'] },
       { id: 'banker', label: 'The Banker', selectors: ['match'] },
+      { id: 'match-probabilities', label: 'Match Probabilities', selectors: ['match'] },
       { id: 'goals-per-ground', label: 'Goals Per Ground', selectors: ['league'] },
       { id: 'over-under', label: 'Over/Under Split', selectors: ['match'] },
       { id: 'referee-watch', label: 'Referee Watch', selectors: ['match'] },
@@ -228,9 +253,15 @@ function groupedByLeagueWithSort(matches, statusFilter) {
   return ordered;
 }
 
-function buildEndpointUrl(type, { selectedMatch, selectedLeague, selectedGameweek, selectedTeam }) {
+function buildEndpointUrl(type, { selectedMatch, selectedLeague, selectedGameweek, selectedTeam, selectedView }) {
   const params = new URLSearchParams();
   const sels = type?.selectors || [];
+
+  // Lineups view-mode passthrough — only Lineups has a viewModes config; the
+  // param is harmless if absent. `auto` is the API default so we elide it.
+  if (type?.viewModes && selectedView && selectedView !== 'auto') {
+    params.set('view', selectedView);
+  }
 
   // Comeback Bench — three variants all hit the same endpoint with different params.
   if (type?.id?.startsWith('comeback-bench')) {
@@ -327,9 +358,12 @@ function ControlsPanel({
   matches, leagues, contentType, setContentType,
   selectedMatch, setSelectedMatch, selectedLeague, setSelectedLeague,
   selectedGameweek, setSelectedGameweek, selectedTeam, setSelectedTeam,
+  selectedView, setSelectedView,
   loading, previewData, onLoadData, onCopyJson, onLogout,
   leagueFilter, onLeagueFilterChange,
-  statusFilter, onStatusFilterChange,
+  // statusFilter is passed in but the panel only reads `effectiveStatusFilter`
+  // (which already accounts for the intel-type lock). Only the writer is needed.
+  onStatusFilterChange,
   effectiveStatusFilter, isStatusFilterLocked,
   isLoadingMatches,
 }) {
@@ -341,6 +375,7 @@ function ControlsPanel({
     setSelectedLeague(null);
     setSelectedGameweek(null);
     setSelectedTeam(null);
+    setSelectedView('auto');
   };
 
   const ready = hasRequiredSelectors(typeConfig, {
@@ -481,6 +516,33 @@ function ControlsPanel({
           </section>
         )}
 
+        {/* View-mode sub-selector — only rendered when the active type defines
+            viewModes (currently just Lineups). Pill row matches the existing
+            league/status pill styling so it visually nests with the match
+            selector above. */}
+        {typeConfig?.viewModes && (
+          <section className="mb-5">
+            <label className={LABEL_CLS}>View</label>
+            <div className="flex gap-1.5" role="radiogroup" aria-label="Lineup view mode">
+              {typeConfig.viewModes.map((mode) => {
+                const isActive = selectedView === mode.id;
+                return (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isActive}
+                    onClick={() => setSelectedView(mode.id)}
+                    className={`${PILL_BASE_CLS} ${isActive ? PILL_ACTIVE_CLS : PILL_INACTIVE_CLS}`}
+                  >
+                    {mode.label}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Standalone League dropdown — hidden when the match pills are driving
             the selection (the match itself resolves the league). */}
         {needsLeague(typeConfig) && !needsMatch(typeConfig) && (
@@ -583,6 +645,10 @@ export default function StatsGen() {
   const [selectedLeague, setSelectedLeague] = useState(null);
   const [selectedGameweek, setSelectedGameweek] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
+  // Sub-selector for content types that expose a viewModes config (currently
+  // only Lineups). Defaults to 'auto' so the API picks confirmed/probable
+  // based on match state.
+  const [selectedView, setSelectedView] = useState('auto');
   const [loading, setLoading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
   const [previewError, setPreviewError] = useState(null);
@@ -687,7 +753,7 @@ export default function StatsGen() {
     setPreviewData(null);
 
     const pw = sessionStorage.getItem(STORAGE_KEY);
-    const url = buildEndpointUrl(typeConfig, { selectedMatch, selectedLeague, selectedGameweek, selectedTeam });
+    const url = buildEndpointUrl(typeConfig, { selectedMatch, selectedLeague, selectedGameweek, selectedTeam, selectedView });
 
     try {
       const res = await fetch(url, { headers: { 'x-stats-gen-password': pw } });
@@ -703,7 +769,7 @@ export default function StatsGen() {
     } finally {
       setLoading(false);
     }
-  }, [contentType, selectedMatch, selectedLeague, selectedGameweek, selectedTeam]);
+  }, [contentType, selectedMatch, selectedLeague, selectedGameweek, selectedTeam, selectedView]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -883,6 +949,7 @@ export default function StatsGen() {
           selectedLeague={selectedLeague} setSelectedLeague={setSelectedLeague}
           selectedGameweek={selectedGameweek} setSelectedGameweek={setSelectedGameweek}
           selectedTeam={selectedTeam} setSelectedTeam={setSelectedTeam}
+          selectedView={selectedView} setSelectedView={setSelectedView}
           loading={loading} previewData={previewData}
           onLoadData={handleLoadData} onCopyJson={handleCopyJson} onLogout={handleLogout}
           leagueFilter={leagueFilter} onLeagueFilterChange={handleLeagueFilterChange}

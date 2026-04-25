@@ -40,7 +40,39 @@ function TeamColumn({ label, starters, bench }) {
   );
 }
 
+// Reason → user-facing message map. Mirrors api/stats-gen/lineups.js's
+// 3 unavailable states (lineup_not_yet_confirmed, lineup_already_confirmed,
+// match_already_started). Kept here so the message lives next to the rendering.
+const UNAVAILABLE_MESSAGES = {
+  lineup_not_yet_confirmed:  'Lineup not yet confirmed. Estimated release: ~1 hour before kickoff.',
+  lineup_already_confirmed:  'This match has confirmed lineups available. Switch to Confirmed view.',
+  match_already_started:     'Match has started. Probable lineups no longer relevant.',
+};
+
 export function LineupsPreview({ data }) {
+  // Unavailable state (view=probable on confirmed match, view=confirmed before
+  // 1h pre-KO, etc). The handler always returns a context block we can show
+  // even when there's no lineup data — render the message inside the shell.
+  if (data.available === false) {
+    const message = UNAVAILABLE_MESSAGES[data.reason] || 'Lineup unavailable for this match.';
+    return (
+      <PreviewShell
+        contentType="Lineups"
+        context={`${data.home_team || '—'} vs ${data.away_team || '—'}`}
+        fetchedAt={data._fetchedAt}
+      >
+        <div className="py-10 text-center">
+          <p className="text-zinc-400 text-sm">{message}</p>
+          {data.view && (
+            <p className="text-zinc-600 text-[10px] uppercase tracking-widest mt-2">
+              Requested view: {data.view}
+            </p>
+          )}
+        </div>
+      </PreviewShell>
+    );
+  }
+
   return (
     <PreviewShell
       contentType="Lineups"
