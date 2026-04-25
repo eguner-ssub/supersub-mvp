@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { syncStandingsForLeague } from '../scripts/sync-standings.js';
 
 /**
  * GET /api/league?tab=<tab>&league_id=<sportmonks_league_id>
@@ -10,7 +11,16 @@ import { createClient } from '@supabase/supabase-js';
  *   bench     — team bench watch stats (top 20 by total bench goals)
  *
  * league_id is a Sportmonks integer (EPL=8, Championship=9, etc.)
+ *
+ * Standings + scorers freshness: lazy-refreshed inline. If the most recent
+ * standings.updated_at for the season is older than STANDINGS_TTL_HOURS (or
+ * if there are zero rows yet), we call syncStandingsForLeague before reading.
+ * Sportmonks fetch failures are swallowed — we'd rather serve slightly stale
+ * data than 500 the page. Replaced the cron-driven sync that was timing out.
  */
+
+const STANDINGS_TTL_HOURS = 3;
+const STANDINGS_TTL_MS = STANDINGS_TTL_HOURS * 60 * 60 * 1000;
 
 // ── Lazy Supabase client ───────────────────────────────────────────────────
 let _client = null;
@@ -55,10 +65,47 @@ async function getCurrentSeason(supabase, leagueId) {
   return season || null;
 }
 
+// ── Lazy refresh helper ───────────────────────────────────────────────────
+// Checks the most recent standings.updated_at for the season; if older than
+// STANDINGS_TTL_HOURS or zero rows exist, calls syncStandingsForLeague.
+// Sportmonks failures are caught and logged — caller proceeds with stale data.
+//
+// Single sync covers BOTH standings + top_scorers (sync-standings.js writes
+// both tables in one Sportmonks pass), so callers of getTopScorers can use
+// the same helper without doubling Sportmonks load.
+async function ensureStandingsFresh(supabase, leagueId, season) {
+  if (!season) return; // nothing we can refresh against
+  const { data: latest } = await supabase
+    .from('standings')
+    .select('updated_at')
+    .eq('season_id', season.id)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const ageMs = latest?.updated_at
+    ? Date.now() - new Date(latest.updated_at).getTime()
+    : Infinity; // no rows → treat as infinitely stale
+
+  if (ageMs <= STANDINGS_TTL_MS) return; // fresh enough — skip
+
+  try {
+    const t0 = Date.now();
+    const { standings, topScorers } = await syncStandingsForLeague(supabase, leagueId);
+    console.log(`[api/league] Lazy refresh league=${leagueId} ageHours=${(ageMs / 3600000).toFixed(1)} → ${standings} standings + ${topScorers} scorers in ${Date.now() - t0}ms`);
+  } catch (err) {
+    // Stale data is preferable to a 500. Log and fall through to read whatever
+    // the table currently holds.
+    console.error(`[api/league] Lazy refresh failed for league=${leagueId}: ${err.message} — serving stale data`);
+  }
+}
+
 // ── Standings ─────────────────────────────────────────────────────────────
 async function getStandings(supabase, leagueId) {
   const season = await getCurrentSeason(supabase, leagueId);
   if (!season) return [];
+
+  await ensureStandingsFresh(supabase, leagueId, season);
 
   const { data, error } = await supabase
     .from('standings')
@@ -150,6 +197,10 @@ async function getFixtures(supabase, leagueId) {
 async function getTopScorers(supabase, leagueId) {
   const season = await getCurrentSeason(supabase, leagueId);
   if (!season) return [];
+
+  // Same TTL check as standings — top_scorers + standings are written together
+  // by syncStandingsForLeague, so if standings are stale, scorers are too.
+  await ensureStandingsFresh(supabase, leagueId, season);
 
   const { data, error } = await supabase
     .from('top_scorers')

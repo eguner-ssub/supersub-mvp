@@ -13,6 +13,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { resolveLeagueContext } from '../lib/statsGen/resolveSeason.js';
+import { syncStandingsForLeague } from './sync-standings.js';
 
 const PREFIX = '[run-season-simulations]';
 const SUPPORTED_LEAGUE_IDS = [8, 301, 82, 564, 384];
@@ -71,6 +72,18 @@ async function simulateLeague(supabase, leagueSmId) {
   if (!ctx.season_uuid || !ctx.season_sm_id) {
     console.log(`${PREFIX}   ✗ league ${leagueSmId}: season unresolved — skipping`);
     return { league: leagueSmId, skipped: true };
+  }
+
+  // 0. ALWAYS refresh standings before reading them. sim:seasons runs daily at
+  // 02:00 UTC — a guaranteed fresh fetch ensures the simulation operates on
+  // current data regardless of what the lazy /api/league refresh has done.
+  // Failures are logged but non-fatal — proceed with whatever standings exist.
+  console.log(`${PREFIX} League ${leagueSmId} — refreshing standings before simulation`);
+  try {
+    const { standings, topScorers } = await syncStandingsForLeague(supabase, leagueSmId);
+    console.log(`${PREFIX} League ${leagueSmId} — standings synced (${standings} rows, ${topScorers} top scorers)`);
+  } catch (err) {
+    console.warn(`${PREFIX} League ${leagueSmId} — standings sync failed (${err.message}); proceeding with existing data`);
   }
 
   // 1. Current standings (team_id + season_id are UUIDs in this table)

@@ -197,19 +197,20 @@ async function runBackfillUpcoming(supabase) {
 }
 
 // ── Job: sync-standings ──────────────────────────────────────────────────────
-// Pulls fresh standings + top scorers per league from Sportmonks. Sequential
-// across the 5 supported league IDs (matches scripts/run-season-simulations.js
-// SUPPORTED_LEAGUE_IDS). Each league = ~2-3 SportMonks calls (standings +
-// goal scorers + assist scorers, with pagination), so 5 leagues is well within
-// the 60s function budget. Failures on one league don't abort the rest —
-// errors are collected per-league and surfaced in the response.
+// Deprecated 2026-04: standings now refresh lazily via api/league.js (3h TTL)
+// and unconditionally at the start of sim:seasons. The cron-driven path was
+// hitting timeouts at the 60s function budget when SportMonks was slow, and
+// added operational complexity for what's effectively a cache. Function kept
+// here for reference + emergency manual invocation; NOT registered in JOBS.
+// To re-enable: add `'sync-standings': runSyncStandings` back to the JOBS map.
 const SUPPORTED_LEAGUE_IDS = [8, 301, 82, 564, 384];
 
+// eslint-disable-next-line no-unused-vars -- intentionally kept for emergency manual re-enable; see deprecation note above
 async function runSyncStandings(supabase) {
   const results = [];
   for (const leagueId of SUPPORTED_LEAGUE_IDS) {
     try {
-      const { standings, topScorers } = await syncStandingsForLeague({ leagueId, supabase });
+      const { standings, topScorers } = await syncStandingsForLeague(supabase, leagueId);
       results.push({ leagueId, standings, topScorers });
     } catch (err) {
       console.error(`[sync-standings] league ${leagueId} failed:`, err.message);
@@ -259,7 +260,9 @@ const JOBS = {
   'sync-news-intel':      runSyncNewsIntel,
   'backfill-upcoming':    runBackfillUpcoming,
   'sync-fpl':             runSyncFpl,
-  'sync-standings':       runSyncStandings,
+  // sync-standings deliberately omitted — replaced by lazy refresh in
+  // api/league.js (3h TTL) and unconditional refresh in sim:seasons.
+  // See deprecation note above runSyncStandings.
 };
 
 /**
@@ -273,7 +276,8 @@ const JOBS = {
  * POST is kept for external triggers (cron-job.org, manual curl).
  *
  * Valid jobs: settle, sync-coaches, refresh-leaderboards, sync-match-intel,
- * sync-news-intel, backfill-upcoming, sync-fpl, sync-standings
+ * sync-news-intel, backfill-upcoming, sync-fpl
+ * (sync-standings deprecated 2026-04 — now lazy via api/league.js + sim:seasons)
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') {

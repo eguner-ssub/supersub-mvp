@@ -236,13 +236,20 @@ async function syncTopScorers(db, smSeasonId, seasonUuid, teamCache) {
 /**
  * Sync standings and top scorers for a league's current season.
  *
- * @param {object} options
- * @param {number} options.leagueId - Sportmonks league ID (e.g. 8 for EPL)
- * @param {import('@supabase/supabase-js').SupabaseClient} [options.supabase] - Existing client (pass from settle.js)
+ * Positional signature so callers from hot paths (api/league.js lazy refresh,
+ * run-season-simulations.js per-league preflight) can pass their own Supabase
+ * client without spreading an options object.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient - Required.
+ * @param {number} leagueId - Sportmonks league ID (e.g. 8 for EPL)
  * @returns {Promise<{ standings: number, topScorers: number }>}
+ * @throws on Sportmonks fetch / DB upsert failures — callers decide whether to
+ *         abort, fall through to stale data, or log-and-continue.
  */
-export async function syncStandingsForLeague({ leagueId, supabase }) {
-  const db = supabase || getSupabase();
+export async function syncStandingsForLeague(supabaseClient, leagueId) {
+  const db = supabaseClient;
+  if (!db) throw new Error('syncStandingsForLeague: supabaseClient is required');
+  if (!leagueId) throw new Error('syncStandingsForLeague: leagueId is required');
 
   // Look up league + current season from DB
   const { data: league, error: leagueErr } = await db
@@ -297,7 +304,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(1);
   }
 
-  syncStandingsForLeague({ leagueId })
+  syncStandingsForLeague(getSupabase(), leagueId)
     .then(({ standings, topScorers }) => {
       console.log(`✓ Sync complete — ${standings} standings, ${topScorers} top scorers`);
     })
