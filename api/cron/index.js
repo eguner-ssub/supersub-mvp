@@ -4,6 +4,7 @@ import { refreshLeaderboards } from '../../lib/leaderboard/refresh.js';
 import { syncMatchIntel } from '../../scripts/sync-match-intel.js';
 import { syncNewsIntel } from '../../scripts/sync-news-intel.js';
 import { backfillUpcomingMatches } from '../../scripts/backfill-matches-full.js';
+import { syncStandingsForLeague } from '../../scripts/sync-standings.js';
 
 // ── Lazy Supabase client ──────────────────────────────────────────────────────
 let _client = null;
@@ -195,6 +196,30 @@ async function runBackfillUpcoming(supabase) {
   return await backfillUpcomingMatches(supabase, { daysAhead });
 }
 
+// ── Job: sync-standings ──────────────────────────────────────────────────────
+// Pulls fresh standings + top scorers per league from Sportmonks. Sequential
+// across the 5 supported league IDs (matches scripts/run-season-simulations.js
+// SUPPORTED_LEAGUE_IDS). Each league = ~2-3 SportMonks calls (standings +
+// goal scorers + assist scorers, with pagination), so 5 leagues is well within
+// the 60s function budget. Failures on one league don't abort the rest —
+// errors are collected per-league and surfaced in the response.
+const SUPPORTED_LEAGUE_IDS = [8, 301, 82, 564, 384];
+
+async function runSyncStandings(supabase) {
+  const results = [];
+  for (const leagueId of SUPPORTED_LEAGUE_IDS) {
+    try {
+      const { standings, topScorers } = await syncStandingsForLeague({ leagueId, supabase });
+      results.push({ leagueId, standings, topScorers });
+    } catch (err) {
+      console.error(`[sync-standings] league ${leagueId} failed:`, err.message);
+      results.push({ leagueId, error: err.message });
+    }
+  }
+  const ok = results.filter(r => !r.error).length;
+  return { ok: ok === SUPPORTED_LEAGUE_IDS.length, leagues: results };
+}
+
 // ── Job: sync-fpl ────────────────────────────────────────────────────────────
 // Calls the Supabase Edge Function which fetches FPL bootstrap data and upserts
 // the top 50 most-transferred players into the fpl_transfers table.
@@ -234,6 +259,7 @@ const JOBS = {
   'sync-news-intel':      runSyncNewsIntel,
   'backfill-upcoming':    runBackfillUpcoming,
   'sync-fpl':             runSyncFpl,
+  'sync-standings':       runSyncStandings,
 };
 
 /**
@@ -247,7 +273,7 @@ const JOBS = {
  * POST is kept for external triggers (cron-job.org, manual curl).
  *
  * Valid jobs: settle, sync-coaches, refresh-leaderboards, sync-match-intel,
- * sync-news-intel, backfill-upcoming, sync-fpl
+ * sync-news-intel, backfill-upcoming, sync-fpl, sync-standings
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') {

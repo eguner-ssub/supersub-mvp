@@ -293,7 +293,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 
   if (!leagueId) {
     console.error('Usage: node scripts/sync-standings.js <sportmonks_league_id>');
-    console.error('  League IDs: 8 (EPL), 9 (Championship), 82 (Bundesliga), 564 (La Liga), 384 (Serie A)');
+    console.error('  Sportmonks league IDs: 8 (EPL), 301 (Ligue 1), 82 (Bundesliga), 564 (La Liga), 384 (Serie A)');
     process.exit(1);
   }
 
