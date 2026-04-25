@@ -41,6 +41,31 @@ function sampleOutcome(pHome, pDraw, pAway) {
   return 'A';
 }
 
+// Form-based fallback for fixtures lacking a Sportmonks-calibrated sim row.
+// match_intel only covers the next 14 days, so end-of-season fixtures fall
+// outside the per-match sim window. Without a fallback they were silently
+// skipped, which collapsed the season simulation: every team got their
+// current points back ± a tiny variance, and the league leader took the
+// title in 100% of iterations.
+//
+// This model is deliberately simple — relative season-to-date PPG, a fixed
+// home-field nudge, a constant draw weight. Far less sharp than the Poisson
+// path, but FAR better than no signal at all.
+const HOME_ADVANTAGE = 1.15;
+const DRAW_BASE = 0.8;
+
+function fallbackFixtureProbabilities(homePpg, awayPpg, leagueAvgPpg) {
+  const safeAvg = leagueAvgPpg > 0 ? leagueAvgPpg : 1; // avoid div-by-zero pre-season
+  const homeStrength = (homePpg / safeAvg) * HOME_ADVANTAGE;
+  const awayStrength = (awayPpg / safeAvg);
+  const denom = homeStrength + awayStrength + DRAW_BASE;
+  return {
+    pHome: homeStrength / denom,
+    pDraw: DRAW_BASE     / denom,
+    pAway: awayStrength  / denom,
+  };
+}
+
 async function simulateLeague(supabase, leagueSmId) {
   const ctx = await resolveLeagueContext(supabase, leagueSmId);
   if (!ctx.season_uuid || !ctx.season_sm_id) {
@@ -49,9 +74,10 @@ async function simulateLeague(supabase, leagueSmId) {
   }
 
   // 1. Current standings (team_id + season_id are UUIDs in this table)
+  // `played` is needed to compute PPG for the form-based fallback model.
   const { data: standings, error: stErr } = await supabase
     .from('standings')
-    .select('team_id, position, points, goals_for, goals_against')
+    .select('team_id, position, played, points, goals_for, goals_against')
     .eq('season_id', ctx.season_uuid);
   if (stErr) throw new Error(`standings: ${stErr.message}`);
   if (!standings?.length) {
@@ -67,19 +93,23 @@ async function simulateLeague(supabase, leagueSmId) {
     .in('id', teamUuids);
   const byUuid = Object.fromEntries((teamRows || []).map(t => [t.id, t]));
 
-  // 3. Build per-team baseline: { sportmonksId, name, logo, currentPoints, currentPos, gd }
+  // 3. Build per-team baseline: { sportmonksId, name, logo, currentPoints, currentPos, gd, ppg }
   const teams = standings
     .map(s => {
       const t = byUuid[s.team_id];
       if (!t?.sportmonks_id) return null;
+      const played = s.played || 0;
+      const points = s.points || 0;
       return {
         teamUuid: s.team_id,
         teamSmId: t.sportmonks_id,
         teamName: t.name,
         teamLogo: t.logo_url,
         currentPos: s.position,
-        currentPoints: s.points || 0,
+        currentPoints: points,
         gd: (s.goals_for || 0) - (s.goals_against || 0),
+        // Played-zero (pre-season) → fall back to league-average later.
+        ppg: played > 0 ? points / played : null,
       };
     })
     .filter(Boolean);
@@ -106,15 +136,57 @@ async function simulateLeague(supabase, leagueSmId) {
 
   const simByFixture = new Map((simRows || []).map(s => [s.fixture_id, s]));
 
-  // Filter to fixtures we have a sim for; warn for those we don't
-  const simulatable = (remainingMatches || []).filter(m => simByFixture.has(m.id));
-  const missing = (remainingMatches || []).length - simulatable.length;
-  if (missing > 0) {
-    console.log(`${PREFIX}   ⚠ league ${leagueSmId}: ${missing}/${(remainingMatches || []).length} remaining fixtures lack a match_simulations row — they will be skipped in this season sim. Re-run sim:matches first to close the gap.`);
+  // Build the per-fixture probability source. PREFER the Sportmonks-calibrated
+  // sim from match_simulations; FALL BACK to a form-based model for fixtures
+  // outside the 14-day intel window. The previous version silently skipped
+  // fallback fixtures entirely, which made the season sim collapse to
+  // "current standings ± tiny variance" → leader = 100% title prob.
+  const teamIdx = new Map(teams.map((t, i) => [t.teamSmId, i]));
+  const ppgValues = teams.map(t => t.ppg).filter(v => v != null);
+  const leagueAvgPpg = ppgValues.length > 0
+    ? ppgValues.reduce((a, b) => a + b, 0) / ppgValues.length
+    : 1.4; // sane default if mid-season standings are missing 'played'
+
+  const probsByFixture = new Map();
+  let withSim = 0;
+  let withFallback = 0;
+
+  for (const fx of (remainingMatches || [])) {
+    const sim = simByFixture.get(fx.id);
+    if (sim) {
+      probsByFixture.set(fx.id, {
+        pHome:    Number(sim.home_win_probability),
+        pDraw:    Number(sim.draw_probability),
+        pAway:    Number(sim.away_win_probability),
+        homeTeam: sim.home_team_id ?? fx.home_team_id,
+        awayTeam: sim.away_team_id ?? fx.away_team_id,
+        source:   'sportmonks',
+      });
+      withSim++;
+      continue;
+    }
+    // Fallback path
+    const homeIdxF = teamIdx.get(fx.home_team_id);
+    const awayIdxF = teamIdx.get(fx.away_team_id);
+    if (homeIdxF == null || awayIdxF == null) continue; // unknown team — can't model
+    const homePpg = teams[homeIdxF].ppg ?? leagueAvgPpg;
+    const awayPpg = teams[awayIdxF].ppg ?? leagueAvgPpg;
+    const { pHome, pDraw, pAway } = fallbackFixtureProbabilities(homePpg, awayPpg, leagueAvgPpg);
+    probsByFixture.set(fx.id, {
+      pHome, pDraw, pAway,
+      homeTeam: fx.home_team_id,
+      awayTeam: fx.away_team_id,
+      source: 'fallback',
+    });
+    withFallback++;
+  }
+
+  const totalRemaining = (remainingMatches || []).length;
+  if (withFallback > 0) {
+    console.log(`${PREFIX}   ℹ league ${leagueSmId}: ${withSim}/${totalRemaining} fixtures use Sportmonks-calibrated sims; ${withFallback} use form-based fallback (outside 14-day intel window).`);
   }
 
   // 5. Run iterations
-  const teamIdx = new Map(teams.map((t, i) => [t.teamSmId, i]));
   const finalPoints = new Array(teams.length).fill(0);
   const titleCount  = new Array(teams.length).fill(0);
   const top4Count   = new Array(teams.length).fill(0);
@@ -131,15 +203,10 @@ async function simulateLeague(supabase, leagueSmId) {
   for (let it = 0; it < ITERATIONS; it++) {
     const simState = teams.map(t => ({ ...t, simPoints: t.currentPoints }));
 
-    for (const fixture of simulatable) {
-      const sim = simByFixture.get(fixture.id);
-      const outcome = sampleOutcome(
-        Number(sim.home_win_probability),
-        Number(sim.draw_probability),
-        Number(sim.away_win_probability),
-      );
-      const homeIdx = teamIdx.get(sim.home_team_id ?? fixture.home_team_id);
-      const awayIdx = teamIdx.get(sim.away_team_id ?? fixture.away_team_id);
+    for (const probs of probsByFixture.values()) {
+      const outcome = sampleOutcome(probs.pHome, probs.pDraw, probs.pAway);
+      const homeIdx = teamIdx.get(probs.homeTeam);
+      const awayIdx = teamIdx.get(probs.awayTeam);
       if (homeIdx == null || awayIdx == null) continue;
 
       if (outcome === 'H') simState[homeIdx].simPoints += 3;
@@ -188,8 +255,9 @@ async function simulateLeague(supabase, leagueSmId) {
   return {
     league: leagueSmId,
     leagueName: ctx.league_name,
-    fixturesSimulated: simulatable.length,
-    fixturesMissing: missing,
+    fixturesWithSim: withSim,
+    fixturesFallback: withFallback,
+    fixturesTotal: totalRemaining,
     teams: rows.length,
   };
 }
@@ -207,7 +275,7 @@ async function run() {
       if (summary.skipped) {
         console.log(`${PREFIX} league ${lid}: skipped (${dt}s)`);
       } else {
-        console.log(`${PREFIX} league ${lid} (${summary.leagueName}): ${summary.teams} teams, ${summary.fixturesSimulated} fixtures simulated, ${summary.fixturesMissing} missing — ${dt}s`);
+        console.log(`${PREFIX} league ${lid} (${summary.leagueName}): ${summary.teams} teams, ${summary.fixturesWithSim} sportmonks-sims + ${summary.fixturesFallback} fallback (${summary.fixturesTotal} total) — ${dt}s`);
       }
       summaries.push(summary);
     } catch (err) {
@@ -223,7 +291,7 @@ async function run() {
   for (const s of summaries) {
     if (s.skipped) console.log(`${PREFIX}   league ${s.league}: SKIPPED`);
     else if (s.error) console.log(`${PREFIX}   league ${s.league}: ERROR ${s.error}`);
-    else console.log(`${PREFIX}   league ${s.league}: ${s.teams} teams, ${s.fixturesSimulated} fixtures (${s.fixturesMissing} missing)`);
+    else console.log(`${PREFIX}   league ${s.league}: ${s.teams} teams, ${s.fixturesWithSim} sportmonks + ${s.fixturesFallback} fallback`);
   }
   console.log(`${PREFIX} ────────────────────────────────────────────`);
 }
