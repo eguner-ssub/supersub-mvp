@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Match prediction architecture (2026-04):** SportMonks predictions are the
+> single source of truth. The Monte Carlo simulation pipeline (per-match
+> Poisson sims feeding `match_simulations`) was archived to
+> `scripts/_archived/` and `lib/_archived/simulation/`. See
+> `scripts/_archived/README.md` for revival path.
+
 ## Commands
 
 ```bash

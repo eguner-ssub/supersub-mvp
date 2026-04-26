@@ -21,9 +21,6 @@ function pct(p) {
 
 export function RelegationRacePreview({ data }) {
   const teams = (data.teams || []).slice(0, 10);
-  // Championship (league_id 9) needs the playoff caveat; the API also surfaces
-  // this via `relegation_metric_note` but we prefer a tighter UI footnote here.
-  const isChampionship = data.league_id === 9;
 
   return (
     <PreviewShell
@@ -84,12 +81,6 @@ export function RelegationRacePreview({ data }) {
             })}
           </tbody>
         </table>
-      )}
-
-      {isChampionship && (
-        <p className="text-amber-400/70 text-[10px] mt-3 italic">
-          Bottom 3 finish — bottom 2 are auto-relegated, 22nd plays a playoff.
-        </p>
       )}
 
       <p className="text-zinc-600 text-[10px] mt-4 pt-3 border-t border-zinc-900">

@@ -4,12 +4,20 @@
 //
 // For each supported league + current season, simulate the rest of the
 // season 10,000 times by sampling each remaining fixture's outcome from
-// the per-match Monte Carlo distribution stored in match_simulations.
+// SportMonks W/D/L predictions stored in match_intel.report_sections.
 // Aggregates: title / top-4 / relegation / expected final points.
-// Upserts into season_probabilities. No Sportmonks API calls.
+// Upserts into season_probabilities. No Sportmonks API calls inside the
+// loop (intel is already pre-synced); standings are refreshed once per
+// league at the start.
 //
-// Prerequisite: scripts/run-match-simulations.js must have run recently —
-// the season sim is only as fresh as match_simulations.
+// 2026-04 ARCHITECTURE PIVOT: this script previously read W/D/L from the
+// match_simulations table (per-fixture Monte Carlo). It now reads
+// match_intel.report_sections.commandOfPitch.data directly. Same SportMonks
+// 1X2 numbers, one less hop, no editorial drift between this and the
+// match-probabilities API. Fixtures without intel (outside the 14-day
+// sync window) are SKIPPED with a warning — the simulation under-counts
+// remaining fixtures rather than inventing data with a fallback model.
+// See scripts/_archived/README.md for the Monte Carlo revival path.
 
 import { createClient } from '@supabase/supabase-js';
 import { resolveLeagueContext } from '../lib/statsGen/resolveSeason.js';
@@ -42,31 +50,6 @@ function sampleOutcome(pHome, pDraw, pAway) {
   return 'A';
 }
 
-// Form-based fallback for fixtures lacking a Sportmonks-calibrated sim row.
-// match_intel only covers the next 14 days, so end-of-season fixtures fall
-// outside the per-match sim window. Without a fallback they were silently
-// skipped, which collapsed the season simulation: every team got their
-// current points back ± a tiny variance, and the league leader took the
-// title in 100% of iterations.
-//
-// This model is deliberately simple — relative season-to-date PPG, a fixed
-// home-field nudge, a constant draw weight. Far less sharp than the Poisson
-// path, but FAR better than no signal at all.
-const HOME_ADVANTAGE = 1.15;
-const DRAW_BASE = 0.8;
-
-function fallbackFixtureProbabilities(homePpg, awayPpg, leagueAvgPpg) {
-  const safeAvg = leagueAvgPpg > 0 ? leagueAvgPpg : 1; // avoid div-by-zero pre-season
-  const homeStrength = (homePpg / safeAvg) * HOME_ADVANTAGE;
-  const awayStrength = (awayPpg / safeAvg);
-  const denom = homeStrength + awayStrength + DRAW_BASE;
-  return {
-    pHome: homeStrength / denom,
-    pDraw: DRAW_BASE     / denom,
-    pAway: awayStrength  / denom,
-  };
-}
-
 async function simulateLeague(supabase, leagueSmId) {
   const ctx = await resolveLeagueContext(supabase, leagueSmId);
   if (!ctx.season_uuid || !ctx.season_sm_id) {
@@ -87,10 +70,9 @@ async function simulateLeague(supabase, leagueSmId) {
   }
 
   // 1. Current standings (team_id + season_id are UUIDs in this table)
-  // `played` is needed to compute PPG for the form-based fallback model.
   const { data: standings, error: stErr } = await supabase
     .from('standings')
-    .select('team_id, position, played, points, goals_for, goals_against')
+    .select('team_id, position, points, goals_for, goals_against')
     .eq('season_id', ctx.season_uuid);
   if (stErr) throw new Error(`standings: ${stErr.message}`);
   if (!standings?.length) {
@@ -106,12 +88,11 @@ async function simulateLeague(supabase, leagueSmId) {
     .in('id', teamUuids);
   const byUuid = Object.fromEntries((teamRows || []).map(t => [t.id, t]));
 
-  // 3. Build per-team baseline: { sportmonksId, name, logo, currentPoints, currentPos, gd, ppg }
+  // 3. Build per-team baseline: { sportmonksId, name, logo, currentPoints, currentPos, gd }
   const teams = standings
     .map(s => {
       const t = byUuid[s.team_id];
       if (!t?.sportmonks_id) return null;
-      const played = s.played || 0;
       const points = s.points || 0;
       return {
         teamUuid: s.team_id,
@@ -121,8 +102,6 @@ async function simulateLeague(supabase, leagueSmId) {
         currentPos: s.position,
         currentPoints: points,
         gd: (s.goals_for || 0) - (s.goals_against || 0),
-        // Played-zero (pre-season) → fall back to league-average later.
-        ppg: played > 0 ? points / played : null,
       };
     })
     .filter(Boolean);
@@ -132,7 +111,7 @@ async function simulateLeague(supabase, leagueSmId) {
     return { league: leagueSmId, skipped: true };
   }
 
-  // 4. Remaining fixtures (non-terminal status) for this league + their sims
+  // 4. Remaining fixtures (non-terminal status) for this league.
   const { data: remainingMatches } = await supabase
     .from('matches')
     .select('id, home_team_id, away_team_id, status')
@@ -140,64 +119,61 @@ async function simulateLeague(supabase, leagueSmId) {
     .not('status', 'in', `(${TERMINAL.join(',')})`);
 
   const remainingIds = (remainingMatches || []).map(m => m.id);
-  const { data: simRows } = remainingIds.length
+
+  // Pull match_intel rows for those fixtures. We only need report_sections
+  // (specifically commandOfPitch.data with home/draw/away SportMonks 1X2
+  // predictions, integer 0-100).
+  const { data: intelRows } = remainingIds.length
     ? await supabase
-        .from('match_simulations')
-        .select('fixture_id, home_team_id, away_team_id, home_win_probability, draw_probability, away_win_probability')
-        .in('fixture_id', remainingIds)
+        .from('match_intel')
+        .select('match_id, report_sections')
+        .in('match_id', remainingIds)
     : { data: [] };
 
-  const simByFixture = new Map((simRows || []).map(s => [s.fixture_id, s]));
+  const intelByFixture = new Map((intelRows || []).map(r => [r.match_id, r]));
 
-  // Build the per-fixture probability source. PREFER the Sportmonks-calibrated
-  // sim from match_simulations; FALL BACK to a form-based model for fixtures
-  // outside the 14-day intel window. The previous version silently skipped
-  // fallback fixtures entirely, which made the season sim collapse to
-  // "current standings ± tiny variance" → leader = 100% title prob.
+  // Per-fixture probability source: ONLY SportMonks W/D/L from intel. If
+  // commandOfPitch isn't available for a fixture (no intel row OR section
+  // unavailable), SKIP that fixture with a warning. No PPG/coin-flip
+  // fallback — better to under-count remaining fixtures than to invent
+  // probabilities. As more fixtures roll into the 14-day intel window via
+  // sync-match-intel cron, season sim coverage improves automatically.
   const teamIdx = new Map(teams.map((t, i) => [t.teamSmId, i]));
-  const ppgValues = teams.map(t => t.ppg).filter(v => v != null);
-  const leagueAvgPpg = ppgValues.length > 0
-    ? ppgValues.reduce((a, b) => a + b, 0) / ppgValues.length
-    : 1.4; // sane default if mid-season standings are missing 'played'
-
   const probsByFixture = new Map();
-  let withSim = 0;
-  let withFallback = 0;
+  let withIntel = 0;
+  let skipped = 0;
 
   for (const fx of (remainingMatches || [])) {
-    const sim = simByFixture.get(fx.id);
-    if (sim) {
-      probsByFixture.set(fx.id, {
-        pHome:    Number(sim.home_win_probability),
-        pDraw:    Number(sim.draw_probability),
-        pAway:    Number(sim.away_win_probability),
-        homeTeam: sim.home_team_id ?? fx.home_team_id,
-        awayTeam: sim.away_team_id ?? fx.away_team_id,
-        source:   'sportmonks',
-      });
-      withSim++;
+    const intel = intelByFixture.get(fx.id);
+    const cop = intel?.report_sections?.commandOfPitch;
+    if (!cop?.available || !cop.data) {
+      skipped++;
       continue;
     }
-    // Fallback path
-    const homeIdxF = teamIdx.get(fx.home_team_id);
-    const awayIdxF = teamIdx.get(fx.away_team_id);
-    if (homeIdxF == null || awayIdxF == null) continue; // unknown team — can't model
-    const homePpg = teams[homeIdxF].ppg ?? leagueAvgPpg;
-    const awayPpg = teams[awayIdxF].ppg ?? leagueAvgPpg;
-    const { pHome, pDraw, pAway } = fallbackFixtureProbabilities(homePpg, awayPpg, leagueAvgPpg);
+    const { home, draw, away } = cop.data;
+    if (typeof home !== 'number' || typeof draw !== 'number' || typeof away !== 'number') {
+      skipped++;
+      continue;
+    }
+
+    // commandOfPitch values are 0-100 integers; sampleOutcome works on any
+    // positive units (it normalises by total), but we keep them in 0-100 to
+    // avoid floating-point drift.
     probsByFixture.set(fx.id, {
-      pHome, pDraw, pAway,
+      pHome: home,
+      pDraw: draw,
+      pAway: away,
       homeTeam: fx.home_team_id,
       awayTeam: fx.away_team_id,
-      source: 'fallback',
     });
-    withFallback++;
+    withIntel++;
   }
 
   const totalRemaining = (remainingMatches || []).length;
-  if (withFallback > 0) {
-    console.log(`${PREFIX}   ℹ league ${leagueSmId}: ${withSim}/${totalRemaining} fixtures use Sportmonks-calibrated sims; ${withFallback} use form-based fallback (outside 14-day intel window).`);
+  if (skipped > 0) {
+    console.log(`${PREFIX}   ⚠ league ${leagueSmId}: ${skipped}/${totalRemaining} remaining fixtures lack intel (commandOfPitch unavailable) — skipped with no fallback. Run sync-match-intel to backfill.`);
   }
+  console.log(`${PREFIX}   ℹ league ${leagueSmId}: ${withIntel}/${totalRemaining} fixtures sampled from match_intel.commandOfPitch.`);
 
   // 5. Run iterations
   const finalPoints = new Array(teams.length).fill(0);
@@ -268,8 +244,8 @@ async function simulateLeague(supabase, leagueSmId) {
   return {
     league: leagueSmId,
     leagueName: ctx.league_name,
-    fixturesWithSim: withSim,
-    fixturesFallback: withFallback,
+    fixturesSampled: withIntel,
+    fixturesSkipped: skipped,
     fixturesTotal: totalRemaining,
     teams: rows.length,
   };
@@ -288,7 +264,7 @@ async function run() {
       if (summary.skipped) {
         console.log(`${PREFIX} league ${lid}: skipped (${dt}s)`);
       } else {
-        console.log(`${PREFIX} league ${lid} (${summary.leagueName}): ${summary.teams} teams, ${summary.fixturesWithSim} sportmonks-sims + ${summary.fixturesFallback} fallback (${summary.fixturesTotal} total) — ${dt}s`);
+        console.log(`${PREFIX} league ${lid} (${summary.leagueName}): ${summary.teams} teams, ${summary.fixturesSampled}/${summary.fixturesTotal} fixtures sampled from intel (${summary.fixturesSkipped} skipped) — ${dt}s`);
       }
       summaries.push(summary);
     } catch (err) {
@@ -304,7 +280,7 @@ async function run() {
   for (const s of summaries) {
     if (s.skipped) console.log(`${PREFIX}   league ${s.league}: SKIPPED`);
     else if (s.error) console.log(`${PREFIX}   league ${s.league}: ERROR ${s.error}`);
-    else console.log(`${PREFIX}   league ${s.league}: ${s.teams} teams, ${s.fixturesWithSim} sportmonks + ${s.fixturesFallback} fallback`);
+    else console.log(`${PREFIX}   league ${s.league}: ${s.teams} teams, ${s.fixturesSampled}/${s.fixturesTotal} sampled (${s.fixturesSkipped} skipped)`);
   }
   console.log(`${PREFIX} ────────────────────────────────────────────`);
 }
