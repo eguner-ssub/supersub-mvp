@@ -1,5 +1,6 @@
 import React from 'react';
 import { PreviewShell } from './PreviewShell';
+import { CoverageNotice } from './CoverageNotice';
 
 function timeAgo(iso) {
   if (!iso) return 'unknown';
@@ -79,6 +80,8 @@ export function TitleRacePreview({ data }) {
           </tbody>
         </table>
       )}
+
+      <CoverageNotice coverage={data.coverage} />
 
       <p className="text-zinc-600 text-[10px] mt-4 pt-3 border-t border-zinc-900">
         Based on 10,000 simulations of remaining fixtures · Updated {timeAgo(data.computed_at)}

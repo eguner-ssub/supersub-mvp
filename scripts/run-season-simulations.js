@@ -241,6 +241,30 @@ async function simulateLeague(supabase, leagueSmId) {
     if (error) throw new Error(`upsert: ${error.message}`);
   }
 
+  // 7. Coverage metadata — single row per (league, season). Lets the FE
+  // surface "Limited Coverage — 8 of 41 fixtures sampled" rather than
+  // silently displaying extreme outputs (e.g. Arsenal at 100% when most
+  // remaining fixtures are outside the 14-day intel window). See migration
+  // 064_create_season_simulation_coverage.sql.
+  const coveragePct = totalRemaining > 0
+    ? Number(((withIntel / totalRemaining) * 100).toFixed(2))
+    : 0;
+  const { error: covErr } = await supabase
+    .from('season_simulation_coverage')
+    .upsert(
+      {
+        league_id:           leagueSmId,
+        season_id:           ctx.season_sm_id,
+        remaining_fixtures:  totalRemaining,
+        sampled_fixtures:    withIntel,
+        skipped_fixtures:    skipped,
+        coverage_percentage: coveragePct,
+        computed_at:         computedAt,
+      },
+      { onConflict: 'league_id,season_id' },
+    );
+  if (covErr) throw new Error(`coverage upsert: ${covErr.message}`);
+
   return {
     league: leagueSmId,
     leagueName: ctx.league_name,
