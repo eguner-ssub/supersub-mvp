@@ -29,7 +29,7 @@ const FONT = "'Montserrat', sans-serif";
    ───────────────────────────────────────────── */
 const LEAGUES = [
   { id: 8,   name: 'Premier League',  flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', eplOnly: false },
-  { id: 9,   name: 'Championship',    flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', eplOnly: false },
+  { id: 301, name: 'Ligue 1',         flag: '🇫🇷',     eplOnly: false },
   { id: 82,  name: 'Bundesliga',      flag: '🇩🇪',     eplOnly: false },
   { id: 564, name: 'La Liga',         flag: '🇪🇸',     eplOnly: false },
   { id: 384, name: 'Serie A',         flag: '🇮🇹',     eplOnly: false },

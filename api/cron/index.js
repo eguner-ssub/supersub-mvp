@@ -251,6 +251,26 @@ async function runSyncFpl() {
   return { success: true, count: data.count ?? null, elapsed_ms: data.elapsed_ms ?? null };
 }
 
+// ── Job: refresh-standings ───────────────────────────────────────────────────
+// Triggered by api/league.js after it serves a stale-but-non-empty standings
+// response. The originating handler returns immediately; this job runs the
+// 5-15s Sportmonks sync in the background so the next user request lands on
+// fresh data. Per-league: caller MUST pass `?league_id=<sportmonks_id>`.
+async function runRefreshStandings(supabase, query) {
+  const lid = parseInt(query?.league_id, 10);
+  if (!lid || Number.isNaN(lid)) {
+    throw new Error('refresh-standings: league_id query param required');
+  }
+  const t0 = Date.now();
+  const { standings, topScorers } = await syncStandingsForLeague(supabase, lid);
+  return {
+    league_id: lid,
+    standings,
+    top_scorers: topScorers,
+    elapsed_ms: Date.now() - t0,
+  };
+}
+
 // ── Job registry ─────────────────────────────────────────────────────────────
 const JOBS = {
   'settle':               runSettle,
@@ -260,9 +280,10 @@ const JOBS = {
   'sync-news-intel':      runSyncNewsIntel,
   'backfill-upcoming':    runBackfillUpcoming,
   'sync-fpl':             runSyncFpl,
-  // sync-standings deliberately omitted — replaced by lazy refresh in
-  // api/league.js (3h TTL) and unconditional refresh in sim:seasons.
-  // See deprecation note above runSyncStandings.
+  // sync-standings deliberately omitted as a *bulk* job — but per-league
+  // refresh-standings is wired below, fired by api/league.js after it serves
+  // a stale-but-non-empty response.
+  'refresh-standings':    runRefreshStandings,
 };
 
 /**
@@ -276,8 +297,9 @@ const JOBS = {
  * POST is kept for external triggers (cron-job.org, manual curl).
  *
  * Valid jobs: settle, sync-coaches, refresh-leaderboards, sync-match-intel,
- * sync-news-intel, backfill-upcoming, sync-fpl
- * (sync-standings deprecated 2026-04 — now lazy via api/league.js + sim:seasons)
+ * sync-news-intel, backfill-upcoming, sync-fpl, refresh-standings
+ * (sync-standings bulk job deprecated 2026-04 — replaced by per-league lazy
+ *  refresh fired from api/league.js via the refresh-standings job below.)
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') {
@@ -304,7 +326,10 @@ export default async function handler(req, res) {
 
   try {
     const supabase = getSupabaseClient();
-    const result = await jobFn(supabase);
+    // Pass req.query as a second arg so per-league jobs (e.g.
+    // refresh-standings) can read params. Existing handlers that take only
+    // (supabase) ignore the extra argument — JS doesn't care.
+    const result = await jobFn(supabase, req.query);
 
     return res.status(200).json({
       job: jobName,

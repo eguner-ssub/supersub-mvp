@@ -60,8 +60,8 @@ function classifyMatchStatus(match) {
 }
 
 // ─── Filter configs ──────────────────────────────────────────────────────────
-// League IDs sourced from src/shared/config/coverage.js — coverage is EPL,
-// Ligue 1, Bundesliga, La Liga, Serie A (no Championship in the current set).
+// League IDs sourced from src/shared/config/coverage.js — keep this list in
+// sync with LEAGUE_COVERAGE there (EPL, Ligue 1, Bundesliga, La Liga, Serie A).
 const LEAGUE_FILTERS = [
   { id: 'epl',        label: 'EPL',        sportmonks_id: 8   },
   { id: 'ligue_1',    label: 'Ligue 1',    sportmonks_id: 301 },

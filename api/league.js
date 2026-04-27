@@ -12,11 +12,20 @@ import { syncStandingsForLeague } from '../scripts/sync-standings.js';
  *
  * league_id is a Sportmonks integer (EPL=8, Championship=9, etc.)
  *
- * Standings + scorers freshness: lazy-refreshed inline. If the most recent
- * standings.updated_at for the season is older than STANDINGS_TTL_HOURS (or
- * if there are zero rows yet), we call syncStandingsForLeague before reading.
- * Sportmonks fetch failures are swallowed — we'd rather serve slightly stale
- * data than 500 the page. Replaced the cron-driven sync that was timing out.
+ * Standings freshness: serve-stale-and-refresh-in-background.
+ *
+ *   1. SELECT current standings (always — single DB round-trip).
+ *   2. If zero rows → cold cache, fall back to BLOCKING sync (then re-query).
+ *      First user pays the 5-15s; everyone after is fast.
+ *   3. If rows exist + age > STANDINGS_TTL_HOURS → respond with stale data
+ *      immediately, then fire-and-forget a POST to /api/cron?job=refresh-
+ *      standings&league_id=X. Vercel routes that to a fresh function
+ *      invocation that runs the sync; the next user request lands fresh.
+ *   4. If rows exist + age <= TTL → respond, no trigger.
+ *
+ * Trigger failures are logged and swallowed — the next user-driven request
+ * will see still-stale data and re-fire the trigger, so the system is
+ * self-healing without being block-and-error-prone.
  */
 
 const STANDINGS_TTL_HOURS = 3;
@@ -65,16 +74,14 @@ async function getCurrentSeason(supabase, leagueId) {
   return season || null;
 }
 
-// ── Lazy refresh helper ───────────────────────────────────────────────────
-// Checks the most recent standings.updated_at for the season; if older than
-// STANDINGS_TTL_HOURS or zero rows exist, calls syncStandingsForLeague.
-// Sportmonks failures are caught and logged — caller proceeds with stale data.
-//
-// Single sync covers BOTH standings + top_scorers (sync-standings.js writes
-// both tables in one Sportmonks pass), so callers of getTopScorers can use
-// the same helper without doubling Sportmonks load.
+// ── Lazy refresh helper (scorers tab only) ───────────────────────────────
+// Block-and-refresh check used by getTopScorers. Standings has migrated to a
+// serve-stale-and-refresh-in-background pattern (see getStandings below);
+// scorers retains the original behaviour because the user-reported latency
+// regression was scoped to the standings tab. If/when the same UX issue
+// surfaces on the Top Scorers tab, switch this to triggerBackgroundRefresh.
 async function ensureStandingsFresh(supabase, leagueId, season) {
-  if (!season) return; // nothing we can refresh against
+  if (!season) return;
   const { data: latest } = await supabase
     .from('standings')
     .select('updated_at')
@@ -85,36 +92,67 @@ async function ensureStandingsFresh(supabase, leagueId, season) {
 
   const ageMs = latest?.updated_at
     ? Date.now() - new Date(latest.updated_at).getTime()
-    : Infinity; // no rows → treat as infinitely stale
-
-  if (ageMs <= STANDINGS_TTL_MS) return; // fresh enough — skip
+    : Infinity;
+  if (ageMs <= STANDINGS_TTL_MS) return;
 
   try {
     const t0 = Date.now();
     const { standings, topScorers } = await syncStandingsForLeague(supabase, leagueId);
     console.log(`[api/league] Lazy refresh league=${leagueId} ageHours=${(ageMs / 3600000).toFixed(1)} → ${standings} standings + ${topScorers} scorers in ${Date.now() - t0}ms`);
   } catch (err) {
-    // Stale data is preferable to a 500. Log and fall through to read whatever
-    // the table currently holds.
     console.error(`[api/league] Lazy refresh failed for league=${leagueId}: ${err.message} — serving stale data`);
   }
 }
 
 // ── Standings ─────────────────────────────────────────────────────────────
+// Single-query read; freshness derived from the rows themselves so we don't
+// pay a second round-trip just to check updated_at. Cold cache is the only
+// blocking path; stale-but-populated data is served immediately and the
+// caller fires a background refresh.
+//
+// Returns { rows, needsRefresh }:
+//   - rows         → mapped standings array for the response
+//   - needsRefresh → caller should trigger the background sync
 async function getStandings(supabase, leagueId) {
   const season = await getCurrentSeason(supabase, leagueId);
-  if (!season) return [];
+  if (!season) return { rows: [], needsRefresh: false };
 
-  await ensureStandingsFresh(supabase, leagueId, season);
-
-  const { data, error } = await supabase
+  const standingsQuery = () => supabase
     .from('standings')
-    .select('position, played, won, drawn, lost, goals_for, goals_against, points, form, teams(name, logo_url, sportmonks_id)')
+    .select('position, played, won, drawn, lost, goals_for, goals_against, points, form, updated_at, teams(name, logo_url, sportmonks_id)')
     .eq('season_id', season.id)
     .order('position', { ascending: true });
 
+  let { data: raw, error } = await standingsQuery();
   if (error) throw new Error(`Standings query failed: ${error.message}`);
-  return (data || []).map(row => ({
+
+  // Cold cache: nothing to serve. Block on the sync, then re-query.
+  // First user eats the 5-15s; everyone after gets the serve-stale path.
+  if (!raw || raw.length === 0) {
+    try {
+      const t0 = Date.now();
+      const { standings, topScorers } = await syncStandingsForLeague(supabase, leagueId);
+      console.log(`[api/league] Cold-start sync league=${leagueId} → ${standings} standings + ${topScorers} scorers in ${Date.now() - t0}ms`);
+    } catch (err) {
+      console.error(`[api/league] Cold-start sync failed for league=${leagueId}: ${err.message}`);
+      return { rows: [], needsRefresh: false };
+    }
+    ({ data: raw, error } = await standingsQuery());
+    if (error) throw new Error(`Standings query failed: ${error.message}`);
+  }
+
+  // Freshness check on the data we already have. All rows share an
+  // updated_at from the same sync pass, but use max() defensively in case
+  // partial writes ever leave mixed timestamps.
+  const latestUpdate = (raw || []).reduce((max, r) => {
+    if (!r.updated_at) return max;
+    const t = new Date(r.updated_at).getTime();
+    return t > max ? t : max;
+  }, 0);
+  const ageMs = latestUpdate ? Date.now() - latestUpdate : Infinity;
+  const needsRefresh = ageMs > STANDINGS_TTL_MS;
+
+  const rows = (raw || []).map(row => ({
     position: row.position,
     team:     row.teams?.name || 'Unknown',
     logo:     row.teams?.logo_url || null,
@@ -128,6 +166,41 @@ async function getStandings(supabase, leagueId) {
     points:   row.points,
     form:     row.form || null,
   }));
+
+  return { rows, needsRefresh };
+}
+
+// ── Background refresh trigger ────────────────────────────────────────────
+// Fire a POST to /api/cron?job=refresh-standings&league_id=X — Vercel routes
+// that to a fresh function invocation (api/cron has maxDuration=60s, plenty
+// of headroom for the 5-15s sync). We DON'T await the response; if the
+// trigger fetch fails, the next user request will detect stale data and
+// re-fire it.
+//
+// keepalive: true asks the runtime to flush the request even if this
+// function terminates immediately after the call. In Node 18+ undici this
+// is honoured for outbound fetches; on Vercel it's the closest we can get
+// to a guaranteed dispatch without awaiting.
+async function triggerBackgroundRefresh(leagueId) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    console.warn(`[api/league] CRON_SECRET not configured — background refresh for league=${leagueId} skipped`);
+    return;
+  }
+
+  const host = process.env.VERCEL_URL || 'localhost:3000';
+  const proto = process.env.VERCEL_URL ? 'https' : 'http';
+  const url = `${proto}://${host}/api/cron?job=refresh-standings&league_id=${leagueId}`;
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${secret}` },
+      keepalive: true,
+    });
+  } catch (err) {
+    console.error(`[api/league] Trigger fetch failed for league=${leagueId}: ${err.message}`);
+  }
 }
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
@@ -305,9 +378,18 @@ export default async function handler(req, res) {
     let data;
 
     switch (tab) {
-      case 'standings':
-        data = await getStandings(supabase, leagueId);
-        return res.status(200).json({ tab, leagueId, standings: data });
+      case 'standings': {
+        const { rows, needsRefresh } = await getStandings(supabase, leagueId);
+        // Send the response BEFORE firing the trigger — user latency is the
+        // SLA we're protecting here. The trigger is fire-and-forget; a
+        // failure just means the next user request detects stale data and
+        // re-fires it.
+        res.status(200).json({ tab, leagueId, standings: rows });
+        if (needsRefresh) {
+          triggerBackgroundRefresh(leagueId);
+        }
+        return;
+      }
 
       case 'fixtures':
         data = await getFixtures(supabase, leagueId);
